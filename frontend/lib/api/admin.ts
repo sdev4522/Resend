@@ -224,24 +224,40 @@ export const adminApi = {
     port: number;
     username: string;
     password?: string;
-    from_email: string;
+    from_email?: string;
+    email?: string;
     from_name?: string;
     secure?: boolean;
   }) => {
-    return api.post<{ success: boolean; msg: string }>('/admin/update_smtp', payload);
+    const emailVal = payload.email || payload.from_email || '';
+    return api.post<{ success: boolean; msg: string }>('/admin/update_smtp', {
+      ...payload,
+      email: emailVal,
+      from_email: emailVal,
+    });
   },
 
   sendTestEmail: (payload: {
-    to_email: string;
+    to_email?: string;
+    to?: string;
     host?: string;
     port?: number;
     username?: string;
     password?: string;
     from_email?: string;
+    email?: string;
     from_name?: string;
     secure?: boolean;
   }) => {
-    return api.post<{ success: boolean; msg: string }>('/admin/send_test_email', payload);
+    const toVal = payload.to || payload.to_email || '';
+    const emailVal = payload.email || payload.from_email || '';
+    return api.post<{ success: boolean; msg: string }>('/admin/send_test_email', {
+      ...payload,
+      to: toVal,
+      to_email: toVal,
+      email: emailVal,
+      from_email: emailVal,
+    });
   },
 
   getWorkspaces: (params?: { search?: string; limit?: number; offset?: number }) => {

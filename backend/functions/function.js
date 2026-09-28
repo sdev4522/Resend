@@ -1290,7 +1290,7 @@ function sendEmail(host, port, email, pass, html, subject, from, to, username) {
       let transporter = nodemailer.createTransport({
         host: host,
         port: port,
-        secure: port === "465" ? true : false, // true for 465, false for other ports
+        secure: String(port).trim() === "465" || Number(port) === 465, // true for 465, false for other ports
         auth: {
           user: username || email, // generated ethereal user
           pass: pass, // generated ethereal password

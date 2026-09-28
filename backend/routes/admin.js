@@ -1305,6 +1305,7 @@ router.get("/get_smtp", adminValidator, async (req, res) => {
         data: {
           id: config.id,
           email: config.email,
+          from_email: config.email,
           host: config.host,
           port: config.port,
           username: config.username,
@@ -1324,7 +1325,11 @@ router.get("/get_smtp", adminValidator, async (req, res) => {
 // update smtp
 router.post("/update_smtp", adminValidator, async (req, res) => {
   try {
-    const { email, port, password, host, username } = req.body;
+    const host = req.body.host;
+    const port = req.body.port;
+    const password = req.body.password;
+    const username = req.body.username;
+    const email = req.body.email || req.body.from_email;
 
     if (!email || !port || !host || !username) {
       return res.json({ success: false, msg: "Please fill email, host, port, and username" });
@@ -1370,7 +1375,12 @@ router.post("/update_smtp", adminValidator, async (req, res) => {
 // send test email
 router.post("/send_test_email", adminValidator, async (req, res) => {
   try {
-    const { email, port, password, host, to, username } = req.body;
+    const host = req.body.host;
+    const port = req.body.port;
+    const password = req.body.password;
+    const username = req.body.username;
+    const email = req.body.email || req.body.from_email;
+    const to = req.body.to || req.body.to_email;
 
     if (!to) {
       return res.json({ success: false, msg: "Recipient email address ('to') is required" });
@@ -1402,7 +1412,7 @@ router.post("/send_test_email", adminValidator, async (req, res) => {
       finalPassword,
       `<h1>WACRM SMTP Test Successful</h1><p>Your SMTP credentials are configured correctly and active.</p>`,
       "WACRM SMTP Testing",
-      "WACRM System",
+      req.body.from_name || "WACRM System",
       to,
       finalUsername,
     );

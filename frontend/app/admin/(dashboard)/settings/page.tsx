@@ -141,10 +141,9 @@ export default function AdminSettingsPage() {
         setSmtpPort(Number(smtpRes.data.port) || 587);
         setSmtpUser(smtpRes.data.username || '');
         setHasSmtpPass(Boolean(smtpRes.data.password && smtpRes.data.password !== ''));
-        setSmtpPass('');
-        setSmtpFromEmail(smtpRes.data.from_email || '');
+        setSmtpFromEmail(smtpRes.data.from_email || smtpRes.data.email || '');
         setSmtpFromName(smtpRes.data.from_name || '');
-        setSmtpSecure(Boolean(smtpRes.data.secure));
+        setSmtpSecure(Boolean(smtpRes.data.secure) || Number(smtpRes.data.port) === 465);
       }
 
       // 5. Branding settings
@@ -339,6 +338,7 @@ export default function AdminSettingsPage() {
         username: smtpUser.trim(),
         password: smtpPass.trim() || undefined,
         from_email: smtpFromEmail.trim(),
+        email: smtpFromEmail.trim(),
         from_name: smtpFromName.trim() || undefined,
         secure: smtpSecure,
       });
@@ -366,12 +366,14 @@ export default function AdminSettingsPage() {
     try {
       setTestEmailLoading(true);
       const res = await adminApi.sendTestEmail({
+        to: testEmailTarget.trim(),
         to_email: testEmailTarget.trim(),
         host: smtpHost.trim() || undefined,
         port: Number(smtpPort) || undefined,
         username: smtpUser.trim() || undefined,
         password: smtpPass.trim() || undefined,
         from_email: smtpFromEmail.trim() || undefined,
+        email: smtpFromEmail.trim() || undefined,
         from_name: smtpFromName.trim() || undefined,
         secure: smtpSecure,
       });
