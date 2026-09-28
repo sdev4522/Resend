@@ -1,0 +1,5 @@
+node_modules
+.codegraph/
+.DS_Store
+*.log
+client/public/meta-media/*.jpeg

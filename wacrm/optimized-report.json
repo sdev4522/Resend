@@ -1,0 +1,298 @@
+{
+  "timestamp": "2026-09-25T16:27:15.840Z",
+  "apiResults": [
+    {
+      "name": "Health check",
+      "status": 200,
+      "avgLatencyMs": 3,
+      "sizeBytes": 1635,
+      "encoding": "gzip"
+    },
+    {
+      "name": "User Profile (/api/user/get_user_profile)",
+      "status": 200,
+      "avgLatencyMs": 4,
+      "sizeBytes": 1635,
+      "encoding": "br"
+    },
+    {
+      "name": "User Analytics (/api/user/analytics?range=30d)",
+      "status": 200,
+      "avgLatencyMs": 13,
+      "sizeBytes": 1942,
+      "encoding": "br"
+    },
+    {
+      "name": "Contacts List (/api/phonebook/get_by_uid)",
+      "status": 200,
+      "avgLatencyMs": 5,
+      "sizeBytes": 149,
+      "encoding": "none"
+    },
+    {
+      "name": "Campaigns List (/api/broadcast/get_campaigns)",
+      "status": 200,
+      "avgLatencyMs": 8,
+      "sizeBytes": 2809,
+      "encoding": "br"
+    },
+    {
+      "name": "Templates List (/api/templet/get_templets)",
+      "status": 200,
+      "avgLatencyMs": 5,
+      "sizeBytes": 232,
+      "encoding": "none"
+    },
+    {
+      "name": "Inbox Chats (/api/inbox/get_chats)",
+      "status": 200,
+      "avgLatencyMs": 9,
+      "sizeBytes": 17553,
+      "encoding": "br"
+    },
+    {
+      "name": "Billing Plan (/api/billing/current_plan)",
+      "status": 200,
+      "avgLatencyMs": 5,
+      "sizeBytes": 1635,
+      "encoding": "br"
+    },
+    {
+      "name": "Admin Stats (/api/admin/overview)",
+      "status": 200,
+      "avgLatencyMs": 4,
+      "sizeBytes": 1635,
+      "encoding": "br"
+    },
+    {
+      "name": "Admin Users (/api/admin/users?page=1&limit=20)",
+      "status": 200,
+      "avgLatencyMs": 2,
+      "sizeBytes": 1635,
+      "encoding": "br"
+    }
+  ],
+  "pageHttpResults": [
+    {
+      "name": "Marketing Homepage",
+      "path": "/",
+      "coldLatencyMs": 15.4,
+      "warmLatencyMs": 12.7,
+      "sizeBytes": 124863,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Login",
+      "path": "/login",
+      "coldLatencyMs": 170.6,
+      "warmLatencyMs": 10.3,
+      "sizeBytes": 26680,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Dashboard",
+      "path": "/dashboard",
+      "coldLatencyMs": 20.8,
+      "warmLatencyMs": 10.8,
+      "sizeBytes": 55286,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Inbox",
+      "path": "/dashboard/inbox",
+      "coldLatencyMs": 16,
+      "warmLatencyMs": 11.6,
+      "sizeBytes": 46935,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Contacts",
+      "path": "/dashboard/contacts",
+      "coldLatencyMs": 25.4,
+      "warmLatencyMs": 8.9,
+      "sizeBytes": 45080,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Campaigns",
+      "path": "/dashboard/campaigns",
+      "coldLatencyMs": 10.5,
+      "warmLatencyMs": 8.4,
+      "sizeBytes": 39805,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Templates",
+      "path": "/dashboard/templates",
+      "coldLatencyMs": 11.6,
+      "warmLatencyMs": 7.6,
+      "sizeBytes": 34059,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Analytics",
+      "path": "/dashboard/analytics",
+      "coldLatencyMs": 8,
+      "warmLatencyMs": 4.4,
+      "sizeBytes": 53202,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Billing",
+      "path": "/dashboard/billing",
+      "coldLatencyMs": 8.6,
+      "warmLatencyMs": 4.1,
+      "sizeBytes": 36046,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Admin Dashboard",
+      "path": "/admin",
+      "coldLatencyMs": 5.9,
+      "warmLatencyMs": 4.3,
+      "sizeBytes": 57926,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    },
+    {
+      "name": "Admin Users",
+      "path": "/admin/users",
+      "coldLatencyMs": 5.9,
+      "warmLatencyMs": 4.8,
+      "sizeBytes": 41622,
+      "encoding": "gzip",
+      "cacheControl": "s-maxage=31536000"
+    }
+  ],
+  "lhResults": [
+    {
+      "page": "Marketing Homepage",
+      "preset": "desktop",
+      "score": 100,
+      "FCP": "0.3 s",
+      "LCP": "0.8 s",
+      "TBT": "0 ms",
+      "CLS": "0",
+      "speedIndex": "0.4 s",
+      "totalByteWeight": "Total size was 467 KiB",
+      "reqCount": 28
+    },
+    {
+      "page": "Marketing Homepage",
+      "preset": "mobile",
+      "score": 89,
+      "FCP": "1.2 s",
+      "LCP": "3.2 s",
+      "TBT": "240 ms",
+      "CLS": "0",
+      "speedIndex": "1.2 s",
+      "totalByteWeight": "Total size was 467 KiB",
+      "reqCount": 28
+    },
+    {
+      "page": "Login",
+      "preset": "desktop",
+      "score": 100,
+      "FCP": "0.3 s",
+      "LCP": "0.7 s",
+      "TBT": "0 ms",
+      "CLS": "0",
+      "speedIndex": "0.3 s",
+      "totalByteWeight": "Total size was 461 KiB",
+      "reqCount": 36
+    },
+    {
+      "page": "Login",
+      "preset": "mobile",
+      "score": 90,
+      "FCP": "1.1 s",
+      "LCP": "3.2 s",
+      "TBT": "190 ms",
+      "CLS": "0",
+      "speedIndex": "1.1 s",
+      "totalByteWeight": "Total size was 461 KiB",
+      "reqCount": 36
+    },
+    {
+      "page": "Dashboard",
+      "preset": "desktop",
+      "score": 100,
+      "FCP": "0.3 s",
+      "LCP": "0.7 s",
+      "TBT": "0 ms",
+      "CLS": "0.008",
+      "speedIndex": "0.3 s",
+      "totalByteWeight": "Total size was 638 KiB",
+      "reqCount": 76
+    },
+    {
+      "page": "Dashboard",
+      "preset": "mobile",
+      "score": 87,
+      "FCP": "1.1 s",
+      "LCP": "2.7 s",
+      "TBT": "360 ms",
+      "CLS": "0.078",
+      "speedIndex": "1.1 s",
+      "totalByteWeight": "Total size was 442 KiB",
+      "reqCount": 35
+    },
+    {
+      "page": "Inbox",
+      "preset": "desktop",
+      "score": 100,
+      "FCP": "0.3 s",
+      "LCP": "0.7 s",
+      "TBT": "20 ms",
+      "CLS": "0.003",
+      "speedIndex": "0.5 s",
+      "totalByteWeight": "Total size was 670 KiB",
+      "reqCount": 80
+    },
+    {
+      "page": "Inbox",
+      "preset": "mobile",
+      "score": 87,
+      "FCP": "1.1 s",
+      "LCP": "2.9 s",
+      "TBT": "360 ms",
+      "CLS": "0.002",
+      "speedIndex": "1.2 s",
+      "totalByteWeight": "Total size was 479 KiB",
+      "reqCount": 37
+    },
+    {
+      "page": "Admin Dashboard",
+      "preset": "desktop",
+      "score": 100,
+      "FCP": "0.3 s",
+      "LCP": "0.7 s",
+      "TBT": "0 ms",
+      "CLS": "0.002",
+      "speedIndex": "0.3 s",
+      "totalByteWeight": "Total size was 616 KiB",
+      "reqCount": 79
+    },
+    {
+      "page": "Admin Dashboard",
+      "preset": "mobile",
+      "score": 89,
+      "FCP": "1.1 s",
+      "LCP": "2.7 s",
+      "TBT": "310 ms",
+      "CLS": "0",
+      "speedIndex": "1.1 s",
+      "totalByteWeight": "Total size was 431 KiB",
+      "reqCount": 30
+    }
+  ]
+}

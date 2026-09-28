@@ -1,0 +1,467 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WACRM Public REST API",
+    "version": "1.0.0",
+    "description": "Production Developer REST API platform for WhatsApp messaging, templates, connections, contacts, and usage analytics."
+  },
+  "servers": [
+    {
+      "url": "https://api.resend.in/v1",
+      "description": "Production Public API"
+    },
+    {
+      "url": "/v1",
+      "description": "Current Host / Local Proxy"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Public health check endpoint for monitoring and uptime verification.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "System operational",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections": {
+      "get": {
+        "summary": "List Authorized WhatsApp Connections",
+        "description": "Returns list of WhatsApp numbers/instances authorized for the calling API key.",
+        "responses": {
+          "200": {
+            "description": "List of authorized connections",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionsResponse"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/messages": {
+      "post": {
+        "summary": "Send WhatsApp Message",
+        "description": "Dispatches text, image, video, audio, or document message via authorized WhatsApp connection. Supports idempotency.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Unique client-side key to prevent duplicate sends upon network retry.",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Message accepted for delivery",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/messages/{id}": {
+      "get": {
+        "summary": "Get Message Delivery Status",
+        "description": "Retrieves authoritative delivery status of a previously dispatched message.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "The public message ID (msg_...)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authoritative message status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageStatusResponse"
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/templates": {
+      "get": {
+        "summary": "List WhatsApp Templates",
+        "description": "Returns approved templates available in the workspace.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated templates list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplatesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/template-messages": {
+      "post": {
+        "summary": "Send Meta WhatsApp Template",
+        "description": "Sends an approved Meta Cloud WhatsApp template with variables. Strictly prohibited on QR connections.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendTemplateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Template message accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TemplateMessageResponse"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/contacts": {
+      "get": {
+        "summary": "List Contacts",
+        "description": "Returns paginated contacts belonging to workspace.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20 } },
+          { "name": "search", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated contacts list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContactsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usage": {
+      "get": {
+        "summary": "Get Usage Metrics",
+        "description": "Returns aggregate API requests and messaging volumes.",
+        "parameters": [
+          { "name": "period", "in": "query", "schema": { "type": "string", "example": "2026-09" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usage analytics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "API_KEY"
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Invalid input or missing required parameter",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, invalid, or expired API key",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Insufficient scope or permission denied",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource not found or outside workspace boundary",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Idempotency key reused with mismatched payload",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Rate limit exceeded (HTTP 429)",
+        "headers": {
+          "Retry-After": {
+            "schema": { "type": "integer" },
+            "description": "Seconds to wait before retrying"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorEnvelope" }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "ok" }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string", "example": "CONNECTION_REQUIRED" },
+              "message": { "type": "string", "example": "No connection_id was provided and no default connection is configured." },
+              "request_id": { "type": "string", "example": "req_01KABC..." }
+            },
+            "required": ["code", "message", "request_id"]
+          }
+        }
+      },
+      "Connection": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "wa_01KABC123" },
+          "name": { "type": "string", "example": "Official Support" },
+          "phone_number": { "type": "string", "example": "919876543210" },
+          "provider": { "type": "string", "enum": ["qr", "meta"] },
+          "status": { "type": "string", "enum": ["connected", "disconnected"] }
+        }
+      },
+      "ConnectionsResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Connection" }
+          },
+          "request_id": { "type": "string" }
+        }
+      },
+      "SendMessageRequest": {
+        "type": "object",
+        "required": ["to", "type"],
+        "properties": {
+          "connection_id": { "type": "string", "example": "wa_01KABC123" },
+          "to": { "type": "string", "example": "919876543210" },
+          "type": { "type": "string", "enum": ["text", "image", "video", "audio", "document"] },
+          "text": {
+            "type": "object",
+            "properties": {
+              "body": { "type": "string", "example": "Your order #1234 has been shipped!" }
+            }
+          },
+          "image": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string", "example": "https://example.com/invoice.jpg" },
+              "caption": { "type": "string" }
+            }
+          },
+          "document": {
+            "type": "object",
+            "properties": {
+              "url": { "type": "string", "example": "https://example.com/receipt.pdf" },
+              "filename": { "type": "string", "example": "receipt.pdf" },
+              "caption": { "type": "string" }
+            }
+          }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "example": "msg_01KXYZ..." },
+              "status": { "type": "string", "example": "accepted" },
+              "connection_id": { "type": "string", "example": "wa_01KABC123" },
+              "to": { "type": "string", "example": "919876543210" },
+              "provider": { "type": "string", "example": "meta" },
+              "created_at": { "type": "string", "format": "date-time" }
+            }
+          },
+          "request_id": { "type": "string" }
+        }
+      },
+      "MessageStatusResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "example": "msg_01KXYZ..." },
+              "status": { "type": "string", "enum": ["accepted", "sent", "delivered", "read", "failed"] },
+              "connection_id": { "type": "string" },
+              "to": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" },
+              "updated_at": { "type": "string", "format": "date-time" }
+            }
+          },
+          "request_id": { "type": "string" }
+        }
+      },
+      "SendTemplateRequest": {
+        "type": "object",
+        "required": ["to", "template_name"],
+        "properties": {
+          "connection_id": { "type": "string", "example": "wa_01KABC123" },
+          "to": { "type": "string", "example": "919876543210" },
+          "template_name": { "type": "string", "example": "order_confirmation" },
+          "language_code": { "type": "string", "default": "en_US" },
+          "components": { "type": "array", "items": { "type": "object" } }
+        }
+      },
+      "TemplateMessageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "example": "msg_01KXYZ..." },
+              "status": { "type": "string", "example": "accepted" },
+              "connection_id": { "type": "string" },
+              "to": { "type": "string" },
+              "template": { "type": "string" },
+              "created_at": { "type": "string", "format": "date-time" }
+            }
+          },
+          "request_id": { "type": "string" }
+        }
+      },
+      "TemplatesResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "items": { "type": "object" } },
+          "pagination": { "type": "object" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "ContactsResponse": {
+        "type": "object",
+        "properties": {
+          "data": { "type": "array", "items": { "type": "object" } },
+          "pagination": { "type": "object" },
+          "request_id": { "type": "string" }
+        }
+      },
+      "UsageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "properties": {
+              "period": { "type": "string", "example": "2026-09" },
+              "api_requests": { "type": "integer", "example": 524 },
+              "messages": {
+                "type": "object",
+                "properties": {
+                  "accepted": { "type": "integer" },
+                  "sent": { "type": "integer" },
+                  "delivered": { "type": "integer" },
+                  "failed": { "type": "integer" }
+                }
+              }
+            }
+          },
+          "request_id": { "type": "string" }
+        }
+      }
+    }
+  }
+}
