@@ -1,0 +1,7 @@
+# Local persistent project memory for AI agents (per repository rules)
+docs/
+
+# General IDE & System
+.DS_Store
+*.log
+.codegraph/
