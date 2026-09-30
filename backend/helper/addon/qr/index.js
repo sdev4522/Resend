@@ -490,17 +490,54 @@ const createSession = async (
           }
         } else if (connection === "close") {
           const statusCode = lastDisconnect?.error?.output?.statusCode;
-
-          // Check if this was a pending session
           const isPending = pendingSessions.has(sessionId);
+
+          newLogger.log(
+            `[QR Auth Lifecycle] Session ${sessionId} closed. isPending: ${isPending}, statusCode: ${statusCode}`
+          );
+
+          // Crucial: Check if this close is part of the Baileys post-scan handshake restart
+          // During WhatsApp pairing, after scanning the QR, WhatsApp closes the initial socket
+          // with restartRequired (515) or connectionClosed (428) to finalize credentials.
+          const isRestartRequired =
+            statusCode === DisconnectReason.restartRequired ||
+            statusCode === 515 ||
+            statusCode === DisconnectReason.connectionClosed ||
+            statusCode === 428;
+
+          let hasSavedCreds = false;
+          try {
+            const credsFile = path.join(sessionsDir(sessionId), "creds.json");
+            if (fs.existsSync(credsFile)) {
+              const raw = JSON.parse(fs.readFileSync(credsFile, "utf8"));
+              if (raw?.registered || raw?.me || raw?.account) {
+                hasSavedCreds = true;
+              }
+            }
+          } catch (_) {}
+
+          if (isPending && (isRestartRequired || hasSavedCreds)) {
+            newLogger.log(
+              `[QR Auth Lifecycle] Pending session ${sessionId} received handshake restart (code: ${statusCode}, hasSavedCreds: ${hasSavedCreds}). Reconnecting to finalize authentication...`
+            );
+            activeConnections.delete(sessionId);
+            setTimeout(() => {
+              createSession(sessionId, title, { ...options, isPending: true });
+            }, 1000);
+            return;
+          }
+
+          // Check if this was a non-handshake pending session close (e.g. explicit cancel or badSession)
           if (isPending) {
             const pending = pendingSessions.get(sessionId);
             if (pending?.timer) clearTimeout(pending.timer);
             pendingSessions.delete(sessionId);
             activeConnections.delete(sessionId);
 
-            // Clean up session storage
-            await deleteSessionData(sessionId);
+            // Clean up session storage if not reconnecting an existing instance
+            if (!pending?.isReconnect) {
+              await deleteSessionData(sessionId);
+            }
 
             // Clean up DB row
             try {
@@ -850,13 +887,13 @@ const init = async () => {
     // Clean up any stale pending or unfinalized sessions in DB on startup
     await query("DELETE FROM instance WHERE status IN ('PENDING', 'GENERATING') OR status IS NULL", []);
 
-    // ONLY initialize instances from database that are confirmed ACTIVE
-    const instances = await query(
-      "SELECT uniqueId, title FROM instance WHERE status = 'ACTIVE'",
+    // Read all known instances in database (ACTIVE and INACTIVE) to prevent deleting credentials of disconnected instances
+    const allKnownInstances = await query(
+      "SELECT uniqueId, title, status FROM instance WHERE status IN ('ACTIVE', 'INACTIVE')",
       [],
     );
 
-    const activeSet = new Set(instances.map((i) => i.uniqueId));
+    const knownInstanceSet = new Set(allKnownInstances.map((i) => i.uniqueId));
 
     if (STORAGE_METHOD === "local") {
       const sessionsPath = sessionsDir();
@@ -866,9 +903,9 @@ const init = async () => {
         for (const file of files) {
           if (!file.startsWith("md_")) continue;
           const sessionId = file.replace("md_", "");
-          // If directory is NOT in active instances, clean it up to prevent ghost sessions
-          if (!activeSet.has(sessionId)) {
-            newLogger.log(`Cleaning up orphaned session directory on init: ${file}`);
+          // Only clean up directories that have NO matching record in the database at all
+          if (!knownInstanceSet.has(sessionId)) {
+            newLogger.log(`Cleaning up orphaned session directory on init (not in DB): ${file}`);
             await deleteSessionFiles(sessionId);
           }
         }
@@ -878,7 +915,8 @@ const init = async () => {
     }
 
     // Now start only the confirmed active sessions
-    for (const instance of instances) {
+    const activeInstances = allKnownInstances.filter((i) => i.status === "ACTIVE");
+    for (const instance of activeInstances) {
       await createSession(instance.uniqueId, instance.title || "WhatsApp Web");
     }
   } catch (error) {

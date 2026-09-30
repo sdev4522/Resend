@@ -334,7 +334,7 @@ async function runTests() {
       method: 'POST',
       headers: adminHeaders,
       body: JSON.stringify({
-        app_name: 'WaCRM Enterprise',
+        app_name: 'Resends',
         meta_description: 'Production CRM & WhatsApp Automation',
         logo: '/brand/logo.png',
       }),

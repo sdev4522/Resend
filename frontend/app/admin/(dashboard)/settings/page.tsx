@@ -30,8 +30,12 @@ import {
   Mail,
   Bell,
   Send,
+  Palette,
+  RotateCcw,
+  Sliders,
 } from 'lucide-react';
 import { SupportedCurrencyItem } from '@/lib/api/admin';
+import { useGlobalTheme } from '@/components/providers/theme-provider';
 
 
 const CURRENCY_PRESETS = [
@@ -99,6 +103,17 @@ export default function AdminSettingsPage() {
   const [fcmKey, setFcmKey] = useState('');
   const [savingFcm, setSavingFcm] = useState(false);
 
+  // Global theme settings states
+  const { reloadTheme, applyPreview, resetToDefault } = useGlobalTheme();
+  const [themePresets, setThemePresets] = useState<Array<{ id: string; name: string; description: string; isProtected: boolean; isActive: boolean }>>([]);
+  const [selectedPresetId, setSelectedPresetId] = useState<string>('default');
+  const [themePrimary, setThemePrimary] = useState<string>('#6366f1');
+  const [themeSecondary, setThemeSecondary] = useState<string>('#4f46e5');
+  const [themeAccent, setThemeAccent] = useState<string>('#ec4899');
+  const [themeRadius, setThemeRadius] = useState<string>('0.625rem');
+  const [savingTheme, setSavingTheme] = useState<boolean>(false);
+  const [resettingTheme, setResettingTheme] = useState<boolean>(false);
+
   // Fetch current admin settings
   const fetchSettings = async () => {
     try {
@@ -160,12 +175,44 @@ export default function AdminSettingsPage() {
         setFcmKey(fcmRes.data.server_key || '');
       }
 
+      // 7. Global Theme settings
+      try {
+        const themeListRes = await adminApi.listThemes();
+        if (themeListRes.success && Array.isArray(themeListRes.data)) {
+          setThemePresets(themeListRes.data);
+          const activeTheme = themeListRes.data.find((t) => t.isActive);
+          if (activeTheme) {
+            setSelectedPresetId(activeTheme.id);
+          }
+        }
+        const activeThemeRes = await adminApi.getThemeConfig();
+        if (activeThemeRes.success && activeThemeRes.data) {
+          const cfg = activeThemeRes.data;
+          if (cfg.brandColors?.primary || cfg.primary_light) {
+            setThemePrimary(cfg.brandColors?.primary || cfg.primary_light);
+          }
+          if (cfg.brandColors?.secondary || cfg.secondary_light) {
+            setThemeSecondary(cfg.brandColors?.secondary || cfg.secondary_light);
+          }
+          if (cfg.brandColors?.accent || cfg.accent_light) {
+            setThemeAccent(cfg.brandColors?.accent || cfg.accent_light);
+          }
+          const rad = cfg.radius ?? cfg.card?.borderRadius ?? cfg.button?.contained?.borderRadius;
+          if (rad !== undefined) {
+            setThemeRadius(typeof rad === 'number' ? `${rad}px` : String(rad));
+          }
+        }
+      } catch {
+        // theme fetch fallback
+      }
+
     } catch (err: any) {
       toast.error(err.message || 'Failed to load system settings');
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     fetchSettings();
@@ -429,6 +476,118 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleSelectThemePreset = async (presetId: string) => {
+    setSelectedPresetId(presetId);
+    try {
+      const res = await adminApi.setActiveTheme(presetId);
+      if (res.success) {
+        await reloadTheme();
+        const activeThemeRes = await adminApi.getThemeConfig();
+        if (activeThemeRes.success && activeThemeRes.data) {
+          const cfg = activeThemeRes.data;
+          setThemePrimary(cfg.brandColors?.primary || cfg.primary_light || '#6366f1');
+          setThemeSecondary(cfg.brandColors?.secondary || cfg.secondary_light || '#4f46e5');
+          setThemeAccent(cfg.brandColors?.accent || cfg.accent_light || '#ec4899');
+          const rad = cfg.radius ?? cfg.card?.borderRadius ?? cfg.button?.contained?.borderRadius;
+          if (rad !== undefined) {
+            setThemeRadius(typeof rad === 'number' ? `${rad}px` : String(rad));
+          }
+        }
+        toast.success(`Theme switched to '${presetId}'`);
+      } else {
+        toast.error(res.msg || 'Failed to activate theme preset');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error activating theme');
+    }
+  };
+
+  const handleUpdateColors = (type: 'primary' | 'secondary' | 'accent', value: string) => {
+    let p = themePrimary;
+    let s = themeSecondary;
+    let a = themeAccent;
+    if (type === 'primary') {
+      p = value;
+      setThemePrimary(value);
+    } else if (type === 'secondary') {
+      s = value;
+      setThemeSecondary(value);
+    } else if (type === 'accent') {
+      a = value;
+      setThemeAccent(value);
+    }
+    applyPreview({
+      brandColors: { primary: p, secondary: s, accent: a },
+      radius: themeRadius,
+      isCustomized: true,
+    });
+  };
+
+  const handleUpdateRadius = (val: string) => {
+    setThemeRadius(val);
+    applyPreview({
+      brandColors: { primary: themePrimary, secondary: themeSecondary, accent: themeAccent },
+      radius: val,
+      isCustomized: true,
+    });
+  };
+
+  const handleSaveThemeConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setSavingTheme(true);
+      const res = await adminApi.updateBrandColors({
+        primary: themePrimary,
+        secondary: themeSecondary,
+        accent: themeAccent,
+      });
+      if (res.success) {
+        await adminApi.updateThemeConfig({
+          brandColors: { primary: themePrimary, secondary: themeSecondary, accent: themeAccent },
+          primary_light: themePrimary,
+          primary_dark: themePrimary,
+          secondary_light: themeSecondary,
+          secondary_dark: themeSecondary,
+          accent_light: themeAccent,
+          accent_dark: themeAccent,
+          radius: themeRadius,
+          isCustomized: true,
+        });
+        await reloadTheme();
+        toast.success('Global theme configuration saved and applied site-wide!');
+      } else {
+        toast.error(res.msg || 'Failed to save theme configuration');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error saving global theme');
+    } finally {
+      setSavingTheme(false);
+    }
+  };
+
+  const handleResetThemeConfig = async () => {
+    try {
+      setResettingTheme(true);
+      const res = await adminApi.resetThemeConfig();
+      if (res.success) {
+        await resetToDefault();
+        await reloadTheme();
+        setSelectedPresetId('default');
+        setThemePrimary('#6366f1');
+        setThemeSecondary('#4f46e5');
+        setThemeAccent('#ec4899');
+        setThemeRadius('0.625rem');
+        toast.success('Theme successfully reset to factory defaults');
+      } else {
+        toast.error(res.msg || 'Failed to reset theme');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error resetting theme');
+    } finally {
+      setResettingTheme(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -453,6 +612,10 @@ export default function AdminSettingsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted p-1 rounded-xl flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="theme" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
+            <Palette className="h-3.5 w-3.5 text-primary" />
+            Global Theme
+          </TabsTrigger>
           <TabsTrigger value="smtp" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
             <Mail className="h-3.5 w-3.5 text-primary" />
             SMTP & Email
@@ -478,6 +641,7 @@ export default function AdminSettingsPage() {
             Meta WhatsApp Cloud API
           </TabsTrigger>
         </TabsList>
+
 
         {/* 0. SMTP & EMAIL SETTINGS */}
         <TabsContent value="smtp">
@@ -1528,7 +1692,272 @@ export default function AdminSettingsPage() {
             </form>
           )}
         </TabsContent>
+
+        {/* GLOBAL THEME CUSTOMIZATION SETTINGS */}
+        <TabsContent value="theme">
+          {loading ? (
+            <Card className="shadow-xs border p-6">
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-10 w-full mt-4" />
+              <Skeleton className="h-10 w-full mt-4" />
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Presets Gallery Card */}
+              <Card className="shadow-xs border rounded-2xl overflow-hidden">
+                <CardHeader className="p-6 pb-4 border-b bg-muted/20">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base font-semibold flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        Curated Global Theme Presets
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-0.5">
+                        Choose from professionally curated palettes or customize token colors below.
+                      </CardDescription>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      Active: {selectedPresetId}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                    {themePresets.map((preset) => {
+                      const isSelected = selectedPresetId === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => handleSelectThemePreset(preset.id)}
+                          className={`p-3 rounded-xl border text-left transition-all relative flex flex-col justify-between h-24 ${
+                            isSelected
+                              ? 'border-primary ring-2 ring-primary/20 bg-primary/5 shadow-xs'
+                              : 'border-border/60 hover:border-primary/50 hover:bg-muted/30'
+                          }`}
+                        >
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-foreground line-clamp-1">
+                                {preset.name}
+                              </span>
+                              {isSelected && (
+                                <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
+                              )}
+                            </div>
+                            <p className="text-[10px] text-muted-foreground line-clamp-2 mt-1">
+                              {preset.description || 'Pre-designed palette'}
+                            </p>
+                          </div>
+                          {preset.isProtected && (
+                            <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              System Default
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Custom Token Configuration Form */}
+              <form onSubmit={handleSaveThemeConfig}>
+                <Card className="shadow-xs border rounded-2xl overflow-hidden">
+                  <CardHeader className="p-6 pb-4 border-b bg-muted/20">
+                    <CardTitle className="text-base font-semibold flex items-center gap-2">
+                      <Palette className="h-4 w-4 text-primary" />
+                      Semantic Design Tokens & CSS Variables
+                    </CardTitle>
+                    <CardDescription className="text-xs">
+                      Configure site-wide brand colors, contrast, and corner radiuses. These map dynamically to shadcn variables.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-6">
+                    {/* Brand Colors Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Primary Color */}
+                      <div className="space-y-2 p-4 rounded-xl border border-border/60 bg-card">
+                        <Label htmlFor="themePrimary" className="text-xs font-semibold flex items-center justify-between">
+                          <span>Primary Brand Color</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-mono">--primary</span>
+                        </Label>
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="color"
+                            id="themePrimaryPicker"
+                            value={themePrimary.startsWith('#') ? themePrimary : '#6366f1'}
+                            onChange={(e) => handleUpdateColors('primary', e.target.value)}
+                            className="h-9 w-12 rounded-lg border border-input cursor-pointer bg-transparent p-0.5"
+                          />
+                          <Input
+                            id="themePrimary"
+                            value={themePrimary}
+                            onChange={(e) => handleUpdateColors('primary', e.target.value)}
+                            placeholder="#6366f1"
+                            className="h-9 text-xs font-mono"
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Used for main CTA buttons, active sidebar links, key badges, and focused borders.
+                        </p>
+                      </div>
+
+                      {/* Secondary Color */}
+                      <div className="space-y-2 p-4 rounded-xl border border-border/60 bg-card">
+                        <Label htmlFor="themeSecondary" className="text-xs font-semibold flex items-center justify-between">
+                          <span>Secondary Brand Color</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-mono">--secondary</span>
+                        </Label>
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="color"
+                            id="themeSecondaryPicker"
+                            value={themeSecondary.startsWith('#') ? themeSecondary : '#4f46e5'}
+                            onChange={(e) => handleUpdateColors('secondary', e.target.value)}
+                            className="h-9 w-12 rounded-lg border border-input cursor-pointer bg-transparent p-0.5"
+                          />
+                          <Input
+                            id="themeSecondary"
+                            value={themeSecondary}
+                            onChange={(e) => handleUpdateColors('secondary', e.target.value)}
+                            placeholder="#4f46e5"
+                            className="h-9 text-xs font-mono"
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Used for secondary actions, subtle hover surfaces, and complementary containers.
+                        </p>
+                      </div>
+
+                      {/* Accent Color */}
+                      <div className="space-y-2 p-4 rounded-xl border border-border/60 bg-card">
+                        <Label htmlFor="themeAccent" className="text-xs font-semibold flex items-center justify-between">
+                          <span>Accent Highlight Color</span>
+                          <span className="text-[10px] text-muted-foreground uppercase font-mono">--accent</span>
+                        </Label>
+                        <div className="flex items-center gap-2.5">
+                          <input
+                            type="color"
+                            id="themeAccentPicker"
+                            value={themeAccent.startsWith('#') ? themeAccent : '#ec4899'}
+                            onChange={(e) => handleUpdateColors('accent', e.target.value)}
+                            className="h-9 w-12 rounded-lg border border-input cursor-pointer bg-transparent p-0.5"
+                          />
+                          <Input
+                            id="themeAccent"
+                            value={themeAccent}
+                            onChange={(e) => handleUpdateColors('accent', e.target.value)}
+                            placeholder="#ec4899"
+                            className="h-9 text-xs font-mono"
+                          />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Used for highlights, micro-interactions, pill tags, and dynamic stats indicators.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Corner Radius Controls */}
+                    <div className="space-y-2.5 p-4 rounded-xl border border-border/60 bg-card">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-semibold flex items-center gap-1.5">
+                          <Sliders className="h-3.5 w-3.5 text-primary" />
+                          <span>Component Corner Radius</span>
+                        </Label>
+                        <span className="text-xs font-mono text-muted-foreground">{themeRadius}</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+                        {[
+                          { label: 'Sharp (0px)', value: '0px' },
+                          { label: 'Subtle (4px)', value: '4px' },
+                          { label: 'Standard (8px)', value: '8px' },
+                          { label: 'Default (10px)', value: '0.625rem' },
+                          { label: 'Rounded (16px)', value: '16px' },
+                        ].map((r) => (
+                          <button
+                            key={r.value}
+                            type="button"
+                            onClick={() => handleUpdateRadius(r.value)}
+                            className={`p-2 rounded-lg border text-xs font-medium transition-all ${
+                              themeRadius === r.value
+                                ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                                : 'border-border/60 hover:bg-muted text-foreground'
+                            }`}
+                          >
+                            {r.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Live Interactive UI Preview */}
+                    <div className="space-y-3 p-4 rounded-xl border border-primary/20 bg-primary/5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                          <Sparkles className="h-3.5 w-3.5 text-primary" />
+                          Live Interactive Component Preview
+                        </h4>
+                        <span className="text-[11px] text-muted-foreground">Updates instantly across session</span>
+                      </div>
+                      <div className="p-4 rounded-xl border bg-background space-y-4">
+                        <div className="flex flex-wrap items-center gap-2.5">
+                          <Button size="sm" type="button" className="text-xs h-8">
+                            Primary CTA
+                          </Button>
+                          <Button size="sm" type="button" variant="secondary" className="text-xs h-8">
+                            Secondary
+                          </Button>
+                          <Button size="sm" type="button" variant="outline" className="text-xs h-8">
+                            Outline
+                          </Button>
+                          <Button size="sm" type="button" variant="destructive" className="text-xs h-8">
+                            Destructive
+                          </Button>
+                          <Badge variant="default" className="text-[11px]">Primary Badge</Badge>
+                          <Badge variant="secondary" className="text-[11px]">Secondary</Badge>
+                          <Badge variant="outline" className="text-[11px]">Outline</Badge>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                          <Input placeholder="Preview input field with active theme..." className="text-xs h-8" />
+                          <div className="p-2.5 rounded-lg border bg-card flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">Card Surface Preview</span>
+                            <span className="font-semibold text-primary">Active</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="p-4 px-6 border-t bg-muted/20 flex items-center justify-between">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResetThemeConfig}
+                      disabled={resettingTheme || savingTheme}
+                      className="gap-1.5 text-xs h-8 text-muted-foreground hover:text-foreground"
+                    >
+                      {resettingTheme ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                      Reset to Factory Default
+                    </Button>
+
+                    <Button
+                      type="submit"
+                      disabled={savingTheme}
+                      size="sm"
+                      className="bg-primary text-primary-foreground hover:opacity-90 gap-1.5 text-xs h-8 font-semibold shadow-xs"
+                    >
+                      {savingTheme ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                      Save Global Theme
+                    </Button>
+                  </CardFooter>
+                </Card>
+              </form>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
+
     </div>
   );
 }

@@ -339,6 +339,48 @@ export const adminApi = {
       }>;
     }>('/api/admin/get_audit_logs');
   },
+
+  getThemeConfig: () => {
+    return api.get<{ success: boolean; data: any; msg?: string }>('/api/theme/get-theme-config');
+  },
+
+  updateThemeConfig: (themeData: any) => {
+    return api.post<{ success: boolean; data: any; msg: string }>('/api/theme/update-theme-config', themeData);
+  },
+
+  updateBrandColors: (payload: {
+    primary?: string;
+    secondary?: string;
+    accent?: string;
+    success?: string;
+    warning?: string;
+    error?: string;
+    info?: string;
+  }) => {
+    return api.post<{ success: boolean; data: any; msg: string }>('/api/theme/update-brand-colors', payload);
+  },
+
+  resetThemeConfig: () => {
+    return api.post<{ success: boolean; data: any; msg: string }>('/api/theme/reset-to-default');
+  },
+
+  listThemes: () => {
+    return api.get<{
+      success: boolean;
+      data: Array<{
+        id: string;
+        name: string;
+        description: string;
+        isProtected: boolean;
+        isActive: boolean;
+      }>;
+    }>('/api/theme/list-themes');
+  },
+
+  setActiveTheme: (themeId: string) => {
+    return api.post<{ success: boolean; msg: string }>('/api/theme/set-active-theme', { themeId });
+  },
 };
+
 
 

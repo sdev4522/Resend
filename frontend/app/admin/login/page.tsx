@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
       </div>
 
       <div className="mt-8 text-center text-xs text-muted-foreground">
-        WaCRM Enterprise Administration Engine
+        Resend Administration Engine
       </div>
     </div>
   );

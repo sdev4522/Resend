@@ -8,6 +8,8 @@ import { AuthDialogProvider } from '@/components/auth/auth-dialog-context';
 import { AuthModals } from '@/components/auth/auth-modals';
 import { Toaster } from '@/components/ui/sonner';
 
+import { OnboardingProvider } from '@/components/onboarding/onboarding-provider';
+
 export function RootProvider({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider
@@ -19,9 +21,11 @@ export function RootProvider({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <CurrencyProvider>
           <AuthDialogProvider>
-          {children}
-          <AuthModals />
-          <Toaster position="top-right" richColors closeButton />
+            <OnboardingProvider>
+              {children}
+              <AuthModals />
+              <Toaster position="top-right" richColors closeButton />
+            </OnboardingProvider>
           </AuthDialogProvider>
         </CurrencyProvider>
       </AuthProvider>

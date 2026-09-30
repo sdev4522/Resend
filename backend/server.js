@@ -111,7 +111,19 @@ const app = express();
 const currentDir = process.cwd();
 
 // ─── Parse allowed hostnames from env (protocol & trailing slash agnostic) ───
-const allowedHostnames = [process.env.FRONTENDURI, process.env.BACKURI]
+const allowedHostnames = [
+  process.env.FRONTENDURI,
+  process.env.BACKURI,
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "http://localhost:3005",
+  "http://127.0.0.1:3000",
+  "http://127.0.0.1:3001",
+  "http://127.0.0.1:3005",
+  "resend.in",
+  "api.resend.in",
+  "www.resend.in",
+]
   .filter(Boolean)
   .flatMap((o) => o.split(","))
   .map((o) => o.trim())
