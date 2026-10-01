@@ -56,7 +56,13 @@ interface InboxContextType {
   // Actions
   sendTextMessage: (text: string) => Promise<boolean>;
   sendMediaMessage: (file: File, caption?: string) => Promise<boolean>;
-  sendMetaTemplate: (templateName: string, templateBody: string, language?: string) => Promise<boolean>;
+  sendMetaTemplate: (
+    templateName: string,
+    templateBody: string,
+    language?: string,
+    variables?: Record<string, string> | any[],
+    components?: any[]
+  ) => Promise<boolean>;
   addTagToChat: (tagTitle: string) => Promise<void>;
   removeTagFromChat: (tagTitle: string) => Promise<void>;
   addNoteToChat: (noteText: string) => Promise<void>;
@@ -881,7 +887,9 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
   const sendMetaTemplate = async (
     templateName: string,
     templateBody: string,
-    language: string = "en"
+    language: string = "en",
+    variables?: Record<string, string> | any[],
+    components?: any[]
   ): Promise<boolean> => {
     if (!selectedConversation) {
       toast.error("No conversation selected");
@@ -899,19 +907,61 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
 
-    socket.emit("message", {
-      type: "send_template_to_conversation",
-      payload: {
-        chatInfo: selectedConversation,
-        templateName,
-        templateBody,
-        templateLanguage: language,
-        messageId: "tpl_" + Date.now(),
-      },
-    });
+    return new Promise<boolean>((resolve) => {
+      let resolved = false;
 
-    toast.success("Template \"" + templateName + "\" sent!");
-    return true;
+      const cleanup = () => {
+        socket.off("template_send_result", onResult);
+        socket.off("error", onError);
+        if (timer) clearTimeout(timer);
+      };
+
+      const onResult = (data: any) => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        if (data && data.success) {
+          toast.success(`Template "${templateName}" sent successfully!`);
+          resolve(true);
+        } else {
+          const errMsg = data?.msg || "Failed to send template message via Meta Cloud API";
+          toast.error(errMsg);
+          resolve(false);
+        }
+      };
+
+      const onError = () => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        // Global socket error handler will also toast, but ensure Promise resolves false
+        resolve(false);
+      };
+
+      const timer = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        cleanup();
+        toast.error("Template send request timed out. Please check your connection.");
+        resolve(false);
+      }, 20000);
+
+      socket.on("template_send_result", onResult);
+      socket.once("error", onError);
+
+      socket.emit("message", {
+        type: "send_template_to_conversation",
+        payload: {
+          chatInfo: selectedConversation,
+          templateName,
+          templateBody,
+          templateLanguage: language,
+          variables: variables || {},
+          components: components || [],
+          messageId: "tpl_" + Date.now(),
+        },
+      });
+    });
   };
 
   // 10. Labels and Notes

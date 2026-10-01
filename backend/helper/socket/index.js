@@ -911,55 +911,157 @@ function processSocketEvent({
             templateName,
             templateBody,
             templateLanguage,
-            messageId,
+            variables,
+            components,
           } = payload;
 
-          if (!tplChatInfo?.chat_id || !templateBody) {
-            return socket.emit("error", { msg: "Invalid template payload" });
-          }
-
-          // Authoritative QR template restriction
-          if (tplChatInfo?.origin === "qr") {
+          if (!tplChatInfo?.chat_id || !templateName) {
             return socket.emit("error", {
-              msg: "Templates are available only for Meta Cloud API WhatsApp connections.",
+              msg: "Invalid template payload: chat_id and templateName are required.",
             });
           }
 
           const targetOwnerUid = isAgent ? socket?.userData?.owner_uid : uid;
+
           const [dbTplChat] = await query(
-            `SELECT origin FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
+            `SELECT id, origin, sender_mobile, sender_name FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
             [tplChatInfo.chat_id, targetOwnerUid],
           );
-          if (dbTplChat && dbTplChat.origin === "qr") {
+
+          if (!dbTplChat) {
+            return socket.emit("error", {
+              msg: "Conversation not found or unauthorized.",
+            });
+          }
+
+          // Authoritative QR template restriction
+          if (tplChatInfo?.origin === "qr" || dbTplChat.origin === "qr") {
             return socket.emit("error", {
               msg: "Templates are available only for Meta Cloud API WhatsApp connections.",
             });
           }
 
-          const [tplUser] = await query(`SELECT * FROM user WHERE uid = ?`, [
-            isAgent ? socket?.userData?.owner_uid : uid,
-          ]);
+          const recipientMobile = (
+            tplChatInfo?.sender_mobile ||
+            dbTplChat?.sender_mobile ||
+            ""
+          ).replace(/\D/g, "");
+
+          if (!recipientMobile) {
+            return socket.emit("error", {
+              msg: "Recipient phone number not found for this conversation.",
+            });
+          }
+
+          // Build template components if variables or components provided
+          let templateComponents = [];
+          if (Array.isArray(components) && components.length > 0) {
+            templateComponents = components;
+          } else if (variables) {
+            let bodyParams = [];
+            if (Array.isArray(variables)) {
+              bodyParams = variables
+                .filter((v) => v !== undefined && v !== null && v !== "")
+                .map((v) => ({ type: "text", text: String(v) }));
+            } else if (typeof variables === "object" && variables !== null) {
+              bodyParams = Object.keys(variables)
+                .sort((a, b) => Number(a) - Number(b))
+                .filter(
+                  (k) =>
+                    variables[k] !== undefined &&
+                    variables[k] !== null &&
+                    variables[k] !== "",
+                )
+                .map((k) => ({ type: "text", text: String(variables[k]) }));
+            }
+            if (bodyParams.length > 0) {
+              templateComponents.push({
+                type: "body",
+                parameters: bodyParams,
+              });
+            }
+          }
+
+          const metaTemplateMsgObj = {
+            type: "template",
+            template: {
+              name: templateName,
+              language: {
+                code: templateLanguage || "en",
+              },
+              ...(templateComponents.length > 0
+                ? { components: templateComponents }
+                : {}),
+            },
+          };
+
+          const maskedNumber =
+            recipientMobile.length > 5
+              ? `${recipientMobile.slice(0, 3)}***${recipientMobile.slice(-2)}`
+              : "***";
+
+          logger.log(
+            `[WA TEMPLATE SEND] user=${targetOwnerUid} recipient=${maskedNumber} template=${templateName} language=${templateLanguage || "en"}`,
+          );
+
+          // Invoke real Meta sending helper
+          const sendMsg = await sendMetaMsg({
+            uid: targetOwnerUid,
+            to: recipientMobile,
+            msgObj: metaTemplateMsgObj,
+          });
+
+          if (!sendMsg?.success || !sendMsg?.id) {
+            logger.error(
+              `[WA TEMPLATE META ERROR] user=${targetOwnerUid} code=${sendMsg?.code || "unknown"} msg=${sendMsg?.msg || "unknown"}`,
+            );
+
+            let errorMsg =
+              sendMsg?.msg || "Failed to send template message via Meta Cloud API";
+            if (sendMsg?.code) errorMsg += ` (Code: ${sendMsg.code})`;
+            if (sendMsg?.isTransient) errorMsg += ` — Transient error, please retry`;
+            if (sendMsg?.fbtrace_id) errorMsg += ` [trace: ${sendMsg.fbtrace_id}]`;
+
+            socket.emit("template_send_result", {
+              success: false,
+              msg: errorMsg,
+              code: sendMsg?.code,
+            });
+            return socket.emit("error", { msg: errorMsg });
+          }
+
+          logger.log(
+            `[WA TEMPLATE META RESPONSE] status=200 message_id=${sendMsg.id}`,
+          );
+
+          const [tplUser] = await query(
+            `SELECT timezone FROM user WHERE uid = ? LIMIT 1`,
+            [targetOwnerUid],
+          );
 
           const tplTimestamp = getCurrentTimestampInTimeZone(
             tplUser?.timezone || "Asia/Kolkata",
           );
 
           const templateMsgData = {
-            type: "text",
-            metaChatId: messageId || "",
+            type: "template",
+            metaChatId: sendMsg.id,
             msgContext: {
-              type: "text",
+              template: {
+                name: templateName,
+                text: templateBody || `Template: ${templateName}`,
+              },
               text: {
                 preview_url: false,
-                body: `📋 *${templateName}*\n\n${templateBody}`,
+                body: templateBody || `Template: ${templateName}`,
               },
             },
             reaction: "",
             timestamp: tplTimestamp,
-            senderName: tplChatInfo?.sender_name || "NA",
-            senderMobile: tplChatInfo?.sender_mobile || "NA",
+            senderName: "Me",
+            senderMobile: recipientMobile,
             status: "sent",
-            star: false,
+            star: 0,
             route: "OUTGOING",
             context: null,
             origin: "meta",
@@ -967,9 +1069,10 @@ function processSocketEvent({
           };
 
           await saveMessageToConversation({
-            uid: isAgent ? socket?.userData?.owner_uid : uid,
+            uid: targetOwnerUid,
             chatId: tplChatInfo.chat_id,
             messageData: templateMsgData,
+            sentBy: "template",
           });
 
           await query(
@@ -977,15 +1080,38 @@ function processSocketEvent({
             [
               JSON.stringify(templateMsgData),
               tplChatInfo.chat_id,
-              isAgent ? socket?.userData?.owner_uid : uid,
+              targetOwnerUid,
             ],
           );
 
-          socket.emit("request_update_chat_list", {
+          // Broadcast to conversation tabs
+          sendToUid(
+            targetOwnerUid,
+            {
+              chatId: tplChatInfo.chat_id,
+              message: templateMsgData,
+            },
+            "new_message",
+          );
+
+          // Update chat list
+          sendToUid(
+            targetOwnerUid,
+            {
+              chatId: tplChatInfo.chat_id,
+            },
+            "request_update_chat_list",
+          );
+
+          // Return authoritative success back to sender socket
+          socket.emit("template_send_result", {
+            success: true,
+            messageId: sendMsg.id,
             chatId: tplChatInfo.chat_id,
+            templateName,
+            message: templateMsgData,
           });
-          // Trigger conversation reload so the message appears immediately
-          socket.emit("request_update_opened_chat", {});
+
           break;
         }
 

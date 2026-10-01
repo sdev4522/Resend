@@ -65,12 +65,32 @@ export function TemplateModal({
 
   const handleSend = async () => {
     if (!selectedTemplate) return;
+
+    // Validate that all required variables have values
+    if (uniqueVars.length > 0) {
+      const missingVars = uniqueVars.filter((v) => {
+        const varNum = v.replace(/[\{\}]/g, "");
+        return !variables[varNum] || !variables[varNum].trim();
+      });
+      if (missingVars.length > 0) {
+        toast.error(`Please provide values for: ${missingVars.join(", ")}`);
+        return;
+      }
+    }
+
     setSending(true);
     try {
       const templateName = selectedTemplate.name || selectedTemplate.templet_name;
       const lang = selectedTemplate.language || "en";
-      await sendMetaTemplate(templateName, previewText, lang);
-      onOpenChange(false);
+      const success = await sendMetaTemplate(
+        templateName,
+        previewText,
+        lang,
+        variables
+      );
+      if (success) {
+        onOpenChange(false);
+      }
     } catch (err: any) {
       toast.error(err.message || "Failed to dispatch template");
     } finally {
