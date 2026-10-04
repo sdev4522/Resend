@@ -949,18 +949,24 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
       socket.on("template_send_result", onResult);
       socket.once("error", onError);
 
-      socket.emit("message", {
-        type: "send_template_to_conversation",
-        payload: {
-          chatInfo: selectedConversation,
-          templateName,
-          templateBody,
-          templateLanguage: language,
-          variables: variables || {},
-          components: components || [],
-          messageId: "tpl_" + Date.now(),
+      socket.emit(
+        "message",
+        {
+          type: "send_template_to_conversation",
+          payload: {
+            chatInfo: selectedConversation,
+            templateName,
+            templateBody,
+            templateLanguage: language,
+            variables: variables || {},
+            components: components || [],
+            messageId: "tpl_" + Date.now(),
+          },
         },
-      });
+        (ackData: any) => {
+          onResult(ackData);
+        }
+      );
     });
   };
 

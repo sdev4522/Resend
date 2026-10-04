@@ -13,8 +13,8 @@ function getCurrentTimestamp() {
 
 function extractPhoneNumber(str) {
   if (!str) return null;
-  const match = str.match(/^(\d+)/);
-  return match ? match[1] : null;
+  const cleaned = String(str).replace(/\D/g, "");
+  return cleaned || null;
 }
 
 function formatMessage(type, content) {
@@ -68,18 +68,21 @@ async function updateChatInMysql({
     const allowedMessageTypes = ["text", "image", "document", "video", "audio"];
     const isIncoming = actualMsg?.route === "INCOMING";
 
-    // Check if chat exists
+    const cleanSenderMobile = extractPhoneNumber(senderMobile) || senderMobile || "NA";
+
+    // Check if chat exists by chatId or sender_mobile
     const [chat] = await query(
       `SELECT * FROM beta_chats 
-       WHERE uid = ? AND chat_id = ?`,
-      [uid, chatId],
+       WHERE uid = ? AND (chat_id = ? OR (sender_mobile = ? AND origin = 'meta')) LIMIT 1`,
+      [uid, chatId, cleanSenderMobile],
     );
 
     const updateFields = {
       last_message: JSON.stringify(actualMsg),
       sender_name: senderName || "NA",
-      sender_mobile: senderMobile || "NA",
+      sender_mobile: cleanSenderMobile,
       origin: "meta",
+      updatedAt: new Date(),
     };
 
     if (isIncoming && allowedMessageTypes.includes(actualMsg?.type)) {
@@ -88,21 +91,31 @@ async function updateChatInMysql({
         : 1;
     }
 
+    const metadata = body?.entry?.[0]?.changes?.[0]?.value?.metadata;
+    const phoneNumId = metadata?.phone_number_id || "";
+    const wabaId = body?.entry?.[0]?.id || "";
+    const displayPhone = metadata?.display_phone_number || "";
+
+    const originInstanceData = {
+      id: phoneNumId || displayPhone || chatId,
+      phone_number_id: phoneNumId,
+      waba_id: wabaId,
+      display_phone_number: displayPhone,
+    };
+
     if (chat) {
-      await query(`UPDATE beta_chats SET ? WHERE chat_id = ? AND uid = ?`, [
+      if (phoneNumId && (!chat.origin_instance_id || !chat.origin_instance_id.includes(phoneNumId))) {
+        updateFields.origin_instance_id = JSON.stringify(originInstanceData);
+      }
+      await query(`UPDATE beta_chats SET ? WHERE id = ?`, [
         updateFields,
-        chatId,
-        uid,
+        chat.id,
       ]);
     } else {
       await query(`INSERT INTO beta_chats SET ?`, {
         ...updateFields,
         uid,
-        origin_instance_id: JSON.stringify({
-          id:
-            body.entry?.[0]?.changes?.[0]?.value?.metadata
-              ?.display_phone_number || chatId,
-        }),
+        origin_instance_id: JSON.stringify(originInstanceData),
         chat_id: chatId,
         unread_count: isIncoming ? 1 : 0,
         assigned_agent: null,
@@ -249,6 +262,7 @@ async function processMetaMsg({ body, uid, origin }) {
     }
 
     // Status processing
+    let statusUpdate = null;
     if (statuses.length) {
       const status = statuses[0];
       statusType =
@@ -276,10 +290,21 @@ async function processMetaMsg({ body, uid, origin }) {
             [statusType, status.id, uid],
           );
         }
+
+        const [foundConv] = await query(
+          `SELECT chat_id FROM beta_conversation WHERE metaChatId = ? AND uid = ? LIMIT 1`,
+          [status.id, uid],
+        );
+
+        statusUpdate = {
+          chatId: foundConv?.chat_id || (extractPhoneNumber(value?.contacts?.[0]?.wa_id) ? `meta_${extractPhoneNumber(value?.contacts?.[0]?.wa_id)}` : ""),
+          messageId: status.id,
+          status: statusType,
+          timestamp: Date.now(),
+        };
       }
     }
 
-    // Message processing
     // Message processing
     if (message) {
       const msgType = message.type;
@@ -367,7 +392,8 @@ async function processMetaMsg({ body, uid, origin }) {
         // ✅ Extract contact info - works for both regular and ad messages
         const contactInfo = value?.contacts?.[0] || {};
         const senderName = contactInfo?.profile?.name || "NA";
-        const senderMobile = contactInfo?.wa_id || message.from || "NA";
+        const rawMobile = contactInfo?.wa_id || message.from || "NA";
+        const cleanSenderMobile = extractPhoneNumber(rawMobile) || rawMobile;
 
         newMessage = {
           type: msgContext.type,
@@ -376,7 +402,7 @@ async function processMetaMsg({ body, uid, origin }) {
           reaction: "",
           timestamp: message.timestamp || getCurrentTimestamp(),
           senderName,
-          senderMobile,
+          senderMobile: cleanSenderMobile,
           status: isEcho ? "sent" : statusType,
           star: false,
           route: isEcho ? "OUTGOING" : "INCOMING",
@@ -384,10 +410,11 @@ async function processMetaMsg({ body, uid, origin }) {
           origin: "meta",
         };
 
-        // ✅ Generate chatId from sender's number
-        const chatId = `meta_${
-          extractPhoneNumber(senderMobile) || randomstring.generate(10)
-        }`;
+        // ✅ Generate chatId consistently from sender's normalized number
+        const normalizedDigits = extractPhoneNumber(cleanSenderMobile);
+        const chatId = normalizedDigits
+          ? `meta_${normalizedDigits}`
+          : `meta_${randomstring.generate(10)}`;
 
         await saveMessageToConversation({
           uid,
@@ -407,19 +434,21 @@ async function processMetaMsg({ body, uid, origin }) {
         return {
           newMessage,
           chatId,
+          statusUpdate,
         };
       }
     }
 
-    // ✅ Return chatId even if no new message (for status updates)
-    const fallbackChatId = `meta_${
-      extractPhoneNumber(value?.contacts?.[0]?.wa_id) ||
-      randomstring.generate(10)
-    }`;
+    // ✅ Return chatId and statusUpdate even if no new message (for status updates)
+    const normalizedFallbackDigits = extractPhoneNumber(value?.contacts?.[0]?.wa_id);
+    const fallbackChatId = statusUpdate?.chatId || (normalizedFallbackDigits
+      ? `meta_${normalizedFallbackDigits}`
+      : `meta_${randomstring.generate(10)}`);
 
     return {
       newMessage,
       chatId: fallbackChatId,
+      statusUpdate,
     };
   } catch (err) {
     logger.error("Message processing error:", err);
@@ -522,12 +551,13 @@ async function processMetaEchoMessage({ body, uid, userData }) {
     if (!msgContext) return null;
 
     // ✅ chatId is based on the CUSTOMER's number (echo.to)
-    const chatId = `meta_${extractPhoneNumber(toNumber) || randomstring.generate(10)}`;
+    const cleanToNumber = extractPhoneNumber(toNumber) || toNumber;
+    const chatId = `meta_${cleanToNumber}`;
 
     // ✅ Get customer name from contacts array if available
     const contactInfo = value?.contacts?.[0] || {};
-    const senderName = contactInfo?.profile?.name || toNumber;
-    const senderMobile = toNumber;
+    const senderName = contactInfo?.profile?.name || cleanToNumber;
+    const senderMobile = cleanToNumber;
 
     const newMessage = {
       type: msgContext.type,

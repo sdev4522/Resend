@@ -43,7 +43,8 @@ function processSocketEvent({
   getConnectionBySocketId,
   getAllSocketData,
 }) {
-  socket.on("message", async ({ type, payload }) => {
+  socket.on("message", async (data, ack) => {
+    const { type, payload } = data || {};
     const { isAgent, uid } = socket?.userData || {};
 
     try {
@@ -913,32 +914,64 @@ function processSocketEvent({
             templateLanguage,
             variables,
             components,
-          } = payload;
+          } = payload || {};
+
+          // Helper to send both ack and template_send_result
+          const respond = (result) => {
+            if (typeof ack === "function") {
+              try {
+                ack(result);
+              } catch (ackErr) {
+                logger.error("Error executing socket ack:", ackErr);
+              }
+            }
+            socket.emit("template_send_result", result);
+          };
 
           if (!tplChatInfo?.chat_id || !templateName) {
-            return socket.emit("error", {
+            const errRes = {
+              success: false,
               msg: "Invalid template payload: chat_id and templateName are required.",
-            });
+            };
+            respond(errRes);
+            return socket.emit("error", { msg: errRes.msg });
           }
 
           const targetOwnerUid = isAgent ? socket?.userData?.owner_uid : uid;
 
-          const [dbTplChat] = await query(
+          let [dbTplChat] = await query(
             `SELECT id, origin, sender_mobile, sender_name FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
             [tplChatInfo.chat_id, targetOwnerUid],
           );
 
+          if (!dbTplChat && tplChatInfo?.sender_mobile) {
+            const cleanPhone = String(tplChatInfo.sender_mobile).replace(/\D/g, "");
+            const [fallbackChat] = await query(
+              `SELECT id, origin, sender_mobile, sender_name FROM beta_chats WHERE (sender_mobile = ? OR chat_id = ?) AND uid = ? LIMIT 1`,
+              [cleanPhone, `meta_${cleanPhone}`, targetOwnerUid],
+            );
+            if (fallbackChat) {
+              dbTplChat = fallbackChat;
+            }
+          }
+
           if (!dbTplChat) {
-            return socket.emit("error", {
+            const errRes = {
+              success: false,
               msg: "Conversation not found or unauthorized.",
-            });
+            };
+            respond(errRes);
+            return socket.emit("error", { msg: errRes.msg });
           }
 
           // Authoritative QR template restriction
           if (tplChatInfo?.origin === "qr" || dbTplChat.origin === "qr") {
-            return socket.emit("error", {
+            const errRes = {
+              success: false,
               msg: "Templates are available only for Meta Cloud API WhatsApp connections.",
-            });
+            };
+            respond(errRes);
+            return socket.emit("error", { msg: errRes.msg });
           }
 
           const recipientMobile = (
@@ -948,9 +981,12 @@ function processSocketEvent({
           ).replace(/\D/g, "");
 
           if (!recipientMobile) {
-            return socket.emit("error", {
+            const errRes = {
+              success: false,
               msg: "Recipient phone number not found for this conversation.",
-            });
+            };
+            respond(errRes);
+            return socket.emit("error", { msg: errRes.msg });
           }
 
           // Build template components if variables or components provided
@@ -1022,7 +1058,7 @@ function processSocketEvent({
             if (sendMsg?.isTransient) errorMsg += ` — Transient error, please retry`;
             if (sendMsg?.fbtrace_id) errorMsg += ` [trace: ${sendMsg.fbtrace_id}]`;
 
-            socket.emit("template_send_result", {
+            respond({
               success: false,
               msg: errorMsg,
               code: sendMsg?.code,
@@ -1034,83 +1070,87 @@ function processSocketEvent({
             `[WA TEMPLATE META RESPONSE] status=200 message_id=${sendMsg.id}`,
           );
 
-          const [tplUser] = await query(
-            `SELECT timezone FROM user WHERE uid = ? LIMIT 1`,
-            [targetOwnerUid],
-          );
-
-          const tplTimestamp = getCurrentTimestampInTimeZone(
-            tplUser?.timezone || "Asia/Kolkata",
-          );
-
-          const templateMsgData = {
-            type: "template",
-            metaChatId: sendMsg.id,
-            msgContext: {
-              template: {
-                name: templateName,
-                text: templateBody || `Template: ${templateName}`,
-              },
-              text: {
-                preview_url: false,
-                body: templateBody || `Template: ${templateName}`,
-              },
-            },
-            reaction: "",
-            timestamp: tplTimestamp,
-            senderName: "Me",
-            senderMobile: recipientMobile,
-            status: "sent",
-            star: 0,
-            route: "OUTGOING",
-            context: null,
-            origin: "meta",
-            sentBy: "template",
-          };
-
-          await saveMessageToConversation({
-            uid: targetOwnerUid,
-            chatId: tplChatInfo.chat_id,
-            messageData: templateMsgData,
-            sentBy: "template",
-          });
-
-          await query(
-            `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-            [
-              JSON.stringify(templateMsgData),
-              tplChatInfo.chat_id,
-              targetOwnerUid,
-            ],
-          );
-
-          // Broadcast to conversation tabs
-          sendToUid(
-            targetOwnerUid,
-            {
-              chatId: tplChatInfo.chat_id,
-              message: templateMsgData,
-            },
-            "new_message",
-          );
-
-          // Update chat list
-          sendToUid(
-            targetOwnerUid,
-            {
-              chatId: tplChatInfo.chat_id,
-            },
-            "request_update_chat_list",
-          );
-
-          // Return authoritative success back to sender socket
-          socket.emit("template_send_result", {
+          // Immediate acknowledgement to client as soon as Meta accepts
+          respond({
             success: true,
             messageId: sendMsg.id,
             chatId: tplChatInfo.chat_id,
             templateName,
-            message: templateMsgData,
           });
+
+          // Perform database logging & UI refresh broadcasts asynchronously without blocking ack
+          try {
+            const [tplUser] = await query(
+              `SELECT timezone FROM user WHERE uid = ? LIMIT 1`,
+              [targetOwnerUid],
+            );
+
+            const tplTimestamp = getCurrentTimestampInTimeZone(
+              tplUser?.timezone || "Asia/Kolkata",
+            );
+
+            const templateMsgData = {
+              type: "template",
+              metaChatId: sendMsg.id,
+              msgContext: {
+                template: {
+                  name: templateName,
+                  text: templateBody || `Template: ${templateName}`,
+                },
+                text: {
+                  preview_url: false,
+                  body: templateBody || `Template: ${templateName}`,
+                },
+              },
+              reaction: "",
+              timestamp: tplTimestamp,
+              senderName: "Me",
+              senderMobile: recipientMobile,
+              status: "sent",
+              star: 0,
+              route: "OUTGOING",
+              context: null,
+              origin: "meta",
+              sentBy: "template",
+            };
+
+            await saveMessageToConversation({
+              uid: targetOwnerUid,
+              chatId: tplChatInfo.chat_id,
+              messageData: templateMsgData,
+              sentBy: "template",
+            });
+
+            await query(
+              `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE chat_id = ? AND uid = ?`,
+              [
+                JSON.stringify(templateMsgData),
+                tplChatInfo.chat_id,
+                targetOwnerUid,
+              ],
+            );
+
+            // Broadcast to conversation tabs
+            sendToUid(
+              targetOwnerUid,
+              {
+                chatId: tplChatInfo.chat_id,
+                message: templateMsgData,
+              },
+              "new_message",
+            );
+
+            // Update chat list
+            sendToUid(
+              targetOwnerUid,
+              {
+                chatId: tplChatInfo.chat_id,
+              },
+              "request_update_chat_list",
+            );
+          } catch (dbErr) {
+            logger.error("Error logging template message to database:", dbErr);
+          }
 
           break;
         }

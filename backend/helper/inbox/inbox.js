@@ -356,6 +356,24 @@ async function processMessage({
       }
     });
 
+    // Also broadcast using canonical sendToUid to guarantee delivery across all active user/agent tabs
+    if (latestConversation?.statusUpdate) {
+      sendToUid(uid, latestConversation.statusUpdate, "message_status_update");
+    } else if (latestConversation?.chatId) {
+      sendToUid(uid, { chatId: latestConversation.chatId }, "request_update_chat_list");
+    }
+
+    if (latestConversation?.newMessage) {
+      sendToUid(
+        uid,
+        {
+          chatId: latestConversation?.chatId,
+          message: latestConversation?.newMessage,
+        },
+        "new_message",
+      );
+    }
+
     // chatbot init
     if (latestConversation?.newMessage && uid) {
       // Skip if message is from me (for QR/Telegram)

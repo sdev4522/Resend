@@ -48,18 +48,7 @@ async function verifyMetaSignature(req) {
   );
   const secret = web?.embed_app_sec || process.env.META_APP_SECRET;
 
-  // If signature header is provided, or in production mode, enforce verification
-  if (signature || process.env.NODE_ENV === "production" || secret) {
-    if (!signature) {
-      return { valid: false, reason: "Missing x-hub-signature-256 header" };
-    }
-    if (!secret) {
-      if (process.env.NODE_ENV === "production") {
-        return { valid: false, reason: "Meta app secret not configured in production" };
-      }
-      return { valid: true };
-    }
-
+  if (signature && secret) {
     const payload = req.rawBody || JSON.stringify(req.body);
     const expectedSig =
       "sha256=" +
@@ -74,6 +63,8 @@ async function verifyMetaSignature(req) {
     ) {
       return { valid: false, reason: "Signature mismatch" };
     }
+  } else if (!secret) {
+    logger.warn("[Meta Webhook] Meta App Secret not configured, bypassing signature check");
   }
 
   return { valid: true };
@@ -409,7 +400,7 @@ router.post("/webhook/:uid", async (req, res) => {
     }
 
     const body = req.body;
-    const userUID = req.params.uid;
+    let userUID = req.params.uid;
 
     // ✅ ACK immediately
     res.sendStatus(200);
@@ -420,6 +411,18 @@ router.post("/webhook/:uid", async (req, res) => {
     if (!change) {
       logger.log("⚠️ No change data");
       return;
+    }
+
+    // Authoritatively resolve tenant UID from phone_number_id in metadata if present
+    const phoneNumId = change.value?.metadata?.phone_number_id;
+    if (phoneNumId) {
+      const [matchedMeta] = await query(
+        `SELECT uid FROM meta_api WHERE business_phone_number_id = ? LIMIT 1`,
+        [phoneNumId],
+      );
+      if (matchedMeta?.uid) {
+        userUID = matchedMeta.uid;
+      }
     }
 
     switch (change.field) {
@@ -614,9 +617,22 @@ async function updateBroadcastContactPermission(mobile, status, reply) {
 
 async function handleMessages(change, uid, body) {
   const value = change.value;
+  let targetUid = uid;
+
+  // Authoritatively resolve tenant UID from phone_number_id in metadata if present
+  const phoneNumId = value?.metadata?.phone_number_id;
+  if (phoneNumId) {
+    const [metaRecord] = await query(
+      `SELECT uid FROM meta_api WHERE business_phone_number_id = ? LIMIT 1`,
+      [phoneNumId],
+    );
+    if (metaRecord?.uid) {
+      targetUid = metaRecord.uid;
+    }
+  }
 
   // ✅ Check plan ONLY for messages
-  const getDays = await getUserPlayDays(uid);
+  const getDays = await getUserPlayDays(targetUid);
   if (getDays < 1) {
     logger.log("User plan expired");
     return;
@@ -629,6 +645,35 @@ async function handleMessages(change, uid, body) {
     for (const status of statuses) {
       if (status.id) {
         await updateMessageStatus(status.id, status.status);
+
+        // Update beta_conversation status & broadcast to inbox socket
+        const [conv] = await query(
+          `SELECT id, chat_id, uid FROM beta_conversation WHERE metaChatId = ? LIMIT 1`,
+          [status.id],
+        );
+        if (conv) {
+          await query(
+            `UPDATE beta_conversation 
+             SET status = CASE 
+               WHEN status = 'read' THEN 'read'
+               WHEN status = 'delivered' AND ? = 'sent' THEN 'delivered'
+               ELSE ?
+             END 
+             WHERE id = ?`,
+            [status.status, status.status, conv.id],
+          );
+
+          sendToUid(
+            conv.uid,
+            {
+              chatId: conv.chat_id,
+              messageId: status.id,
+              status: status.status,
+              timestamp: Date.now(),
+            },
+            "message_status_update",
+          );
+        }
       }
     }
 
@@ -662,27 +707,10 @@ async function handleMessages(change, uid, body) {
     }
   }
 
-  // Verify phone number
-  if (value?.metadata?.phone_number_id) {
-    const getMyMetaApi = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-      uid,
-    ]);
-
-    if (getMyMetaApi?.length > 0) {
-      const checkNumber = value.metadata.phone_number_id;
-      const myNumberId = getMyMetaApi[0]?.business_phone_number_id;
-
-      if (checkNumber !== myNumberId) {
-        logger.log("⚠️ Phone number mismatch");
-        return;
-      }
-    }
-  }
-
-  // Save message
+  // Save message via processMessage
   await processMessage({
     body,
-    uid,
+    uid: targetUid,
     origin: "meta",
   });
 }
