@@ -82,7 +82,7 @@ router.get("/get_by_uid", validateUser, async (req, res) => {
     const data = await query(
       `SELECT p.*, COUNT(c.id) AS contactCount
        FROM phonebook p
-       LEFT JOIN contact c ON ((c.phonebook_id = p.id OR c.phonebook_id = CAST(p.id AS CHAR)) AND c.uid = p.uid)
+       LEFT JOIN contact c ON (c.phonebook_id = p.id AND c.uid = p.uid)
        WHERE p.uid = ?
        GROUP BY p.id
        ORDER BY p.id DESC`,
