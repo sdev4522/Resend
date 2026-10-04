@@ -59,11 +59,13 @@ import {
   ChevronRight,
   Tag,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ContactsPage() {
   // Data State
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [phonebooks, setPhonebooks] = useState<Phonebook[]>([]);
+  const [phonebookDialogError, setPhonebookDialogError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<ContactPagination>({
     total: 0,
     page: 1,
@@ -134,8 +136,13 @@ export default function ContactsPage() {
     try {
       const res = await contactsApi.getPhonebooks();
       if (res && res.success && Array.isArray(res.data)) {
-        setPhonebooks(res.data);
-        return res.data;
+        const normalized: Phonebook[] = res.data.map((pb) => ({
+          ...pb,
+          id: Number(pb.id),
+          contactCount: Number(pb.contactCount || 0),
+        }));
+        setPhonebooks(normalized);
+        return normalized;
       }
     } catch (err: any) {
       console.error('Failed to load phonebooks:', err);
@@ -214,17 +221,44 @@ export default function ContactsPage() {
     try {
       setActionLoading(true);
       setErrorMessage(null);
+      setPhonebookDialogError(null);
+
       const res = await contactsApi.createPhonebook(name);
       if (res && res.success) {
+        if (res.data && res.data.id) {
+          const newPb: Phonebook = {
+            id: Number(res.data.id),
+            name: String(res.data.name || name).trim(),
+            uid: String(res.data.uid || ''),
+            contactCount: Number(res.data.contactCount || 0),
+          };
+          setPhonebooks((prev) => {
+            const exists = prev.some(
+              (p) => p.id === newPb.id || p.name.toLowerCase() === newPb.name.toLowerCase()
+            );
+            if (exists) {
+              return prev.map((p) => (p.id === newPb.id ? { ...p, ...newPb } : p));
+            }
+            return [newPb, ...prev];
+          });
+        }
         setSuccessMessage('Phonebook group created successfully.');
+        toast.success('Phonebook group created successfully.');
         setNewPhonebookName('');
+        setPhonebookDialogError(null);
         setAddPhonebookOpen(false);
         await loadPhonebooks();
       } else {
-        setErrorMessage(res?.msg || 'Failed to create phonebook');
+        const msg = res?.msg || 'Failed to create phonebook';
+        setErrorMessage(msg);
+        setPhonebookDialogError(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error creating phonebook');
+      const msg = err?.message || 'Error creating phonebook';
+      setErrorMessage(msg);
+      setPhonebookDialogError(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -238,18 +272,26 @@ export default function ContactsPage() {
       setErrorMessage(null);
       const res = await contactsApi.deletePhonebook(phonebookToDelete.id);
       if (res && res.success) {
-        setSuccessMessage(`Phonebook "${phonebookToDelete.name}" deleted.`);
+        const deletedId = phonebookToDelete.id;
+        const deletedName = phonebookToDelete.name;
         setPhonebookToDelete(null);
-        if (selectedPhonebookId === String(phonebookToDelete.id)) {
+        if (selectedPhonebookId === String(deletedId)) {
           setSelectedPhonebookId('ALL');
         }
-        loadPhonebooks();
-        loadContacts();
+        setPhonebooks((prev) => prev.filter((p) => p.id !== deletedId));
+        setSuccessMessage(`Phonebook "${deletedName}" deleted.`);
+        toast.success(`Phonebook "${deletedName}" deleted.`);
+        await loadPhonebooks();
+        await loadContacts();
       } else {
-        setErrorMessage(res?.msg || 'Failed to delete phonebook');
+        const msg = res?.msg || 'Failed to delete phonebook';
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error deleting phonebook');
+      const msg = err.message || 'Error deleting phonebook';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -283,6 +325,7 @@ export default function ContactsPage() {
 
       if (res && res.success) {
         setSuccessMessage('Contact added successfully.');
+        toast.success('Contact added successfully.');
         setAddContactOpen(false);
         setNewContact({
           phonebook_id: '',
@@ -294,13 +337,17 @@ export default function ContactsPage() {
           var4: '',
           var5: '',
         });
-        loadPhonebooks();
-        loadContacts();
+        await loadPhonebooks();
+        await loadContacts();
       } else {
-        setErrorMessage(res?.msg || 'Failed to add contact');
+        const msg = res?.msg || 'Failed to add contact';
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error adding contact');
+      const msg = err.message || 'Error adding contact';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -328,14 +375,19 @@ export default function ContactsPage() {
 
       if (res && res.success) {
         setSuccessMessage('Contact updated successfully.');
+        toast.success('Contact updated successfully.');
         setEditContactOpen(false);
         setEditingContact(null);
-        loadContacts();
+        await loadContacts();
       } else {
-        setErrorMessage(res?.msg || 'Failed to update contact');
+        const msg = res?.msg || 'Failed to update contact';
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error updating contact');
+      const msg = err.message || 'Error updating contact';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -352,17 +404,23 @@ export default function ContactsPage() {
 
       const res = await contactsApi.deleteContacts(idsToDelete);
       if (res && res.success) {
-        setSuccessMessage(`${idsToDelete.length} contact(s) deleted.`);
+        const count = idsToDelete.length;
+        setSuccessMessage(`${count} contact(s) deleted.`);
+        toast.success(`${count} contact(s) deleted.`);
         setContactToDelete(null);
         setSelectedIds([]);
         setDeleteConfirmOpen(false);
-        loadPhonebooks();
-        loadContacts();
+        await loadPhonebooks();
+        await loadContacts();
       } else {
-        setErrorMessage(res?.msg || 'Failed to delete contacts');
+        const msg = res?.msg || 'Failed to delete contacts';
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Error deleting contacts');
+      const msg = err.message || 'Error deleting contacts';
+      setErrorMessage(msg);
+      toast.error(msg);
     } finally {
       setActionLoading(false);
     }
@@ -393,13 +451,16 @@ export default function ContactsPage() {
       if (res && res.success) {
         setImportResult({ inserted: res.inserted || 0 });
         setSuccessMessage(`Successfully imported ${res.inserted || 0} contacts!`);
-        loadPhonebooks();
-        loadContacts();
+        toast.success(`Successfully imported ${res.inserted || 0} contacts!`);
+        await loadPhonebooks();
+        await loadContacts();
       } else {
         if (res?.invalidNumbers && res.invalidNumbers.length > 0) {
           setImportResult({ invalidNumbers: res.invalidNumbers });
         }
-        setErrorMessage(res?.msg || 'CSV import failed. Please verify the file format.');
+        const msg = res?.msg || 'CSV import failed. Please verify the file format.';
+        setErrorMessage(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Error during CSV upload.');
@@ -506,7 +567,7 @@ export default function ContactsPage() {
           <Users className="h-3 w-3" />
           <span>All</span>
           <span className="text-[10px] opacity-80">
-            ({phonebooks.reduce((acc, curr) => acc + (curr.contactCount || 0), 0)})
+            ({phonebooks.reduce((acc, curr) => acc + (Number(curr.contactCount) || 0), 0)})
           </span>
         </button>
 
@@ -526,7 +587,7 @@ export default function ContactsPage() {
           >
             <BookOpen className="h-3 w-3" />
             <span>{pb.name}</span>
-            <span className="text-[10px] opacity-80">({pb.contactCount || 0})</span>
+            <span className="text-[10px] opacity-80">({Number(pb.contactCount) || 0})</span>
           </button>
         ))}
 
@@ -586,7 +647,7 @@ export default function ContactsPage() {
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
-                {phonebooks.reduce((acc, curr) => acc + (curr.contactCount || 0), 0)}
+                {phonebooks.reduce((acc, curr) => acc + (Number(curr.contactCount) || 0), 0)}
               </span>
             </button>
 
@@ -615,7 +676,7 @@ export default function ContactsPage() {
                         : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    {pb.contactCount || 0}
+                    {Number(pb.contactCount) || 0}
                   </span>
                   <Button
                     type="button"
@@ -903,7 +964,16 @@ export default function ContactsPage() {
       </div>
 
       {/* Dialog: Create Phonebook Group */}
-      <Dialog open={addPhonebookOpen} onOpenChange={setAddPhonebookOpen}>
+      <Dialog
+        open={addPhonebookOpen}
+        onOpenChange={(open) => {
+          setAddPhonebookOpen(open);
+          if (!open) {
+            setPhonebookDialogError(null);
+            setNewPhonebookName('');
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">New Phonebook Group</DialogTitle>
@@ -912,15 +982,25 @@ export default function ContactsPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreatePhonebook} className="space-y-4 pt-2">
+            {phonebookDialogError && (
+              <Alert variant="destructive" className="py-2 text-xs">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                <AlertDescription className="text-xs">{phonebookDialogError}</AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="pb-name" className="text-xs">Phonebook Name *</Label>
               <Input
                 id="pb-name"
                 placeholder="e.g. VIP Customers, Leads Sept 2026"
                 value={newPhonebookName}
-                onChange={(e) => setNewPhonebookName(e.target.value)}
+                onChange={(e) => {
+                  setNewPhonebookName(e.target.value);
+                  if (phonebookDialogError) setPhonebookDialogError(null);
+                }}
                 className="h-9 text-xs"
                 required
+                autoFocus
               />
             </div>
             <DialogFooter className="gap-2 sm:gap-0">

@@ -19,12 +19,12 @@ export const contactsApi = {
     }>('/api/phonebook/get_uid_contacts', { params });
   },
 
-  getPhonebooks: () => {
+  getPhonebooks: (params?: { _t?: number }) => {
     return api.get<{
       success: boolean;
       data: Phonebook[];
       msg?: string;
-    }>('/api/phonebook/get_by_uid');
+    }>('/api/phonebook/get_by_uid', { params: { _t: Date.now(), ...params } });
   },
 
   createPhonebook: (name: string) => {
