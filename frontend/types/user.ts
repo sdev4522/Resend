@@ -32,6 +32,9 @@ export interface User {
   plan_expiration?: string | null;
   plan_expire?: string | null;
   plan?: UserPlan;
+  subscription_id?: string | null;
+  subscription_status?: string | null;
+  trial?: number;
   wa_connected?: boolean;
   wa_phone?: string;
   wa_name?: string;

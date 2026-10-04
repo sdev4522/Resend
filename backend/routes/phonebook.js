@@ -18,39 +18,60 @@ router.post(
   "/add",
   validateUser,
   checkPlan,
-  checkContactLimit,
   async (req, res) => {
     try {
-      const { name } = req.body;
+      const rawName = req.body?.name;
 
-      if (!name) {
-        return res.json({
+      if (!rawName || typeof rawName !== "string" || !rawName.trim()) {
+        return res.status(400).json({
           success: false,
           msg: "Please enter a phonebook name",
         });
       }
 
+      const name = rawName.trim();
+
       // find ext
       const findExt = await query(
-        `SELECT * FROM phonebook WHERE uid = ? AND name = ?`,
+        `SELECT id FROM phonebook WHERE uid = ? AND name = ?`,
         [req.decode.uid, name],
       );
 
-      if (findExt.length > 0) {
-        return res.json({
+      if (findExt && findExt.length > 0) {
+        return res.status(409).json({
           success: false,
           msg: "Duplicate phonebook name found",
         });
       }
 
-      await query(`INSERT INTO phonebook (name, uid) VALUES (?,?)`, [
-        name,
-        req.decode.uid,
-      ]);
-      res.json({ success: true, msg: "Phonebook was addedd" });
+      const insertResult = await query(
+        `INSERT INTO phonebook (name, uid) VALUES (?, ?)`,
+        [name, req.decode.uid],
+      );
+
+      if (!insertResult || !insertResult.insertId || insertResult.affectedRows < 1) {
+        return res.status(500).json({
+          success: false,
+          msg: "Failed to create phonebook group in database",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        msg: "Phonebook group created successfully",
+        data: {
+          id: insertResult.insertId,
+          name,
+          uid: req.decode.uid,
+          contactCount: 0,
+        },
+      });
     } catch (err) {
-      res.json({ success: false, msg: "something went wrong" });
-      logger.log(err);
+      logger.error("Error adding phonebook:", err);
+      return res.status(500).json({
+        success: false,
+        msg: err?.message || "Something went wrong while creating phonebook",
+      });
     }
   },
 );
@@ -61,16 +82,17 @@ router.get("/get_by_uid", validateUser, async (req, res) => {
     const data = await query(
       `SELECT p.*, COUNT(c.id) AS contactCount
        FROM phonebook p
-       LEFT JOIN contact c ON (c.phonebook_id = p.id OR c.phonebook_id = CAST(p.id AS CHAR))
+       LEFT JOIN contact c ON ((c.phonebook_id = p.id OR c.phonebook_id = CAST(p.id AS CHAR)) AND c.uid = p.uid)
        WHERE p.uid = ?
-       GROUP BY p.id`,
+       GROUP BY p.id
+       ORDER BY p.id DESC`,
       [req.decode.uid],
     );
 
-    res.json({ data, success: true });
+    res.json({ data: data || [], success: true });
   } catch (err) {
-    logger.error(err);
-    res.json({ success: false, msg: "Something went wrong" });
+    logger.error("Error fetching phonebooks by uid:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong" });
   }
 });
 

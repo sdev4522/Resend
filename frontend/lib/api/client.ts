@@ -49,6 +49,7 @@ class ApiClient {
     try {
       const response = await fetch(url, {
         credentials: 'same-origin',
+        cache: 'no-store',
         ...customConfig,
         headers: requestHeaders,
       });
@@ -84,9 +85,9 @@ class ApiClient {
         throw new ApiError(data.msg || data.message || 'Session invalidated', 401, data, true);
       }
 
-      if (!response.ok || data.success === false) {
+      if (!response.ok || (data && typeof data === 'object' && data.success === false)) {
         throw new ApiError(
-          data.msg || data.message || data.error || `HTTP error ${response.status}`,
+          data?.msg || data?.message || data?.error || `HTTP error ${response.status}`,
           response.status,
           data
         );
@@ -102,7 +103,7 @@ class ApiClient {
   }
 
   get<T = any>(endpoint: string, options?: RequestOptions) {
-    return this.request<T>(endpoint, { ...options, method: 'GET' });
+    return this.request<T>(endpoint, { cache: 'no-store', ...options, method: 'GET' });
   }
 
   post<T = any>(endpoint: string, body?: any, options?: RequestOptions) {

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { API_BASE_URL } from '@/config/api';
 import { SESSION_COOKIE_NAME, ROLE_COOKIE_NAME } from '@/lib/auth/session';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 async function handleProxy(
   request: NextRequest,
   { params }: { params: Promise<{ path: string[] }> }
@@ -51,6 +54,7 @@ async function handleProxy(
       method: request.method,
       headers,
       body,
+      cache: 'no-store',
     });
 
     const responseData = await backendRes.json().catch(() => null);
@@ -70,7 +74,9 @@ async function handleProxy(
       return response;
     }
 
-    return NextResponse.json(responseData, { status: backendRes.status });
+    const response = NextResponse.json(responseData, { status: backendRes.status });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    return response;
   } catch (error: any) {
     console.error('API Proxy error:', error);
     return NextResponse.json(

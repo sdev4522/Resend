@@ -178,6 +178,9 @@ export async function GET(request: NextRequest) {
       wa_phone: waPhone,
       plan: parsedPlan,
       plan_expire: planExpireFormatted,
+      subscription_id: userData.subscription_id || null,
+      subscription_status: userData.subscription_status || (parsedPlan?.is_trial ? 'trialing' : null),
+      trial: typeof userData.trial !== 'undefined' ? Number(userData.trial) : (parsedPlan?.is_trial ? 1 : 0),
       role,
     };
 

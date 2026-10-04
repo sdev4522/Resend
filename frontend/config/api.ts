@@ -1,5 +1,5 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3010";
-export const SOCKET_BASE_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3010";
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.BACKEND_API_URL || "http://localhost:3001";
+export const SOCKET_BASE_URL = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3001";
 
 export const API_ENDPOINTS = {
   auth: {
@@ -11,11 +11,13 @@ export const API_ENDPOINTS = {
     checkRecovery: "/api/user/check_recovery",
   },
   contacts: {
-    list: "/api/phonebook/get_contacts",
-    add: "/api/phonebook/add_contact",
+    list: "/api/phonebook/get_uid_contacts",
+    add: "/api/phonebook/add_single_contact",
     edit: "/api/phonebook/edit_contact",
-    delete: "/api/phonebook/delete_contact",
-    groups: "/api/phonebook/get_groups",
+    delete: "/api/phonebook/del_contacts",
+    groups: "/api/phonebook/get_by_uid",
+    addGroup: "/api/phonebook/add",
+    deleteGroup: "/api/phonebook/del_phonebook",
   },
   inbox: {
     chats: "/api/inbox/get_chats",
@@ -47,6 +49,7 @@ export const API_ENDPOINTS = {
     validateCoupon: "/api/billing/validate_coupon",
     createOrder: "/api/billing/create_order",
     verifyPayment: "/api/billing/verify_payment",
+    activateTrial: "/api/billing/activate_trial",
   },
   admin: {
     stats: "/api/admin/get_stats",

@@ -127,7 +127,7 @@ router.get("/detect_currency", async (req, res) => {
 router.get("/plans", async (req, res) => {
   try {
     const plans = await query(
-      `SELECT * FROM plan WHERE is_trial = 0 ORDER BY price ASC`
+      `SELECT * FROM plan ORDER BY is_trial DESC, price ASC`
     );
 
     const allPrices = await query(
@@ -195,6 +195,91 @@ router.get("/plans", async (req, res) => {
   } catch (err) {
     logger.error("[Billing] Error fetching plans:", err);
     res.status(500).json({ success: false, msg: "Failed to fetch plans" });
+  }
+});
+
+/**
+ * POST /api/billing/activate_trial
+ * Activates 14-day free trial for authenticated user.
+ * Authoritative backend state: trial = 1, subscription_status = 'trialing'.
+ */
+router.post("/activate_trial", validateUser, async (req, res) => {
+  try {
+    const uid = req.decode.uid;
+
+    const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [uid]);
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    // Check if user has active paid subscription
+    if (
+      user.subscription_status === "active" &&
+      user.plan_expire &&
+      Number(user.plan_expire) > Date.now() &&
+      !user.trial
+    ) {
+      return res.status(400).json({
+        success: false,
+        msg: "You already have an active paid subscription.",
+      });
+    }
+
+    // Check if user has already used their trial
+    const trialOrders = await query(
+      `SELECT id FROM orders WHERE uid = ? AND payment_mode = 'FREE_TRIAL' LIMIT 1`,
+      [uid]
+    );
+    if (user.trial === 1 || trialOrders.length > 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "You have already used your free trial.",
+      });
+    }
+
+    // Find Trial plan (is_trial = 1 or title like Trial)
+    const [trialPlan] = await query(
+      `SELECT * FROM plan WHERE is_trial = 1 OR LOWER(title) LIKE '%trial%' ORDER BY id ASC LIMIT 1`
+    );
+
+    if (!trialPlan) {
+      return res.status(500).json({
+        success: false,
+        msg: "No trial plan configured in system",
+      });
+    }
+
+    const trialDays = parseInt(trialPlan.plan_duration_in_days || 14, 10);
+    const newExpiry = await updateUserPlan(trialPlan, uid, trialDays, false);
+
+    await query(
+      `UPDATE user SET trial = 1, subscription_status = 'trialing' WHERE uid = ?`,
+      [uid]
+    );
+
+    // Record order audit trail
+    await query(
+      `INSERT INTO orders (uid, payment_mode, amount, data, s_token, status) VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        uid,
+        "FREE_TRIAL",
+        "0.00",
+        JSON.stringify({ plan: trialPlan, isTrial: true, durationDays: trialDays }),
+        `trial_${uid.slice(0, 8)}_${Date.now()}`,
+        "paid",
+      ]
+    );
+
+    res.json({
+      success: true,
+      msg: "14-day free trial activated successfully!",
+      plan: trialPlan,
+      subscription_status: "trialing",
+      newExpiry,
+    });
+  } catch (err) {
+    logger.error("[Billing] Activate trial error:", err);
+    res.status(500).json({ success: false, msg: err.message || "Failed to activate trial" });
   }
 });
 
@@ -272,7 +357,9 @@ router.post("/validate_coupon", validateUser, async (req, res) => {
  */
 router.post("/create_order", validateUser, async (req, res) => {
   try {
-    const { planId, couponCode, autopay = true, currency } = req.body;
+    const planId = req.body.planId || req.body.plan_id;
+    const { couponCode, currency } = req.body;
+    const autopay = req.body.autopay === true;
     const uid = req.decode.uid;
 
     if (!planId) {
@@ -346,6 +433,7 @@ router.post("/create_order", validateUser, async (req, res) => {
         isAutopay: true,
         subscriptionId: rzSub.id,
         orderId: rzSub.id,
+        order_id: rzSub.id,
         internalOrderId: insertRes.insertId,
         amount: priceSummary.amountMinor,
         currency: priceSummary.currency,
@@ -398,6 +486,7 @@ router.post("/create_order", validateUser, async (req, res) => {
       success: true,
       isAutopay: false,
       orderId: rzOrder.id,
+      order_id: rzOrder.id,
       internalOrderId: insertRes.insertId,
       amount: rzOrder.amount,
       currency: rzOrder.currency,
@@ -417,16 +506,16 @@ router.post("/create_order", validateUser, async (req, res) => {
  */
 router.post("/verify_payment", validateUser, async (req, res) => {
   try {
-    const {
-      razorpay_order_id,
-      razorpay_subscription_id,
-      razorpay_payment_id,
-      razorpay_signature,
-    } = req.body;
+    const referenceToken =
+      req.body.razorpay_subscription_id ||
+      req.body.razorpay_order_id ||
+      req.body.subscriptionId ||
+      req.body.orderId;
+    const paymentId = req.body.razorpay_payment_id || req.body.paymentId;
+    const signature = req.body.razorpay_signature || req.body.signature;
     const uid = req.decode.uid;
 
-    const referenceToken = razorpay_subscription_id || razorpay_order_id;
-    if (!referenceToken || !razorpay_payment_id || !razorpay_signature) {
+    if (!referenceToken || !paymentId || !signature) {
       return res.status(400).json({
         success: false,
         msg: "Missing required payment parameters",
@@ -457,17 +546,17 @@ router.post("/verify_payment", validateUser, async (req, res) => {
 
     // 3. Signature verification
     let isValidSignature = false;
-    if (razorpay_subscription_id) {
+    if (req.body.razorpay_subscription_id || req.body.subscriptionId) {
       isValidSignature = await verifySubscriptionSignature({
-        subscriptionId: razorpay_subscription_id,
-        paymentId: razorpay_payment_id,
-        signature: razorpay_signature,
+        subscriptionId: referenceToken,
+        paymentId,
+        signature,
       });
     } else {
       isValidSignature = await verifyRazorpaySignature({
-        orderId: razorpay_order_id,
-        paymentId: razorpay_payment_id,
-        signature: razorpay_signature,
+        orderId: referenceToken,
+        paymentId,
+        signature,
       });
     }
 
@@ -503,12 +592,10 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     const newExpiry = await updateUserPlan(planToActivate, uid, totalDays, true);
 
     // If Autopay subscription, attach subscription to user
-    if (razorpay_subscription_id) {
-      await query(
-        `UPDATE user SET subscription_id = ?, subscription_status = 'active' WHERE uid = ?`,
-        [razorpay_subscription_id, uid]
-      );
-    }
+    await query(
+      `UPDATE user SET subscription_id = COALESCE(?, subscription_id), subscription_status = 'active', trial = 0 WHERE uid = ?`,
+      [req.body.razorpay_subscription_id || req.body.subscriptionId || null, uid]
+    );
 
     // 6. Coupon usage increment
     if (orderData.couponCode) {
@@ -519,8 +606,8 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     // 7. Update internal order to 'paid'
-    orderData.razorpayPaymentId = razorpay_payment_id;
-    orderData.razorpaySignature = razorpay_signature;
+    orderData.razorpayPaymentId = paymentId;
+    orderData.razorpaySignature = signature;
     orderData.paidAt = new Date().toISOString();
 
     await query(
@@ -533,7 +620,7 @@ router.post("/verify_payment", validateUser, async (req, res) => {
       msg: "Payment verified successfully! Your plan is now active.",
       plan: planToActivate,
       newExpiry,
-      isAutopay: Boolean(razorpay_subscription_id),
+      isAutopay: Boolean(req.body.razorpay_subscription_id || req.body.subscriptionId),
     });
   } catch (err) {
     logger.error("[Billing] Payment verification error:", err);
@@ -627,6 +714,54 @@ router.get("/orders", validateUser, async (req, res) => {
 });
 
 /**
+ * GET /api/billing/subscription
+ * Retrieves the current authoritative subscription state, plan, and expiration for authenticated user.
+ */
+router.get("/subscription", validateUser, async (req, res) => {
+  try {
+    const uid = req.decode.uid;
+    const [user] = await query(
+      `SELECT uid, plan, plan_expire, trial, subscription_id, subscription_status FROM user WHERE uid = ? LIMIT 1`,
+      [uid]
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    let parsedPlan = null;
+    if (user.plan) {
+      try {
+        parsedPlan = typeof user.plan === "string" ? JSON.parse(user.plan) : user.plan;
+      } catch (e) {
+        parsedPlan = null;
+      }
+    }
+
+    const isExpired = user.plan_expire ? Number(user.plan_expire) < Date.now() : false;
+    let status = user.subscription_status || (user.trial ? "trialing" : "inactive");
+    if (isExpired && status !== "inactive") {
+      status = "expired";
+    }
+
+    res.json({
+      success: true,
+      subscription: {
+        status,
+        plan: parsedPlan,
+        expiresAt: user.plan_expire ? Number(user.plan_expire) : null,
+        trial: Boolean(user.trial),
+        subscriptionId: user.subscription_id || null,
+        isExpired,
+      },
+    });
+  } catch (err) {
+    logger.error("[Billing] Get subscription error:", err);
+    res.status(500).json({ success: false, msg: "Failed to fetch subscription" });
+  }
+});
+
+/**
  * POST /api/billing/webhook
  * Razorpay webhook handler for server-to-server reconciliation (both orders and subscriptions).
  */
@@ -659,7 +794,7 @@ router.post("/webhook", async (req, res) => {
       );
       if (alreadyProcessed) {
         logger.log(`[Billing Webhook] Duplicate event ${eventId} safely ignored (idempotent)`);
-        return res.json({ status: "ok", duplicate: true });
+        return res.json({ status: "ok", success: true, duplicate: true });
       }
     }
 
@@ -688,6 +823,7 @@ router.post("/webhook", async (req, res) => {
               JSON.stringify(orderData),
               order.id,
             ]);
+            await query(`UPDATE user SET subscription_status = 'active', trial = 0 WHERE uid = ?`, [order.uid]);
             logger.log(`[Billing Webhook] Order ${order.id} marked as paid via webhook reconciliation`);
           }
         }
@@ -750,7 +886,7 @@ router.post("/webhook", async (req, res) => {
       );
     }
 
-    res.json({ status: "ok" });
+    res.json({ status: "ok", success: true });
   } catch (err) {
     logger.error("[Billing Webhook] Processing error:", err);
     res.status(500).json({ error: "Webhook processing failed" });

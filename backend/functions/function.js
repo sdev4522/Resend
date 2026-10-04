@@ -1223,9 +1223,14 @@ async function updateUserPlan(plan, uid, customDays = null, extendIfActive = fal
   const millisecondsToAdd = planDays * 24 * 60 * 60 * 1000;
   const timeStamp = baseTimestamp + millisecondsToAdd;
 
-  await query(`UPDATE user SET plan = ?, plan_expire = ?, trial = 0 WHERE uid = ?`, [
+  const isTrial = plan?.is_trial === 1 || String(plan?.title || "").toLowerCase().includes("trial") ? 1 : 0;
+  const subStatus = isTrial ? "trialing" : "active";
+
+  await query(`UPDATE user SET plan = ?, plan_expire = ?, trial = ?, subscription_status = ? WHERE uid = ?`, [
     JSON.stringify(plan),
     String(timeStamp),
+    isTrial,
+    subStatus,
     uid,
   ]);
   return timeStamp;

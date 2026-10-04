@@ -28,7 +28,7 @@ export const contactsApi = {
   },
 
   createPhonebook: (name: string) => {
-    return api.post<{ success: boolean; msg: string }>('/api/phonebook/add', { name });
+    return api.post<{ success: boolean; msg: string; data?: Phonebook }>('/api/phonebook/add', { name });
   },
 
   deletePhonebook: (id: number) => {

@@ -732,20 +732,31 @@ export default function BillingPage() {
                         <div className="space-y-1 pt-1">
                           <div className="flex items-baseline gap-2 flex-wrap">
                             <span className="text-3xl font-black tracking-tight text-foreground font-mono">
-                              {formatCurrencyAmount(price, selectedCurrency, currencySymbol)}
+                              {p.is_trial === 1
+                                ? 'Free'
+                                : formatCurrencyAmount(price, selectedCurrency, currencySymbol)}
                             </span>
-                            {strikePrice && strikePrice > price && (
+                            {strikePrice && strikePrice > price && p.is_trial !== 1 && (
                               <span className="text-sm font-semibold text-muted-foreground line-through font-mono">
                                 {formatCurrencyAmount(strikePrice, selectedCurrency, currencySymbol)}
                               </span>
                             )}
                             <span className="text-xs text-muted-foreground font-normal">
-                              / {p.plan_duration_in_days || 30} days
+                              / {p.plan_duration_in_days || (p.is_trial === 1 ? 14 : 30)} days
                             </span>
                           </div>
                           <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            <Repeat className="h-3 w-3 text-primary" />
-                            Supports Razorpay Autopay (Cancel anytime)
+                            {p.is_trial === 1 ? (
+                              <>
+                                <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                                14-day full access &bull; No payment required
+                              </>
+                            ) : (
+                              <>
+                                <Repeat className="h-3 w-3 text-primary" />
+                                Supports Razorpay Autopay (Cancel anytime)
+                              </>
+                            )}
                           </p>
                         </div>
 
@@ -787,24 +798,45 @@ export default function BillingPage() {
                       </div>
 
                       <div className="p-5 pt-0">
-                        <Button
-                          variant={isCurrent ? 'outline' : 'default'}
-                          size="sm"
-                          onClick={() => handleOpenCheckout(p)}
-                          className="w-full text-xs font-semibold gap-1.5 shadow-2xs"
-                        >
-                          {isCurrent ? (
-                            <>
-                              <RefreshCw className="h-3.5 w-3.5" />
-                              Renew / Autopay {p.title}
-                            </>
-                          ) : (
-                            <>
-                              <Zap className="h-3.5 w-3.5" />
-                              Subscribe to {p.title}
-                            </>
-                          )}
-                        </Button>
+                        {p.is_trial === 1 ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={true}
+                            className="w-full text-xs font-semibold gap-1.5 shadow-2xs cursor-default opacity-85"
+                          >
+                            {isCurrent ? (
+                              <>
+                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                                Current Plan (Free Trial)
+                              </>
+                            ) : (
+                              <>
+                                <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                                Trial (Included with Account)
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            variant={isCurrent ? 'outline' : 'default'}
+                            size="sm"
+                            onClick={() => handleOpenCheckout(p)}
+                            className="w-full text-xs font-semibold gap-1.5 shadow-2xs"
+                          >
+                            {isCurrent ? (
+                              <>
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                Renew / Autopay {p.title}
+                              </>
+                            ) : (
+                              <>
+                                <Zap className="h-3.5 w-3.5" />
+                                Subscribe to {p.title}
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   );

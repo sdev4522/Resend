@@ -135,10 +135,12 @@ export default function ContactsPage() {
       const res = await contactsApi.getPhonebooks();
       if (res && res.success && Array.isArray(res.data)) {
         setPhonebooks(res.data);
+        return res.data;
       }
     } catch (err: any) {
       console.error('Failed to load phonebooks:', err);
     }
+    return [];
   }, []);
 
   // Load Contacts with Pagination & Filter
@@ -206,17 +208,18 @@ export default function ContactsPage() {
   // Create Phonebook Group
   const handleCreatePhonebook = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPhonebookName.trim()) return;
+    const name = newPhonebookName.trim();
+    if (!name) return;
 
     try {
       setActionLoading(true);
       setErrorMessage(null);
-      const res = await contactsApi.createPhonebook(newPhonebookName.trim());
+      const res = await contactsApi.createPhonebook(name);
       if (res && res.success) {
         setSuccessMessage('Phonebook group created successfully.');
         setNewPhonebookName('');
         setAddPhonebookOpen(false);
-        loadPhonebooks();
+        await loadPhonebooks();
       } else {
         setErrorMessage(res?.msg || 'Failed to create phonebook');
       }

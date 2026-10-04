@@ -68,6 +68,16 @@ export const billingApi = {
     );
   },
 
+  activateTrial: () => {
+    return api.post<{
+      success: boolean;
+      msg: string;
+      plan: SubscriptionPlan;
+      subscription_status: string;
+      newExpiry: number;
+    }>(API_ENDPOINTS.billing.activateTrial);
+  },
+
   cancelAutopay: () => {
     return api.post<{ success: boolean; msg: string }>('/api/billing/cancel_autopay');
   },
