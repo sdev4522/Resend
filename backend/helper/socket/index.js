@@ -928,66 +928,107 @@ function processSocketEvent({
             socket.emit("template_send_result", result);
           };
 
-          if (!tplChatInfo?.chat_id || !templateName) {
-            const errRes = {
+          const rawMobile = tplChatInfo?.sender_mobile || tplChatInfo?.mobile || "";
+          const cleanPhone = String(rawMobile || tplChatInfo?.chat_id || "").replace(/\D/g, "");
+
+          if ((!tplChatInfo?.chat_id && !cleanPhone) || !templateName) {
+            return respond({
               success: false,
               msg: "Invalid template payload: chat_id and templateName are required.",
-            };
-            respond(errRes);
-            return socket.emit("error", { msg: errRes.msg });
+            });
           }
 
           const targetOwnerUid = isAgent ? socket?.userData?.owner_uid : uid;
 
-          let [dbTplChat] = await query(
-            `SELECT id, origin, sender_mobile, sender_name FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-            [tplChatInfo.chat_id, targetOwnerUid],
-          );
+          // 1. Authoritative conversation lookup in beta_chats
+          let dbTplChat = null;
 
-          if (!dbTplChat && tplChatInfo?.sender_mobile) {
-            const cleanPhone = String(tplChatInfo.sender_mobile).replace(/\D/g, "");
-            const [fallbackChat] = await query(
-              `SELECT id, origin, sender_mobile, sender_name FROM beta_chats WHERE (sender_mobile = ? OR chat_id = ?) AND uid = ? LIMIT 1`,
-              [cleanPhone, `meta_${cleanPhone}`, targetOwnerUid],
+          // 1a. Direct lookup by row primary key id if present
+          if (tplChatInfo?.id && !isNaN(tplChatInfo.id)) {
+            const [chatById] = await query(
+              `SELECT id, chat_id, origin, sender_mobile, sender_name FROM beta_chats WHERE id = ? AND uid = ? LIMIT 1`,
+              [Number(tplChatInfo.id), targetOwnerUid],
             );
-            if (fallbackChat) {
-              dbTplChat = fallbackChat;
-            }
+            if (chatById) dbTplChat = chatById;
           }
 
-          if (!dbTplChat) {
-            const errRes = {
+          // 1b. Direct lookup by canonical chat_id
+          if (!dbTplChat && tplChatInfo?.chat_id) {
+            const [chatByChatId] = await query(
+              `SELECT id, chat_id, origin, sender_mobile, sender_name FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
+              [tplChatInfo.chat_id, targetOwnerUid],
+            );
+            if (chatByChatId) dbTplChat = chatByChatId;
+          }
+
+          // 1c. Multi-format lookup by phone and chat_id variations
+          if (!dbTplChat && cleanPhone) {
+            const candidateChatIds = [
+              `meta_${cleanPhone}`,
+              `meta_+${cleanPhone}`,
+              cleanPhone,
+              `+${cleanPhone}`,
+            ];
+            const candidateMobiles = [
+              cleanPhone,
+              `+${cleanPhone}`,
+              String(rawMobile),
+            ].filter(Boolean);
+
+            const [chatByPhone] = await query(
+              `SELECT id, chat_id, origin, sender_mobile, sender_name 
+               FROM beta_chats 
+               WHERE uid = ? AND (
+                 chat_id IN (?, ?, ?, ?) OR 
+                 sender_mobile IN (?, ?, ?)
+               )
+               ORDER BY id DESC LIMIT 1`,
+              [
+                targetOwnerUid,
+                candidateChatIds[0],
+                candidateChatIds[1],
+                candidateChatIds[2],
+                candidateChatIds[3],
+                candidateMobiles[0],
+                candidateMobiles[1] || candidateMobiles[0],
+                candidateMobiles[2] || candidateMobiles[0],
+              ],
+            );
+            if (chatByPhone) dbTplChat = chatByPhone;
+          }
+
+          // If no existing conversation in beta_chats, check whether we can dispatch as outbound template to valid phone number
+          if (!dbTplChat && (!cleanPhone || cleanPhone.length < 7)) {
+            return respond({
               success: false,
               msg: "Conversation not found or unauthorized.",
-            };
-            respond(errRes);
-            return socket.emit("error", { msg: errRes.msg });
+            });
           }
 
           // Authoritative QR template restriction
-          if (tplChatInfo?.origin === "qr" || dbTplChat.origin === "qr") {
-            const errRes = {
+          if (tplChatInfo?.origin === "qr" || dbTplChat?.origin === "qr") {
+            return respond({
               success: false,
               msg: "Templates are available only for Meta Cloud API WhatsApp connections.",
-            };
-            respond(errRes);
-            return socket.emit("error", { msg: errRes.msg });
+            });
           }
 
           const recipientMobile = (
-            tplChatInfo?.sender_mobile ||
-            dbTplChat?.sender_mobile ||
-            ""
-          ).replace(/\D/g, "");
+            cleanPhone ||
+            String(dbTplChat?.sender_mobile || tplChatInfo?.sender_mobile || "").replace(/\D/g, "")
+          );
 
-          if (!recipientMobile) {
-            const errRes = {
+          if (!recipientMobile || recipientMobile.length < 7) {
+            return respond({
               success: false,
               msg: "Recipient phone number not found for this conversation.",
-            };
-            respond(errRes);
-            return socket.emit("error", { msg: errRes.msg });
+            });
           }
+
+          const canonicalChatId =
+            dbTplChat?.chat_id ||
+            tplChatInfo?.chat_id ||
+            `meta_${recipientMobile}`;
 
           // Build template components if variables or components provided
           let templateComponents = [];
@@ -1058,12 +1099,11 @@ function processSocketEvent({
             if (sendMsg?.isTransient) errorMsg += ` — Transient error, please retry`;
             if (sendMsg?.fbtrace_id) errorMsg += ` [trace: ${sendMsg.fbtrace_id}]`;
 
-            respond({
+            return respond({
               success: false,
               msg: errorMsg,
               code: sendMsg?.code,
             });
-            return socket.emit("error", { msg: errorMsg });
           }
 
           logger.log(
@@ -1074,7 +1114,7 @@ function processSocketEvent({
           respond({
             success: true,
             messageId: sendMsg.id,
-            chatId: tplChatInfo.chat_id,
+            chatId: canonicalChatId,
             templateName,
           });
 
@@ -1116,25 +1156,45 @@ function processSocketEvent({
 
             await saveMessageToConversation({
               uid: targetOwnerUid,
-              chatId: tplChatInfo.chat_id,
+              chatId: canonicalChatId,
               messageData: templateMsgData,
               sentBy: "template",
             });
 
-            await query(
-              `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE chat_id = ? AND uid = ?`,
-              [
-                JSON.stringify(templateMsgData),
-                tplChatInfo.chat_id,
-                targetOwnerUid,
-              ],
-            );
+            if (dbTplChat) {
+              await query(
+                `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE id = ? AND uid = ?`,
+                [
+                  JSON.stringify(templateMsgData),
+                  dbTplChat.id,
+                  targetOwnerUid,
+                ],
+              );
+            } else {
+              await query(
+                `INSERT INTO beta_chats 
+                  (uid, chat_id, last_message, sender_name, sender_mobile, 
+                    origin, origin_instance_id, unread_count, assigned_agent) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  targetOwnerUid,
+                  canonicalChatId,
+                  JSON.stringify(templateMsgData),
+                  tplChatInfo?.sender_name || recipientMobile,
+                  recipientMobile,
+                  "meta",
+                  JSON.stringify({ id: recipientMobile }),
+                  0,
+                  isAgent ? JSON.stringify([socket?.userData]) : null,
+                ],
+              );
+            }
 
             // Broadcast to conversation tabs
             sendToUid(
               targetOwnerUid,
               {
-                chatId: tplChatInfo.chat_id,
+                chatId: canonicalChatId,
                 message: templateMsgData,
               },
               "new_message",
@@ -1144,7 +1204,7 @@ function processSocketEvent({
             sendToUid(
               targetOwnerUid,
               {
-                chatId: tplChatInfo.chat_id,
+                chatId: canonicalChatId,
               },
               "request_update_chat_list",
             );

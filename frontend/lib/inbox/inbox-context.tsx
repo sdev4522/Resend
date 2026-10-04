@@ -912,7 +912,6 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
 
       const cleanup = () => {
         socket.off("template_send_result", onResult);
-        socket.off("error", onError);
         if (timer) clearTimeout(timer);
       };
 
@@ -930,14 +929,6 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
         }
       };
 
-      const onError = () => {
-        if (resolved) return;
-        resolved = true;
-        cleanup();
-        // Global socket error handler will also toast, but ensure Promise resolves false
-        resolve(false);
-      };
-
       const timer = setTimeout(() => {
         if (resolved) return;
         resolved = true;
@@ -947,14 +938,23 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
       }, 20000);
 
       socket.on("template_send_result", onResult);
-      socket.once("error", onError);
+
+      const chatInfoPayload = {
+        ...selectedConversation,
+        id: selectedConversation.id,
+        chat_id: selectedConversation.chat_id,
+        sender_mobile: selectedConversation.sender_mobile,
+        sender_name: selectedConversation.sender_name,
+        origin: selectedConversation.origin,
+        uid: selectedConversation.uid,
+      };
 
       socket.emit(
         "message",
         {
           type: "send_template_to_conversation",
           payload: {
-            chatInfo: selectedConversation,
+            chatInfo: chatInfoPayload,
             templateName,
             templateBody,
             templateLanguage: language,

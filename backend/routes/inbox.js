@@ -1031,11 +1031,16 @@ router.get("/get_messages", validateUser, async (req, res) => {
       return res.json({ success: false, msg: "chat_id is required" });
     }
 
+    const cleanChatId = String(chat_id).replace(/^meta_/, "").replace(/\D/g, "");
+    const candidateIds = [chat_id, `meta_${cleanChatId}`, `+${cleanChatId}`, cleanChatId];
+
     // Verify conversation ownership
     const [chat] = await query(
       `SELECT id, chat_id, sender_name, sender_mobile, origin, chat_label, chat_note, unread_count 
-       FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [chat_id, uid],
+       FROM beta_chats 
+       WHERE (chat_id IN (?, ?, ?, ?) OR (sender_mobile IN (?, ?) AND origin = 'meta')) AND uid = ? 
+       ORDER BY id DESC LIMIT 1`,
+      [...candidateIds, cleanChatId, `+${cleanChatId}`, uid],
     );
 
     if (!chat) {
@@ -1154,14 +1159,18 @@ router.post("/check_conversation", validateUser, async (req, res) => {
     } else if (accountType === "meta") {
       const metaChatId = `meta_${cleanMobile}`;
       const [found] = await query(
-        `SELECT * FROM beta_chats WHERE (chat_id = ? OR (sender_mobile = ? AND origin = 'meta')) AND uid = ? LIMIT 1`,
-        [metaChatId, cleanMobile, uid],
+        `SELECT * FROM beta_chats 
+         WHERE (chat_id IN (?, ?, ?, ?) OR (sender_mobile IN (?, ?) AND origin = 'meta')) AND uid = ? 
+         ORDER BY id DESC LIMIT 1`,
+        [metaChatId, `meta_+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, uid],
       );
       existingChat = found;
     } else {
       const [found] = await query(
-        `SELECT * FROM beta_chats WHERE sender_mobile = ? AND uid = ? LIMIT 1`,
-        [cleanMobile, uid],
+        `SELECT * FROM beta_chats 
+         WHERE (sender_mobile IN (?, ?) OR chat_id IN (?, ?, ?, ?)) AND uid = ? 
+         ORDER BY id DESC LIMIT 1`,
+        [cleanMobile, `+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, `meta_${cleanMobile}`, `meta_+${cleanMobile}`, uid],
       );
       existingChat = found;
     }
