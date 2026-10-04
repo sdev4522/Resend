@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     canonical: '/contact',
   },
   openGraph: {
-    title: 'Contact WaCRM — Sales & Customer Support',
+    title: 'Contact Resend — Sales & Customer Support',
     description:
       'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
     url: `${siteConfig.url}/contact`,
@@ -25,14 +25,14 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Contact WaCRM Support',
+        alt: 'Contact Resend Support',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Contact WaCRM — Sales & Customer Support',
+    title: 'Contact Resend — Sales & Customer Support',
     description:
       'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
     images: ['/og.png'],

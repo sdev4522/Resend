@@ -341,7 +341,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
         key: orderData.keyId,
         amount: orderData.amount,
         currency: orderData.currency,
-        name: 'WaCRM',
+        name: 'Resend',
         description: `${selectedPlan.title} Plan Subscription`,
         order_id: orderData.orderId,
         prefill: {
@@ -1062,7 +1062,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
           className="h-[94dvh] max-h-[94dvh] rounded-t-2xl p-4 flex flex-col justify-between overflow-hidden"
         >
           <SheetHeader className="text-left pb-1">
-            <SheetTitle className="text-base font-bold">WaCRM Setup</SheetTitle>
+            <SheetTitle className="text-base font-bold">Resend Setup</SheetTitle>
             <SheetDescription className="text-xs">
               Complete these quick steps to initialize your messaging workspace.
             </SheetDescription>
@@ -1082,7 +1082,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
         className="sm:max-w-[680px] p-6 rounded-2xl"
       >
         <DialogHeader className="pb-1">
-          <DialogTitle className="text-lg font-bold">WaCRM Workspace Setup</DialogTitle>
+          <DialogTitle className="text-lg font-bold">Resend Workspace Setup</DialogTitle>
           <DialogDescription className="text-xs">
             Complete these quick steps to customize your messaging environment.
           </DialogDescription>

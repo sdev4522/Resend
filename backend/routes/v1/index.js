@@ -33,7 +33,7 @@ router.use((req, res) => {
   res.status(404).json({
     error: {
       code: "ENDPOINT_NOT_FOUND",
-      message: `The requested endpoint '${req.method} ${req.originalUrl}' does not exist on WACRM API v1.`,
+      message: `The requested endpoint '${req.method} ${req.originalUrl}' does not exist on Resend API v1.`,
       request_id: req.requestId,
     },
   });

@@ -160,7 +160,7 @@ export function CreateApiKeyDialog({
           <DialogHeader>
             <DialogTitle>Generate New API Key</DialogTitle>
             <DialogDescription>
-              Create a cryptographic key to integrate your applications with the WACRM Developer API.
+              Create a cryptographic key to integrate your applications with the Resend Developer API.
             </DialogDescription>
           </DialogHeader>
 

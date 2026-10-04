@@ -23,7 +23,7 @@ export function LoginDialog() {
             <MessageCircle className="h-6 w-6" />
           </div>
           <DialogTitle className="text-xl font-bold tracking-tight">
-            Sign in to WaCRM
+            Sign in to Resend
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Enter your email and password to access your workspace

@@ -7,24 +7,24 @@ import { siteConfig } from '@/config/site';
 export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
-    'Understand how WaCRM collects, protects, and manages account data, messaging metadata, and integration security.',
+    'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
   alternates: {
     canonical: '/privacy',
   },
   openGraph: {
-    title: 'Privacy Policy — WaCRM',
+    title: 'Privacy Policy — Resend',
     description:
-      'Understand how WaCRM collects, protects, and manages account data, messaging metadata, and integration security.',
+      'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
     url: `${siteConfig.url}/privacy`,
     siteName: siteConfig.name,
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'WaCRM Privacy Policy' }],
+    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Resend Privacy Policy' }],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Privacy Policy — WaCRM',
+    title: 'Privacy Policy — Resend',
     description:
-      'Understand how WaCRM collects, protects, and manages account data, messaging metadata, and integration security.',
+      'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
     images: ['/og.png'],
   },
 };
@@ -46,7 +46,7 @@ export default function PrivacyPage() {
           <section className="mt-8 space-y-4">
             <h2 className="text-xl font-semibold text-foreground">1. Introduction</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              WaCRM (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides a cloud-based WhatsApp Customer Relationship Management, broadcast automation, and multi-agent communication platform. This Privacy Policy details the types of personal data we collect, how it is processed and secured, and your rights regarding your information.
+              Resend (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) provides a cloud-based WhatsApp Customer Relationship Management, broadcast automation, and multi-agent communication platform. This Privacy Policy details the types of personal data we collect, how it is processed and secured, and your rights regarding your information.
             </p>
           </section>
 
@@ -77,7 +77,7 @@ export default function PrivacyPage() {
           <section className="mt-8 space-y-4">
             <h2 className="text-xl font-semibold text-foreground">3. WhatsApp &amp; Meta Platform Compliance</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Our service operates in integration with Meta Platforms&apos; official WhatsApp Cloud API. By using WaCRM, you acknowledge and agree that:
+              Our service operates in integration with Meta Platforms&apos; official WhatsApp Cloud API. By using Resend, you acknowledge and agree that:
             </p>
             <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-2">
               <li>

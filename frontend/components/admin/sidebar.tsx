@@ -62,7 +62,7 @@ export function AdminSidebar({ isMobile = false }: AdminSidebarProps) {
           <ShieldCheck className="h-5 w-5" />
         </div>
         <div className="flex flex-col">
-          <span className="font-bold text-base tracking-tight text-sidebar-foreground">WaCRM Admin</span>
+          <span className="font-bold text-base tracking-tight text-sidebar-foreground">Resend Admin</span>
           <span className="text-[10px] uppercase font-semibold text-red-500 tracking-wider">
             Super Administrator
           </span>

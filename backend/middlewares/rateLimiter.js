@@ -232,10 +232,58 @@ function authRateLimiter({ limit = 10, windowSizeMs = 60000, prefix = "auth" } =
   };
 }
 
+/**
+ * Dedicated Rate Limiter for Account Signup / Registration
+ * - Enforces burst limit (rapid automated submissions, e.g. 2 / min)
+ * - Enforces sustained limit (e.g. 5 attempts / hour per IP)
+ * - Uses shared database bucket storage (MySQL api_rate_limits)
+ */
+function signupRateLimiter({
+  hourlyLimit = parseInt(process.env.RATE_LIMIT_SIGNUP_HOURLY || "5", 10),
+  burstLimit = parseInt(process.env.RATE_LIMIT_SIGNUP_BURST || "2", 10),
+} = {}) {
+  return async (req, res, next) => {
+    if (!RATE_LIMIT_ENABLED) return next();
+
+    const clientIp =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.headers["x-real-ip"] ||
+      req.socket.remoteAddress ||
+      "unknown_ip";
+
+    // 1. Burst protection (prevent rapid repeated requests from same IP)
+    const burstKey = `signup_burst:${clientIp}`;
+    const burstResult = await checkBucket(burstKey, burstLimit, 60 * 1000);
+    if (burstResult.exceeded) {
+      logger.warn(`[Signup RateLimit Burst] IP ${clientIp} exceeded burst limit (${burstLimit}/min).`);
+      res.setHeader("Retry-After", burstResult.retryAfterSec);
+      return res.status(429).json({
+        success: false,
+        msg: "Too many signup attempts. Please try again later.",
+      });
+    }
+
+    // 2. Hourly protection (max 5 signup attempts per hour from same IP)
+    const hourlyKey = `signup_hourly:${clientIp}`;
+    const hourlyResult = await checkBucket(hourlyKey, hourlyLimit, 60 * 60 * 1000);
+    if (hourlyResult.exceeded) {
+      logger.warn(`[Signup RateLimit Hourly] IP ${clientIp} exceeded hourly limit (${hourlyLimit}/hr).`);
+      res.setHeader("Retry-After", hourlyResult.retryAfterSec);
+      return res.status(429).json({
+        success: false,
+        msg: "Too many signup attempts. Please try again later.",
+      });
+    }
+
+    next();
+  };
+}
+
 module.exports = {
   ipRateLimiter,
   apiRateLimiter,
   authRateLimiter,
+  signupRateLimiter,
   checkConnectionRateLimit,
   checkPlanMonthlyQuota,
   DEFAULT_LIMITS,

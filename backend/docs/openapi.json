@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "WACRM Public REST API",
+    "title": "Resend Public REST API",
     "version": "1.0.0",
     "description": "Production Developer REST API platform for WhatsApp messaging, templates, connections, contacts, and usage analytics."
   },

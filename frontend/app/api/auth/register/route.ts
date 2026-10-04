@@ -4,7 +4,7 @@ import { API_BASE_URL } from '@/config/api';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { name, email, password, mobile_with_country_code, acceptPolicy } = body;
+    const { name, email, password, mobile_with_country_code, acceptPolicy, turnstileToken } = body;
 
     if (!name || !email || !password || !mobile_with_country_code) {
       return NextResponse.json(
@@ -20,16 +20,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!turnstileToken) {
+      return NextResponse.json(
+        { success: false, msg: 'Please complete the security verification.' },
+        { status: 400 }
+      );
+    }
+
+    // Extract client IP to pass through reverse proxy
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      '';
+
     // Call real backend signup
     const signupRes = await fetch(`${API_BASE_URL}/api/user/signup`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(clientIp ? { 'x-forwarded-for': clientIp, 'x-real-ip': clientIp } : {}),
+      },
       body: JSON.stringify({
         name,
         email,
         password,
         mobile_with_country_code,
         acceptPolicy: true,
+        turnstileToken,
       }),
     });
 
@@ -38,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (!signupData.success) {
       return NextResponse.json(
         { success: false, msg: signupData.msg || 'Signup failed' },
-        { status: 400 }
+        { status: signupRes.status >= 400 ? signupRes.status : 400 }
       );
     }
 

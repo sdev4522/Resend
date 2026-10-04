@@ -78,7 +78,7 @@ export function DashboardSidebar() {
             <MessageSquareQuote className="h-4 w-4" />
           </div>
           <span className="font-bold text-base tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
-            WaCRM
+            Resend
           </span>
         </div>
 

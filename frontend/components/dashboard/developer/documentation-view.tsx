@@ -199,13 +199,13 @@ export function DocumentationView() {
           <div className="border-b pb-2">
             <h2 className="text-xl font-bold tracking-tight">Getting Started</h2>
             <p className="text-xs text-muted-foreground">
-              Send your first WhatsApp message in minutes with the WACRM Developer API.
+              Send your first WhatsApp message in minutes with the Resend Developer API.
             </p>
           </div>
 
           <div className="space-y-2">
             <p>
-              The WACRM Public REST API is served directly at <code>{BASE_URL}</code>. Follow these 4 steps to send your first message:
+              The Resend Public REST API is served directly at <code>{BASE_URL}</code>. Follow these 4 steps to send your first message:
             </p>
             <ol className="list-decimal list-inside space-y-1.5 pl-1 text-xs text-foreground/80">
               <li>

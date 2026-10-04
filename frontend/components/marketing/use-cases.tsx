@@ -19,7 +19,7 @@ const USE_CASES: UseCase[] = [
     problem:
       'Support teams juggle physical phones or browser sessions that log each other out, leading to slow replies and lost conversations.',
     solution:
-      'WaCRM consolidates official WhatsApp numbers into a shared multi-agent workspace with live chat assignment, resolution statuses, and canned templates.',
+      'Resend consolidates official WhatsApp numbers into a shared multi-agent workspace with live chat assignment, resolution statuses, and canned templates.',
     outcome:
       'Eliminate duplicate responses, establish clear agent accountability, and cut first-response times from hours to minutes.',
   },
@@ -86,7 +86,7 @@ export function MarketingUseCases() {
           Built for Everyday Business Operations
         </h2>
         <p className="mt-3 text-base sm:text-lg text-muted-foreground">
-          See how companies use WaCRM to solve communication bottlenecks and scale team output.
+          See how companies use Resend to solve communication bottlenecks and scale team output.
         </p>
       </div>
 
@@ -112,7 +112,7 @@ export function MarketingUseCases() {
 
                 <div>
                   <span className="font-semibold text-primary uppercase tracking-wider text-[10px]">
-                    The WaCRM Solution
+                    The Resend Solution
                   </span>
                   <p className="text-foreground/90 mt-0.5">{uc.solution}</p>
                 </div>

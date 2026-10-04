@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     canonical: '/pricing',
   },
   openGraph: {
-    title: 'Pricing — Transparent WhatsApp CRM Plans | WaCRM',
+    title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
     description:
       'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
     url: `${siteConfig.url}/pricing`,
@@ -26,14 +26,14 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'WaCRM Pricing Plans',
+        alt: 'Resend Pricing Plans',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Pricing — Transparent WhatsApp CRM Plans | WaCRM',
+    title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
     description:
       'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
     images: ['/og.png'],

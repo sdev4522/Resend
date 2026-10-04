@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     canonical: '/features',
   },
   openGraph: {
-    title: 'Features — WhatsApp Cloud API, Inbox & Automation | WaCRM',
+    title: 'Features — WhatsApp Cloud API, Inbox & Automation | Resend',
     description:
       'Explore official WhatsApp Cloud API broadcasting, visual no-code flow builder, multi-agent shared inbox, and developer APIs.',
     url: `${siteConfig.url}/features`,
@@ -27,14 +27,14 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'WaCRM Features — WhatsApp Automation & CRM',
+        alt: 'Resend Features — WhatsApp Automation & CRM',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Features — WhatsApp Cloud API, Inbox & Automation | WaCRM',
+    title: 'Features — WhatsApp Cloud API, Inbox & Automation | Resend',
     description:
       'Explore official WhatsApp Cloud API broadcasting, visual no-code flow builder, multi-agent shared inbox, and developer APIs.',
     images: ['/og.png'],

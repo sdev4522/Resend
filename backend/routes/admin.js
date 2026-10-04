@@ -1410,9 +1410,9 @@ router.post("/send_test_email", adminValidator, async (req, res) => {
       finalPort,
       finalEmail,
       finalPassword,
-      `<h1>WACRM SMTP Test Successful</h1><p>Your SMTP credentials are configured correctly and active.</p>`,
-      "WACRM SMTP Testing",
-      req.body.from_name || "WACRM System",
+      `<h1>Resend SMTP Test Successful</h1><p>Your SMTP credentials are configured correctly and active.</p>`,
+      "Resend SMTP Testing",
+      req.body.from_name || "Resend System",
       to,
       finalUsername,
     );
@@ -2717,7 +2717,7 @@ router.post("/send_notification", adminValidator, async (req, res) => {
       try {
         const [smtp] = await query(`SELECT * FROM smtp LIMIT 1`);
         if (smtp && smtp.host && smtp.email && smtp.password) {
-          const appName = "WACRM";
+          const appName = "Resend";
           for (const u of recipientUsers) {
             if (u.email) {
               const htmlBody = `
@@ -2907,8 +2907,8 @@ router.post("/preview_mail_template", adminValidator, async (req, res) => {
       email: "user@example.com",
       plan: "Business Pro Tier",
       amount: "₹1,999",
-      app_name: "WACRM",
-      reset_link: "https://wacrm.io/recovery-user/sample-token-123",
+      app_name: "Resend",
+      reset_link: "https://resend.in/recovery-user/sample-token-123",
     };
 
     let renderedSubject = subject || "";

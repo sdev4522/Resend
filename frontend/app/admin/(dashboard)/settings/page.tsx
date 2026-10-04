@@ -164,7 +164,7 @@ export default function AdminSettingsPage() {
       // 5. Branding settings
       const webRes = await adminApi.getWebPublic();
       if (webRes.success && webRes.data) {
-        setAppName(webRes.data.app_name || 'WaCRM');
+        setAppName(webRes.data.app_name || 'Resend');
         setMetaDescription(webRes.data.meta_description || '');
         setSiteLogo(webRes.data.logo || '');
       }
@@ -761,7 +761,7 @@ export default function AdminSettingsPage() {
                           id="smtpFromName"
                           value={smtpFromName}
                           onChange={(e) => setSmtpFromName(e.target.value)}
-                          placeholder="WaCRM System"
+                          placeholder="Resend System"
                           className="h-9 text-xs"
                         />
                       </div>
@@ -863,7 +863,7 @@ export default function AdminSettingsPage() {
                       id="appName"
                       value={appName}
                       onChange={(e) => setAppName(e.target.value)}
-                      placeholder="WaCRM"
+                      placeholder="Resend"
                       required
                       className="h-9 text-xs"
                     />
@@ -1090,7 +1090,7 @@ export default function AdminSettingsPage() {
                       id="rzWebhookSecret"
                       value={rzWebhookSecret}
                       onChange={(e) => setRzWebhookSecret(e.target.value)}
-                      placeholder="e.g. wacrm_rz_webhook_secret"
+                      placeholder="e.g. resend_rz_webhook_secret"
                       className="font-mono text-xs"
                     />
                     <p className="text-[11px] text-muted-foreground">

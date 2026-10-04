@@ -398,7 +398,7 @@ export default function BillingPage() {
         key: orderData.keyId,
         amount: orderData.amount, // minor units
         currency: orderData.currency,
-        name: 'WACRM',
+        name: 'Resend',
         description: isSub
           ? `${selectedCheckoutPlan.title} Autopay Subscription`
           : `${selectedCheckoutPlan.title} Plan Subscription`,

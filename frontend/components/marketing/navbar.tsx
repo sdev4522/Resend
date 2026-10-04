@@ -25,7 +25,7 @@ export function MarketingNavbar() {
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <MessageSquareQuote className="h-4 w-4" />
           </div>
-          <span>WaCRM</span>
+          <span>Resend</span>
         </Link>
 
         {/* Desktop Menu */}
@@ -88,7 +88,7 @@ export function MarketingNavbar() {
                   <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     <MessageSquareQuote className="h-3.5 w-3.5" />
                   </div>
-                  <span>WaCRM</span>
+                  <span>Resend</span>
                 </SheetTitle>
 
                 <div className="mt-8 flex flex-col gap-4 text-base font-medium">

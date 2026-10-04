@@ -288,7 +288,7 @@ async function createSession(
     const session = new StringSession("");
     const client = new TelegramClient(session, parseInt(apiId), apiHash, {
       connectionRetries: 5,
-      deviceModel: title || "WaCrm",
+      deviceModel: title || "Resend",
       appVersion: "1.0.0",
       autoReconnect: false,
     });

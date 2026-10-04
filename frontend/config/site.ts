@@ -8,18 +8,18 @@ export interface NavItem {
 
 function getCanonicalUrl() {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (!envUrl) return "https://wacrm.com";
+  if (!envUrl) return "https://resend.in";
   if (process.env.NODE_ENV === "production" && envUrl.includes("localhost")) {
-    return "https://wacrm.com";
+    return "https://resend.in";
   }
   return envUrl.replace(/\/+$/, "");
 }
 
 export const siteConfig = {
-  name: "WaCRM",
+  name: "Resend",
   description: "Official WhatsApp CRM, Automation & Multi-Agent Inbox",
   url: getCanonicalUrl(),
-  contactEmail: "support@wacrm.com",
+  contactEmail: "support@resend.in",
   mainNav: [
     { title: "Features", href: "/features" },
     { title: "Pricing", href: "/pricing" },

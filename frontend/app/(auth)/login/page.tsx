@@ -22,7 +22,7 @@ export default function LoginPage() {
   return (
     <Card className="w-full shadow-lg border-border/80">
       <CardHeader className="space-y-1 text-center pb-4">
-        <CardTitle className="text-2xl font-bold tracking-tight">Sign in to WaCRM</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Sign in to Resend</CardTitle>
         <CardDescription className="text-xs">
           Enter your email and password to access your dashboard
         </CardDescription>

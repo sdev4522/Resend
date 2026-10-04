@@ -23,7 +23,7 @@ export function RegisterDialog() {
             <MessageCircle className="h-6 w-6" />
           </div>
           <DialogTitle className="text-xl font-bold tracking-tight">
-            Create your WaCRM account
+            Create your Resend account
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
             Start your 14-day WhatsApp CRM trial. No credit card required.

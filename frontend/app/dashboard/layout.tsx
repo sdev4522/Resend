@@ -5,6 +5,10 @@ import { DashboardSidebar } from '@/components/dashboard/sidebar';
 import { DashboardHeader } from '@/components/dashboard/header';
 
 export const metadata: Metadata = {
+  title: {
+    default: 'Resend Dashboard',
+    template: '%s | Resend',
+  },
   robots: {
     index: false,
     follow: false,

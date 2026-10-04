@@ -440,7 +440,7 @@ router.post("/admin/tickets/:id/reply", adminValidator, async (req, res) => {
       attachmentsJson = JSON.stringify(attachments.slice(0, 5));
     }
 
-    const adminName = "WaCRM Support Team";
+    const adminName = "Resend Support Team";
     await query(
       `INSERT INTO support_messages (ticket_id, sender_type, sender_id, sender_name, message, attachments)
        VALUES (?, 'admin', ?, ?, ?, ?)`,

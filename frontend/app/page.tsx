@@ -15,7 +15,7 @@ import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'WaCRM — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    absolute: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
   },
   description:
     'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform with official Meta Cloud API.',
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     canonical: '/',
   },
   openGraph: {
-    title: 'WaCRM — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    title: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
     description:
       'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform.',
     url: siteConfig.url,
@@ -33,14 +33,14 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'WaCRM — WhatsApp CRM, Automation & Multi-Agent Inbox',
+        alt: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'WaCRM — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    title: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
     description:
       'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform.',
     images: ['/og.png'],

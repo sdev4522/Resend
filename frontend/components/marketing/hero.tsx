@@ -96,7 +96,7 @@ export function MarketingHero() {
             <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
             <span className="ml-2 font-mono text-[11px] text-foreground/80 font-medium hidden sm:inline">
-              wacrm.com/dashboard/inbox
+              resend.in/dashboard/inbox
             </span>
           </div>
           <div className="flex items-center gap-2 text-[11px]">
@@ -198,7 +198,7 @@ export function MarketingHero() {
               {/* Outbound Agent */}
               <div className="flex flex-col items-end max-w-[85%] sm:max-w-[75%] ml-auto">
                 <div className="rounded-2xl rounded-tr-sm bg-primary text-primary-foreground p-3 text-xs leading-relaxed shadow-sm">
-                  Yes, exactly! With WaCRM, your entire team shares verified numbers with live assignment, internal notes, and automated routing rules.
+                  Yes, exactly! With Resend, your entire team shares verified numbers with live assignment, internal notes, and automated routing rules.
                 </div>
                 <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-1 mr-1">
                   <span>10:43 AM</span>

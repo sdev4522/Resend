@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PhoneInput } from '@/components/ui/phone-input';
+import { Turnstile, TurnstileRef } from '@/components/security/turnstile';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface RegisterFormProps {
@@ -28,8 +29,11 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   const [acceptPolicy, setAcceptPolicy] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const turnstileRef = useRef<TurnstileRef>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,6 +59,11 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
       return;
     }
 
+    if (!turnstileToken) {
+      setError('Please complete the security verification.');
+      return;
+    }
+
     setError(null);
     setLoading(true);
 
@@ -65,6 +74,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
         password,
         mobile_with_country_code: cleanPhone,
         acceptPolicy: true,
+        turnstileToken,
       });
 
       if (onSuccess) {
@@ -74,6 +84,8 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
       router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
+      turnstileRef.current?.reset();
+      setTurnstileToken('');
     } finally {
       setLoading(false);
     }
@@ -207,11 +219,30 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
         </Label>
       </div>
 
+      {/* Cloudflare Turnstile */}
+      <div className="flex justify-center py-1">
+        <Turnstile
+          ref={turnstileRef}
+          action="signup"
+          onSuccess={(token) => {
+            setTurnstileToken(token);
+            setError(null);
+          }}
+          onExpire={() => {
+            setTurnstileToken('');
+          }}
+          onError={() => {
+            setTurnstileToken('');
+            setError('Security verification failed. Please try again.');
+          }}
+        />
+      </div>
+
       {/* Submit Button */}
       <Button
         type="submit"
         className="w-full h-10 text-sm font-medium"
-        disabled={loading}
+        disabled={loading || !turnstileToken}
       >
         {loading ? (
           <>

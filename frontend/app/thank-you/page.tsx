@@ -6,8 +6,8 @@ import { MarketingNavbar } from '@/components/marketing/navbar';
 import { MarketingFooter } from '@/components/marketing/footer';
 
 export const metadata = {
-  title: 'Message Received — WaCRM',
-  description: 'Thank you for reaching out to WaCRM. We have received your inquiry.',
+  title: 'Message Received — Resend',
+  description: 'Thank you for reaching out to Resend. We have received your inquiry.',
   robots: {
     index: false,
     follow: false,
@@ -30,7 +30,7 @@ export default function ThankYouPage() {
           </h1>
 
           <p className="mt-4 text-base text-muted-foreground leading-relaxed">
-            Your inquiry has been received by the WaCRM team. We review submissions during standard business hours and will follow up with you at the email address provided.
+            Your inquiry has been received by the Resend team. We review submissions during standard business hours and will follow up with you at the email address provided.
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">

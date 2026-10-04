@@ -53,7 +53,7 @@ function recoverEmail(appName, recoveryLink) {
                 <a href="${recoveryLink}" class="button">Reset Password</a>
                 <p>If you did not request this, you can safely ignore this email.</p>
                 <p>Thank you,</p>
-                <p>${appName}</p>
+                <p>${appName || 'Resend'}</p>
             </div>
         </div>
     </body>
@@ -132,7 +132,7 @@ function verificationOtpEmail(appName, otpCode) {
     <body>
         <div class="email-wrapper">
             <div class="email-card">
-                <div class="brand-name">${appName || 'WaCRM'}</div>
+                <div class="brand-name">${appName || 'Resend'}</div>
                 <h1>Verify Your Email</h1>
                 <p>Use the 6-digit verification code below to complete your registration and activate your workspace:</p>
                 <div class="otp-box">
@@ -140,7 +140,7 @@ function verificationOtpEmail(appName, otpCode) {
                 </div>
                 <p>This code will expire in <strong>30 minutes</strong>. If you did not create an account, you can safely ignore this email.</p>
                 <div class="footer-text">
-                    &copy; ${new Date().getFullYear()} ${appName || 'WaCRM'}. All rights reserved.
+                    &copy; ${new Date().getFullYear()} ${appName || 'Resend'}. All rights reserved.
                 </div>
             </div>
         </div>

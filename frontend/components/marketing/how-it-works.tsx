@@ -65,7 +65,7 @@ export function MarketingHowItWorks() {
           Onboarding Process
         </Badge>
         <h2 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-          How WaCRM Works in Practice
+          How Resend Works in Practice
         </h2>
         <p className="mt-3 text-base sm:text-lg text-muted-foreground">
           Go from setup to live multi-agent WhatsApp customer support in under 10 minutes.

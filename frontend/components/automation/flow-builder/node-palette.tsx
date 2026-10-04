@@ -142,7 +142,7 @@ export const PALETTE_ITEMS: PaletteItem[] = [
           type: 'list',
           header: { type: 'text', text: 'Select Service' },
           body: { text: 'Choose one of our offerings from the list:' },
-          footer: { text: 'Powered by WaCRM' },
+          footer: { text: 'Powered by Resend' },
           action: {
             button: 'View Options',
             sections: [
@@ -308,7 +308,7 @@ export const PALETTE_ITEMS: PaletteItem[] = [
       waForm: {},
       headerText: 'Customer Information',
       bodyText: 'Please fill out this form to proceed.',
-      footerText: 'Powered by WaCRM',
+      footerText: 'Powered by Resend',
       ctaText: 'Open Form',
     },
   },

@@ -17,15 +17,15 @@ import { Badge } from '@/components/ui/badge';
 const FAQ_ITEMS = [
   {
     icon: MessageSquare,
-    question: 'What is WaCRM?',
+    question: 'What is Resend?',
     answer:
-      'WaCRM is an official B2B customer relationship management and team inbox platform for WhatsApp. It allows teams to consolidate WhatsApp conversations, automate routine interactions, run broadcast campaigns, and collaborate seamlessly from a single workspace.',
+      'Resend is an official B2B customer relationship management and team inbox platform for WhatsApp. It allows teams to consolidate WhatsApp conversations, automate routine interactions, run broadcast campaigns, and collaborate seamlessly from a single workspace.',
   },
   {
     icon: Radio,
     question: 'How does WhatsApp integration work?',
     answer:
-      'WaCRM supports direct integration with Meta’s official WhatsApp Business Cloud API for enterprise deliverability and high message limits. For businesses with existing numbers, we also offer high-speed QR instance connectivity for rapid setup.',
+      'Resend supports direct integration with Meta’s official WhatsApp Business Cloud API for enterprise deliverability and high message limits. For businesses with existing numbers, we also offer high-speed QR instance connectivity for rapid setup.',
   },
   {
     icon: Users,
@@ -49,7 +49,7 @@ const FAQ_ITEMS = [
     icon: Send,
     question: 'Can I send marketing broadcasts and campaigns?',
     answer:
-      'Yes. You can broadcast Meta-approved template messages to segmented contact lists. WaCRM includes built-in rate limiting and delivery pacing to protect your account health and reputation.',
+      'Yes. You can broadcast Meta-approved template messages to segmented contact lists. Resend includes built-in rate limiting and delivery pacing to protect your account health and reputation.',
   },
   {
     icon: Zap,
@@ -59,7 +59,7 @@ const FAQ_ITEMS = [
   },
   {
     icon: Code2,
-    question: 'Does WaCRM have a Developer REST API?',
+    question: 'Does Resend have a Developer REST API?',
     answer:
       'Yes. Our public REST API (v1) and HMAC-SHA256 verified webhooks allow you to send messages, manage contacts, query analytics, and trigger external workflows from your internal systems, CRM, or e-commerce store.',
   },

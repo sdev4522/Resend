@@ -4,6 +4,7 @@ import { MessageCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/shared/theme-toggle';
 
 export const metadata: Metadata = {
+  title: 'Resend Workspace Setup',
   robots: {
     index: false,
     follow: false,
@@ -23,7 +24,7 @@ export default function OnboardingLayout({
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
             <MessageCircle className="h-5 w-5" />
           </div>
-          <span className="font-bold text-lg tracking-tight text-foreground">WaCRM Setup</span>
+          <span className="font-bold text-lg tracking-tight text-foreground">Resend Setup</span>
         </div>
 
         <div className="flex items-center gap-3">

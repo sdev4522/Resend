@@ -29,7 +29,7 @@ export default function AuthLayout({
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <MessageSquareQuote className="h-5 w-5" />
           </div>
-          <span className="font-bold text-2xl tracking-tight text-foreground">WaCRM</span>
+          <span className="font-bold text-2xl tracking-tight text-foreground">Resend</span>
         </Link>
       </div>
 
@@ -40,7 +40,7 @@ export default function AuthLayout({
 
       {/* Footer */}
       <div className="mt-8 text-center text-xs text-muted-foreground">
-        &copy; {new Date().getFullYear()} WaCRM Inc. All rights reserved.
+        &copy; {new Date().getFullYear()} Resend Inc. All rights reserved.
       </div>
     </div>
   );

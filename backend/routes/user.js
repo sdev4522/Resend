@@ -38,7 +38,8 @@ const {
 } = require("../middlewares/plan.js");
 const crypto = require("crypto");
 const { recoverEmail, verificationOtpEmail } = require("../emails/returnEmails.js");
-const { authRateLimiter } = require("../middlewares/rateLimiter.js");
+const { authRateLimiter, signupRateLimiter } = require("../middlewares/rateLimiter.js");
+const { verifyTurnstileToken } = require("../utils/turnstile.js");
 const moment = require("moment");
 const fetch = require("node-fetch");
 const jwt = require("jsonwebtoken");
@@ -313,11 +314,31 @@ router.post("/login_with_google", async (req, res) => {
   }
 });
 
-// aignup user
-router.post("/signup", authRateLimiter({ limit: 10, prefix: "signup_user" }), async (req, res) => {
+// signup user with Turnstile protection & signup rate limits
+router.post("/signup", signupRateLimiter(), async (req, res) => {
   try {
-    const { email, name, password, mobile_with_country_code, acceptPolicy } =
+    const { email, name, password, mobile_with_country_code, acceptPolicy, turnstileToken } =
       req.body;
+
+    const clientIp =
+      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+      req.headers["x-real-ip"] ||
+      req.socket.remoteAddress ||
+      "unknown_ip";
+
+    // 1. Mandatory Cloudflare Turnstile Verification
+    const turnstileCheck = await verifyTurnstileToken({
+      token: turnstileToken,
+      clientIp,
+      action: "signup",
+    });
+
+    if (!turnstileCheck.success) {
+      return res.status(400).json({
+        success: false,
+        msg: turnstileCheck.msg || "Security verification failed. Please try again.",
+      });
+    }
 
     if (!email || !name || !password || !mobile_with_country_code) {
       return res.json({ msg: "Please fill the details", success: false });
@@ -378,7 +399,7 @@ router.post("/signup", authRateLimiter({ limit: 10, prefix: "signup_user" }), as
     // Send verification email via SMTP
     try {
       const getWeb = await query(`SELECT * FROM web_public`, []);
-      const appName = getWeb[0]?.app_name || "WaCRM";
+      const appName = getWeb[0]?.app_name || "Resend";
       const getHtml = verificationOtpEmail(appName, otpCode);
 
       const smtp = await query(`SELECT * FROM smtp`, []);
@@ -601,7 +622,7 @@ router.post("/resend_verification", async (req, res) => {
 
     try {
       const getWeb = await query(`SELECT * FROM web_public`, []);
-      const appName = getWeb[0]?.app_name || "WaCRM";
+      const appName = getWeb[0]?.app_name || "Resend";
       const getHtml = verificationOtpEmail(appName, otpCode);
       const smtp = await query(`SELECT * FROM smtp`, []);
       if (
@@ -2280,7 +2301,7 @@ router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "recovery_user
     }
 
     const getWeb = await query(`SELECT * FROM web_public`, []);
-    const appName = getWeb[0]?.app_name || "WACRM";
+    const appName = getWeb[0]?.app_name || "Resend";
 
     // Secure token: does NOT contain user password hash; includes purpose and tokenVersion for single-use
     const jsontoken = sign(

@@ -39,9 +39,9 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
-  authors: [{ name: 'WaCRM Team' }],
-  creator: 'WaCRM Inc.',
-  publisher: 'WaCRM Inc.',
+  authors: [{ name: 'Resend Team' }],
+  creator: 'Resend Inc.',
+  publisher: 'Resend Inc.',
   formatDetection: {
     email: false,
     address: false,

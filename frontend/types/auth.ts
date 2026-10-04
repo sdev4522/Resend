@@ -21,6 +21,7 @@ export interface RegisterPayload {
   mobile_with_country_code?: string;
   acceptPolicy?: boolean;
   timezone?: string;
+  turnstileToken?: string;
 }
 
 export interface ForgotPasswordPayload {

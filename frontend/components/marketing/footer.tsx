@@ -22,7 +22,7 @@ export function MarketingFooter() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <MessageSquareQuote className="h-4 w-4" />
               </div>
-              <span>WaCRM</span>
+              <span>Resend</span>
             </Link>
             <p className="text-xs leading-relaxed text-muted-foreground">
               Official WhatsApp CRM, automation, and multi-agent customer communication suite.
@@ -83,7 +83,7 @@ export function MarketingFooter() {
 
         {/* Bottom copyright */}
         <div className="mt-12 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>&copy; {new Date().getFullYear()} WaCRM. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Resend. All rights reserved.</p>
           <div className="flex items-center gap-2 text-xs">
             <ShieldCheck className="h-4 w-4 text-primary" />
             <span>Meta WhatsApp Cloud API Compliance</span>

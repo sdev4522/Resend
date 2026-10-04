@@ -2,8 +2,8 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'WaCRM — WhatsApp CRM & Automation',
-    short_name: 'WaCRM',
+    name: 'Resend — WhatsApp CRM & Automation',
+    short_name: 'Resend',
     description: 'Official WhatsApp CRM, Automation & Multi-Agent Inbox',
     start_url: '/',
     display: 'standalone',

@@ -26,7 +26,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/`);
     assert(res.status === 200, 'Homepage returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('<title>WaCRM — WhatsApp CRM, Automation &amp; Multi-Agent Inbox</title>') || html.includes('<title>WaCRM — WhatsApp CRM, Automation & Multi-Agent Inbox</title>'), 'Homepage has exact, unique title');
+    assert(html.includes('<title>Resend — WhatsApp CRM, Automation &amp; Multi-Agent Inbox</title>') || html.includes('<title>Resend — WhatsApp CRM, Automation & Multi-Agent Inbox</title>'), 'Homepage has exact, unique title');
     assert(html.includes('name="description"'), 'Homepage has meta description');
     assert(html.includes('rel="canonical"'), 'Homepage has canonical link');
     assert(html.includes('property="og:image"'), 'Homepage has og:image');
@@ -47,7 +47,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/features`);
     assert(res.status === 200, 'Features page returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('Features — WhatsApp Cloud API, Inbox &amp; Automation | WaCRM') || html.includes('Features — WhatsApp Cloud API, Inbox & Automation | WaCRM'), 'Features page has unique title');
+    assert(html.includes('Features — WhatsApp Cloud API, Inbox &amp; Automation | Resend') || html.includes('Features — WhatsApp Cloud API, Inbox & Automation | Resend'), 'Features page has unique title');
     assert(html.includes('canonical') && html.includes('/features'), 'Features page has canonical URL to /features');
     assert(html.includes('BreadcrumbList'), 'Features page has BreadcrumbList structured data');
   } catch (e) {
@@ -60,7 +60,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/pricing`);
     assert(res.status === 200, 'Pricing page returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('Pricing — Transparent WhatsApp CRM Plans | WaCRM'), 'Pricing page has unique title');
+    assert(html.includes('Pricing — Transparent WhatsApp CRM Plans | Resend'), 'Pricing page has unique title');
     assert(html.includes('canonical') && html.includes('/pricing'), 'Pricing page has canonical URL to /pricing');
     assert(html.includes('Starter') && html.includes('Growth') && html.includes('Enterprise'), 'Pricing plans rendered correctly');
     assert(html.includes('schema.org') && html.includes('Offer'), 'Pricing page has Schema.org Offers');
@@ -74,8 +74,8 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/contact`);
     assert(res.status === 200, 'Contact page returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('Contact Sales &amp; Customer Support | WaCRM') || html.includes('Contact Sales & Customer Support | WaCRM'), 'Contact page has unique title');
-    assert(html.includes('support@wacrm.com'), 'Real business contact email displayed');
+    assert(html.includes('Contact Sales &amp; Customer Support | Resend') || html.includes('Contact Sales & Customer Support | Resend'), 'Contact page has unique title');
+    assert(html.includes('support@resend.in'), 'Real business contact email displayed');
     assert(html.includes('contact-name') && html.includes('contact-email') && html.includes('contact-content'), 'Contact form fields present');
     assert(html.includes('Spam Prevention Challenge'), 'CAPTCHA challenge rendered');
   } catch (e) {
@@ -88,7 +88,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/privacy`);
     assert(res.status === 200, 'Privacy policy returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('Privacy Policy | WaCRM'), 'Privacy policy has unique title');
+    assert(html.includes('Privacy Policy | Resend'), 'Privacy policy has unique title');
     assert(html.includes('WhatsApp &amp; Meta Platform Compliance') || html.includes('WhatsApp & Meta Platform Compliance'), 'Accurately covers WhatsApp Cloud API compliance');
     assert(html.includes('Cookies &amp; Local Storage') || html.includes('Cookies & Local Storage'), 'Accurately documents essential vs telemetry cookies');
   } catch (e) {
@@ -101,7 +101,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/terms`);
     assert(res.status === 200, 'Terms page returns HTTP 200');
     const html = await res.text();
-    assert(html.includes('Terms and Conditions | WaCRM'), 'Terms page has unique title');
+    assert(html.includes('Terms and Conditions | Resend'), 'Terms page has unique title');
     assert(html.includes('WhatsApp Business Messaging Policy'), 'Terms specify WhatsApp policy compliance');
   } catch (e) {
     assert(false, `Terms failed: ${e.message}`);

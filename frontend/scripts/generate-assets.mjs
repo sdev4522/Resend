@@ -62,7 +62,7 @@ const ogSvg = `
     <circle cx="29" cy="36" r="2.5" fill="#25D366" />
     <circle cx="36" cy="36" r="2.5" fill="#25D366" />
     <circle cx="43" cy="36" r="2.5" fill="#25D366" />
-    <text x="92" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="800" fill="#ffffff" letter-spacing="-0.03em">WaCRM</text>
+    <text x="92" y="48" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="800" fill="#ffffff" letter-spacing="-0.03em">Resend</text>
   </g>
 
   <!-- Pill Badge -->
@@ -117,7 +117,7 @@ const logoSvg = `
   <circle cx="46" cy="57.5" r="3" fill="#25D366" />
   <circle cx="55" cy="57.5" r="3" fill="#25D366" />
   <circle cx="64" cy="57.5" r="3" fill="#25D366" />
-  <text x="120" y="78" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#09090b" letter-spacing="-0.03em">WaCRM</text>
+  <text x="120" y="78" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="#09090b" letter-spacing="-0.03em">Resend</text>
 </svg>
 `;
 

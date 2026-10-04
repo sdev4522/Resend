@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     canonical: '/faq',
   },
   openGraph: {
-    title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | WaCRM',
+    title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | Resend',
     description:
       'Answers to common questions regarding WhatsApp Cloud API integration, multi-agent inbox setup, broadcast deliverability, and SaaS billing.',
     url: `${siteConfig.url}/faq`,
@@ -25,14 +25,14 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'WaCRM Frequently Asked Questions',
+        alt: 'Resend Frequently Asked Questions',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | WaCRM',
+    title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | Resend',
     description:
       'Answers to common questions regarding WhatsApp Cloud API integration, multi-agent inbox setup, broadcast deliverability, and SaaS billing.',
     images: ['/og.png'],
@@ -46,10 +46,10 @@ export default function FAQPage() {
     mainEntity: [
       {
         '@type': 'Question',
-        name: 'What is WaCRM?',
+        name: 'What is Resend?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'WaCRM is an official B2B customer relationship management and team inbox platform for WhatsApp. It allows teams to consolidate WhatsApp conversations, automate routine interactions, run broadcast campaigns, and collaborate seamlessly from a single workspace.',
+          text: 'Resend is an official B2B customer relationship management and team inbox platform for WhatsApp. It allows teams to consolidate WhatsApp conversations, automate routine interactions, run broadcast campaigns, and collaborate seamlessly from a single workspace.',
         },
       },
       {
@@ -57,7 +57,7 @@ export default function FAQPage() {
         name: 'How does WhatsApp integration work?',
         acceptedAnswer: {
           '@type': 'Answer',
-          text: 'WaCRM supports direct integration with Meta’s official WhatsApp Business Cloud API for enterprise deliverability and high message limits. For businesses with existing numbers, we also offer high-speed QR instance connectivity for rapid setup.',
+          text: 'Resend supports direct integration with Meta’s official WhatsApp Business Cloud API for enterprise deliverability and high message limits. For businesses with existing numbers, we also offer high-speed QR instance connectivity for rapid setup.',
         },
       },
       {

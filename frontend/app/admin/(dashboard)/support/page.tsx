@@ -558,7 +558,7 @@ export default function AdminSupportPage() {
                       <div className="flex items-center gap-2">
                         {isAdmin ? (
                           <Badge className="bg-red-600/20 text-red-400 border border-red-500/30 text-[10px]">
-                            WaCRM Support
+                            Resend Support
                           </Badge>
                         ) : (
                           <Badge variant="secondary" className="text-[10px]">
