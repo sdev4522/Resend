@@ -6,3 +6,13 @@ Docs/
 .DS_Store
 *.log
 .codegraph/
+# Environment secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Editor temporary files
+*.swp
+*.swo
+*~
