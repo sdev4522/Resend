@@ -60,12 +60,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Email verification is required before session creation
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       email_verification_required: true,
       email: email.toLowerCase().trim(),
       msg: signupData.msg || 'Account created. Please verify your email with the 6-digit code.',
     });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    return response;
   } catch (error: any) {
     console.error('Registration route error:', error);
     return NextResponse.json(

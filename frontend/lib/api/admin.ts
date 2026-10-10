@@ -37,8 +37,8 @@ export const adminApi = {
     return api.get<{ success: boolean; data: AdminOverviewStats }>(API_ENDPOINTS.admin.stats);
   },
 
-  getUsers: () => {
-    return api.get<{ success: boolean; data: AdminUserListItem[] }>(API_ENDPOINTS.admin.users);
+  getUsers: (params?: { email_status?: string }) => {
+    return api.get<{ success: boolean; data: AdminUserListItem[] }>(API_ENDPOINTS.admin.users, { params });
   },
 
   getPlans: () => {
@@ -192,6 +192,14 @@ export const adminApi = {
 
   deleteUser: (id: number) => {
     return api.post<{ success: boolean; msg: string }>('/admin/del_user', { id });
+  },
+
+  deleteUsers: (userIds: (number | string)[]) => {
+    return api.post<{ success: boolean; msg: string; deletedCount?: number; deletedUids?: string[] }>('/admin/delete_users', { userIds });
+  },
+
+  verifyUserEmail: (uid: string) => {
+    return api.post<{ success: boolean; msg: string }>('/admin/verify_user_email', { uid });
   },
 
   getWebPublic: () => {

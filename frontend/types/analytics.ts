@@ -214,6 +214,8 @@ export interface AdminUserDetails {
     subscription_status: string | null;
     is_blocked: number;
     parsedPlan?: any;
+    email_verified_at?: string | null;
+    email_status?: 'verified' | 'unverified' | 'pending' | 'unknown';
   };
   stats: {
     instancesCount: number;

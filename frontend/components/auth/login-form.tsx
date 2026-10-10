@@ -36,7 +36,12 @@ export function LoginForm({ onSuccess, onSwitchToRegister, initialError = null }
         onSuccess();
       }
     } catch (err: any) {
-      if (err.message && err.message.toLowerCase().includes('verify your email')) {
+      const isUnverified =
+        err?.data?.code === 'EMAIL_VERIFICATION_REQUIRED' ||
+        err?.data?.email_unverified ||
+        (err?.message && err.message.toLowerCase().includes('verify your email'));
+
+      if (isUnverified) {
         setUnverifiedEmail(email.trim().toLowerCase());
       } else {
         setError(err.message || 'Invalid email or password');

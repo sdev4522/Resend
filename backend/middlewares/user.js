@@ -52,7 +52,19 @@ const validateUser = async (req, res, next) => {
     if (getUser[0].is_blocked) {
       return res.status(403).json({
         success: false,
+        code: "ACCOUNT_SUSPENDED",
         msg: "Your account has been suspended by an administrator. Please contact support.",
+      });
+    }
+
+    if (!getUser[0].email_verified_at) {
+      return res.status(403).json({
+        success: false,
+        code: "EMAIL_VERIFICATION_REQUIRED",
+        logout: true,
+        email_unverified: true,
+        email: getUser[0].email,
+        msg: "Please verify your email address before accessing the application.",
       });
     }
 

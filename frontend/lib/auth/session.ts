@@ -8,6 +8,7 @@ export interface JWTPayload {
   owner_uid?: string;
   tokenVersion?: number;
   email?: string;
+  emailVerified?: boolean;
   exp?: number;
   iat?: number;
 }

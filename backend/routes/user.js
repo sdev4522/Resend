@@ -265,8 +265,8 @@ router.post("/login_with_google", async (req, res) => {
       const hasPass = await bcrypt.hash(randomPassword, 10);
 
       await query(
-        `INSERT INTO user (name, uid, email, password, tokenVersion) VALUES (?,?,?,?,?)`,
-        [name, uid, email, hasPass, 0],
+        `INSERT INTO user (name, uid, email, password, tokenVersion, email_verified_at) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)`,
+        [name, uid, email.toLowerCase().trim(), hasPass, 0],
       );
 
       const loginToken = sign(
@@ -274,6 +274,7 @@ router.post("/login_with_google", async (req, res) => {
           uid,
           role: "user",
           tokenVersion: 0,
+          emailVerified: true,
         },
         process.env.JWTKEY,
         {
@@ -281,6 +282,7 @@ router.post("/login_with_google", async (req, res) => {
         },
       );
 
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       return res.json({
         success: true,
         token: loginToken,
@@ -288,11 +290,16 @@ router.post("/login_with_google", async (req, res) => {
     }
 
     // EXISTING USER
+    if (!getUser[0].email_verified_at) {
+      await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [getUser[0].uid]);
+    }
+
     const loginToken = sign(
       {
         uid: getUser[0].uid,
         role: "user",
         tokenVersion: getUser[0].tokenVersion || 0,
+        emailVerified: true,
       },
       process.env.JWTKEY,
       {
@@ -300,6 +307,7 @@ router.post("/login_with_google", async (req, res) => {
       },
     );
 
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return res.json({
       success: true,
       token: loginToken,
@@ -470,10 +478,12 @@ router.post("/verify_email", async (req, res) => {
           uid: user.uid,
           role: "user",
           tokenVersion: user.tokenVersion || 0,
+          emailVerified: true,
         },
         process.env.JWTKEY,
         { expiresIn: "7d" }
       );
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       return res.json({
         success: true,
         already_verified: true,
@@ -528,6 +538,7 @@ router.post("/verify_email", async (req, res) => {
     }
 
     await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE id = ?`, [record.id]);
+    await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE email = ? AND used_at IS NULL`, [userEmail]);
     await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [user.uid]);
 
     const updatedUsers = await query(`SELECT * FROM user WHERE uid = ?`, [user.uid]);
@@ -538,11 +549,13 @@ router.post("/verify_email", async (req, res) => {
         uid: updatedUser.uid,
         role: "user",
         tokenVersion: updatedUser.tokenVersion || 0,
+        emailVerified: true,
       },
       process.env.JWTKEY,
       { expiresIn: "7d" }
     );
 
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return res.json({
       success: true,
       token: authToken,
@@ -608,6 +621,12 @@ router.post("/resend_verification", async (req, res) => {
       });
     }
 
+    // Invalidate previous outstanding tokens for this email
+    await query(
+      `UPDATE email_verification SET expires_at = NOW() WHERE email = ? AND used_at IS NULL AND expires_at > NOW()`,
+      [userEmail]
+    );
+
     const otpCode = Math.floor(100000 + crypto.randomInt(900000)).toString();
     const tokenHash = crypto
       .createHash("sha256")
@@ -650,6 +669,7 @@ router.post("/resend_verification", async (req, res) => {
       logger.log(`Error resending verification email to ${userEmail}:`, mailErr);
     }
 
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return res.json({
       success: true,
       cooldown: 60,
@@ -673,24 +693,30 @@ router.post("/login", authRateLimiter({ limit: 15, prefix: "login_user" }), asyn
       });
     }
 
+    const cleanEmail = email.toString().toLowerCase().trim();
+
     // check for user
-    const userFind = await query(`SELECT * FROM user WHERE email = ?`, [email]);
+    const userFind = await query(`SELECT * FROM user WHERE email = ?`, [cleanEmail]);
     if (userFind.length < 1) {
-      return res.status(401).json({ success: false, msg: "Invalid credentials" });
+      return res.status(401).json({ success: false, code: "INVALID_CREDENTIALS", msg: "Invalid credentials" });
     }
 
     const compare = await bcrypt.compare(password, userFind[0].password);
 
     if (!compare) {
-      return res.status(401).json({ success: false, msg: "Invalid credentials" });
+      return res.status(401).json({ success: false, code: "INVALID_CREDENTIALS", msg: "Invalid credentials" });
     } else if (userFind[0].is_blocked) {
       return res.status(403).json({
         success: false,
+        code: "ACCOUNT_SUSPENDED",
         msg: "Your account has been suspended by an administrator. Please contact support.",
       });
     } else if (!userFind[0].email_verified_at) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
       return res.status(403).json({
         success: false,
+        code: "EMAIL_VERIFICATION_REQUIRED",
         email_unverified: true,
         email: userFind[0].email,
         msg: "Please verify your email address before logging in.",
@@ -701,12 +727,14 @@ router.post("/login", authRateLimiter({ limit: 15, prefix: "login_user" }), asyn
           uid: userFind[0].uid,
           role: "user",
           tokenVersion: userFind[0].tokenVersion || 0,
+          emailVerified: true,
         },
         process.env.JWTKEY,
         {
           expiresIn: "7d",
         },
       );
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       res.json({
         success: true,
         token,

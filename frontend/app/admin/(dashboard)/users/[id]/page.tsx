@@ -48,6 +48,10 @@ import {
   Loader2,
   AlertTriangle,
   CheckCircle2,
+  Mail,
+  Clock,
+  XCircle,
+  HelpCircle,
 } from 'lucide-react';
 
 export default function AdminUserInspectorPage({
@@ -76,6 +80,29 @@ export default function AdminUserInspectorPage({
 
   // Impersonate
   const [impersonateLoading, setImpersonateLoading] = useState(false);
+
+  // Manual Email Verification
+  const [showVerifyDialog, setShowVerifyDialog] = useState(false);
+  const [verifyLoading, setVerifyLoading] = useState(false);
+
+  const handleManualVerify = async () => {
+    if (!details?.user) return;
+    setVerifyLoading(true);
+    try {
+      const res = await adminApi.verifyUserEmail(details.user.uid);
+      if (res && res.success) {
+        setShowVerifyDialog(false);
+        setActionSuccess(`Email for ${details.user.email} marked as verified.`);
+        await fetchUserDetails();
+      } else {
+        alert(res?.msg || 'Failed to verify email.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error communicating with server.');
+    } finally {
+      setVerifyLoading(false);
+    }
+  };
 
   const fetchUserDetails = async () => {
     setLoading(true);
@@ -188,6 +215,42 @@ export default function AdminUserInspectorPage({
       return parsed.title || 'Custom Plan';
     } catch {
       return 'Standard Plan';
+    }
+  };
+
+  const renderEmailStatusBadge = (userData: any) => {
+    const status = userData.email_status || (userData.email_verified_at ? 'verified' : 'unverified');
+
+    switch (status) {
+      case 'verified':
+        return (
+          <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[11px] px-2 py-0.5 font-medium inline-flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3 shrink-0" />
+            Verified
+          </Badge>
+        );
+      case 'pending':
+        return (
+          <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[11px] px-2 py-0.5 font-medium inline-flex items-center gap-1">
+            <Clock className="h-3 w-3 shrink-0" />
+            Pending
+          </Badge>
+        );
+      case 'unknown':
+        return (
+          <Badge variant="outline" className="text-muted-foreground text-[11px] px-2 py-0.5 font-normal inline-flex items-center gap-1">
+            <HelpCircle className="h-3 w-3 shrink-0" />
+            Unknown
+          </Badge>
+        );
+      case 'unverified':
+      default:
+        return (
+          <Badge className="bg-red-500/15 text-red-700 dark:text-red-400 border-red-500/30 text-[11px] px-2 py-0.5 font-medium inline-flex items-center gap-1">
+            <XCircle className="h-3 w-3 shrink-0" />
+            Unverified
+          </Badge>
+        );
     }
   };
 
@@ -329,6 +392,34 @@ export default function AdminUserInspectorPage({
             </div>
 
             <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5">
+                  <Mail className="h-3.5 w-3.5" /> Email Status
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {renderEmailStatusBadge(user)}
+                  {!(user.email_status === 'verified' || user.email_verified_at) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowVerifyDialog(true)}
+                      className="h-6 px-1.5 text-[10px] text-emerald-600 hover:text-emerald-700"
+                    >
+                      Verify
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {user.email_verified_at && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Verified At
+                  </span>
+                  <span className="font-mono text-[11px]">
+                    {new Date(user.email_verified_at).toLocaleString()}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-1.5">
                   <Phone className="h-3.5 w-3.5" /> Mobile
@@ -618,6 +709,40 @@ export default function AdminUserInspectorPage({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Manual Email Verification Confirmation Dialog */}
+      <Dialog open={showVerifyDialog} onOpenChange={(open) => !open && !verifyLoading && setShowVerifyDialog(false)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+              <CheckCircle2 className="h-5 w-5" />
+              Manually Verify User Email
+            </DialogTitle>
+            <DialogDescription className="text-xs space-y-2">
+              <p>
+                Are you sure you want to mark <strong>{user.email}</strong> ({user.name}) as email-verified?
+              </p>
+              <p className="text-muted-foreground">
+                This will record an authoritative verification timestamp in the database and allow this user to log into the platform immediately. This administrative override will be logged in the system audit log.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="gap-2 sm:gap-0 mt-4">
+            <Button variant="outline" onClick={() => setShowVerifyDialog(false)} disabled={verifyLoading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleManualVerify}
+              disabled={verifyLoading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {verifyLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Confirm Verification
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

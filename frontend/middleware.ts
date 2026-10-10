@@ -5,16 +5,19 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value;
+  const decoded = sessionCookie ? parseJwt(sessionCookie) : null;
+  const role = roleCookie || decoded?.role;
 
   // Admin login route
   const isAdminLogin = pathname === '/admin/login';
 
-  // Public user auth routes
+  // Public user auth routes (excluding /verify-email so unverified users aren't bounced)
   const isUserAuthRoute =
     pathname === '/login' ||
     pathname === '/register' ||
-    pathname === '/forgot-password' ||
-    pathname === '/verify-email';
+    pathname === '/forgot-password';
+
+  const isVerifyEmailRoute = pathname === '/verify-email';
 
   // Protected admin routes: /admin and /admin/* EXCEPT /admin/login
   const isProtectedAdminRoute = pathname.startsWith('/admin') && !isAdminLogin;
@@ -38,18 +41,35 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(adminLoginUrl);
   }
 
+  // Case 2b: User has session cookie but is unverified
+  if (sessionCookie && role === 'user' && decoded?.emailVerified === false) {
+    if (isProtectedUserRoute) {
+      const verifyUrl = new URL('/verify-email', request.url);
+      if (decoded.email) verifyUrl.searchParams.set('email', decoded.email);
+      return NextResponse.redirect(verifyUrl);
+    }
+  }
+
   // Case 3: Authenticated user visiting /login, /register, /forgot-password
   if (sessionCookie && isUserAuthRoute) {
-    const role = roleCookie || parseJwt(sessionCookie)?.role;
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
+    if (role === 'user' && decoded?.emailVerified === false) {
+      const verifyUrl = new URL('/verify-email', request.url);
+      if (decoded.email) verifyUrl.searchParams.set('email', decoded.email);
+      return NextResponse.redirect(verifyUrl);
+    }
+    return NextResponse.redirect(new URL('/dashboard', request.url));
+  }
+
+  // Case 3b: Authenticated user visiting /verify-email who is already verified
+  if (sessionCookie && isVerifyEmailRoute && decoded?.emailVerified === true) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   // Case 4: Authenticated user visiting /admin/login
   if (sessionCookie && isAdminLogin) {
-    const role = roleCookie || parseJwt(sessionCookie)?.role;
     if (role === 'admin') {
       return NextResponse.redirect(new URL('/admin', request.url));
     }
@@ -58,7 +78,6 @@ export function middleware(request: NextRequest) {
 
   // Case 5: Authenticated non-admin trying to access protected admin routes
   if (sessionCookie && isProtectedAdminRoute) {
-    const role = roleCookie || parseJwt(sessionCookie)?.role;
     if (role !== 'admin') {
       const dashboardUrl = new URL('/dashboard', request.url);
       dashboardUrl.searchParams.set('error', 'unauthorized_admin');

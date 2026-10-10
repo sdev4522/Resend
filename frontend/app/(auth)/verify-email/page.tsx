@@ -67,16 +67,14 @@ function VerifyEmailContent() {
     }
   }, [emailParam]);
 
-  // Handle auto-population from URL
+  // Handle auto-population from URL (pre-fills digits without auto-submitting,
+  // preventing anti-spam/security link scanners from consuming single-use OTPs)
   useEffect(() => {
     if (codeParam && codeParam.length === 6) {
       const digits = codeParam.split('').slice(0, 6);
       setOtpDigits(digits);
-      if (emailParam) {
-        handleVerifyDigits(emailParam, codeParam);
-      }
     }
-  }, [codeParam, emailParam, handleVerifyDigits]);
+  }, [codeParam]);
 
   // Cooldown timer
   useEffect(() => {

@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const con = require("../database/config.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const { sign } = require("jsonwebtoken");
@@ -301,21 +302,36 @@ router.post("/del_plan", adminValidator, async (req, res) => {
 });
 
 // get all users (supports optional server-side pagination & search)
+// get all users (supports optional server-side pagination, search & email verification status)
 router.get("/get_users", adminValidator, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = req.query.limit ? Math.min(100, Math.max(1, parseInt(req.query.limit))) : null;
     const search = req.query.search ? String(req.query.search).trim() : null;
+    const emailStatusFilter = req.query.email_status ? String(req.query.email_status).trim().toLowerCase() : null;
 
-    let sql = `SELECT id, role, uid, name, email, mobile_with_country_code, timezone, plan, plan_expire, trial, createdAt, tokenVersion, subscription_id, subscription_status, is_blocked FROM user`;
+    let sql = `
+      SELECT 
+        u.id, u.role, u.uid, u.name, u.email, u.mobile_with_country_code, 
+        u.timezone, u.plan, u.plan_expire, u.trial, u.createdAt, 
+        u.tokenVersion, u.subscription_id, u.subscription_status, u.is_blocked, 
+        u.email_verified_at,
+        (SELECT COUNT(*) FROM email_verification ev WHERE ev.email = u.email AND ev.used_at IS NULL AND ev.expires_at > NOW()) as pending_verification_count
+      FROM user u
+    `;
     const params = [];
+    const conditions = [];
 
     if (search) {
-      sql += ` WHERE (name LIKE ? OR email LIKE ? OR mobile_with_country_code LIKE ?)`;
-      params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+      conditions.push(`(u.name LIKE ? OR u.email LIKE ? OR u.mobile_with_country_code LIKE ? OR u.uid LIKE ?)`);
+      params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
     }
 
-    sql += ` ORDER BY id DESC`;
+    if (conditions.length > 0) {
+      sql += ` WHERE ` + conditions.join(" AND ");
+    }
+
+    sql += ` ORDER BY u.id DESC`;
 
     if (limit) {
       const offset = (page - 1) * limit;
@@ -323,11 +339,37 @@ router.get("/get_users", adminValidator, async (req, res) => {
       params.push(limit, offset);
     }
 
-    const data = await query(sql, params);
-    res.json({ data, success: true });
+    const rawData = await query(sql, params);
+
+    // Compute authoritative email_status for every user
+    const data = rawData.map((u) => {
+      let emailStatus = "unverified";
+      if (u.email_verified_at !== null) {
+        emailStatus = "verified";
+      } else if (Number(u.pending_verification_count || 0) > 0) {
+        emailStatus = "pending";
+      } else if (u.createdAt && new Date(u.createdAt) < new Date("2026-09-23T00:00:00.000Z")) {
+        emailStatus = "unknown";
+      } else {
+        emailStatus = "unverified";
+      }
+
+      const { pending_verification_count: _, ...cleanUser } = u;
+      return {
+        ...cleanUser,
+        email_status: emailStatus,
+      };
+    });
+
+    const filteredData = emailStatusFilter && ["verified", "unverified", "pending", "unknown"].includes(emailStatusFilter)
+      ? data.filter((u) => u.email_status === emailStatusFilter)
+      : data;
+
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    res.json({ data: filteredData, success: true });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong" });
     logger.log(err);
+    res.json({ success: false, msg: "something went wrong", err });
   }
 });
 
@@ -339,15 +381,31 @@ router.get("/get_user_details", adminValidator, async (req, res) => {
       return res.status(400).json({ success: false, msg: "User UID is required" });
     }
 
-    const [user] = await query(
-      `SELECT id, role, uid, name, email, mobile_with_country_code, timezone, plan, plan_expire, trial, createdAt, subscription_id, subscription_status, is_blocked 
-       FROM user WHERE uid = ?`,
+    const rawUsers = await query(
+      `SELECT u.id, u.role, u.uid, u.name, u.email, u.mobile_with_country_code, u.timezone, u.plan, u.plan_expire, u.trial, u.createdAt, u.subscription_id, u.subscription_status, u.is_blocked, u.email_verified_at,
+        (SELECT COUNT(*) FROM email_verification ev WHERE ev.email = u.email AND ev.used_at IS NULL AND ev.expires_at > NOW()) as pending_verification_count 
+       FROM user u WHERE u.uid = ?`,
       [uid]
     );
 
-    if (!user) {
+    if (rawUsers.length === 0) {
       return res.status(404).json({ success: false, msg: "User not found" });
     }
+
+    const userRaw = rawUsers[0];
+    let emailStatus = "unverified";
+    if (userRaw.email_verified_at !== null) {
+      emailStatus = "verified";
+    } else if (Number(userRaw.pending_verification_count || 0) > 0) {
+      emailStatus = "pending";
+    } else if (userRaw.createdAt && new Date(userRaw.createdAt) < new Date("2026-09-23T00:00:00.000Z")) {
+      emailStatus = "unknown";
+    } else {
+      emailStatus = "unverified";
+    }
+
+    const { pending_verification_count: _, ...user } = userRaw;
+    user.email_status = emailStatus;
 
     // Related counts & lists
     const [instances, contacts, campaigns, flows, chatbots, orders] = await Promise.all([
@@ -1812,22 +1870,295 @@ router.get("/modify_password", adminValidator, async (req, res) => {
   }
 });
 
-// del user
-router.post("/del_user", adminValidator, async (req, res) => {
+// Helper: Transactional deletion of tenant user and all operational dependent records
+async function safelyDeleteUserTenantData(connection, user) {
+  const uid = user.uid;
+
+  // 1. Invalidate all active user sessions immediately
+  await connection.query(
+    `UPDATE user SET tokenVersion = COALESCE(tokenVersion, 0) + 100 WHERE uid = ?`,
+    [uid]
+  );
+
+  // 2. Cascade delete tenant operational data across related tables
+  const tenantTables = [
+    "instance",
+    "meta_api",
+    "email_verification",
+    "wa_contacts",
+    "contact",
+    "phonebook",
+    "templets",
+    "meta_templet_media",
+    "beta_campaign_logs",
+    "beta_campaign",
+    "qr_campaign_logs",
+    "qr_campaigns",
+    "broadcast_log",
+    "broadcast",
+    "beta_conversation",
+    "beta_chats",
+    "chats",
+    "agent_chats",
+    "agent_task",
+    "chat_tags",
+    "quick_reply",
+    "flow_session",
+    "beta_flows",
+    "flow",
+    "flow_data",
+    "beta_chatbot",
+    "chatbot",
+    "wa_forms",
+    "wa_form_submissions",
+    "wa_call_bot",
+    "wa_call_flows",
+    "wa_call_logs",
+    "wa_call_broadcasts",
+    "warmers",
+    "warmer_script",
+    "messenger_accounts",
+    "instagram_accounts",
+    "telegram_session",
+    "api_keys",
+    "api_connections",
+    "api_usage_events",
+    "api_idempotency_keys",
+    "beta_api_logs",
+    "webhooks",
+    "webhook_logs",
+    "in_app_notifications",
+    "fcm_tokens",
+    "support_tickets",
+  ];
+
+  for (const table of tenantTables) {
+    try {
+      await connection.query(`DELETE FROM \`${table}\` WHERE uid = ?`, [uid]);
+    } catch (_) {
+      // Ignore if table does not exist in schema
+    }
+  }
+
+  // Also remove team support agents belonging to this tenant
   try {
-    const { id } = req.body;
-    const [user] = await query(`SELECT * FROM user WHERE id = ?`, [id]);
-    if (!user) {
-      return res.json({ msg: "User not found", success: false });
+    await connection.query(`DELETE FROM agents WHERE owner_uid = ?`, [uid]);
+  } catch (_) {}
+
+  // Statutory retention note: Financial ledger records in `orders` are deliberately preserved for compliance and audit
+
+  // 3. Delete tenant account record
+  await connection.query(`DELETE FROM user WHERE uid = ?`, [uid]);
+}
+
+// del single user (transactional & safe)
+router.post("/del_user", adminValidator, async (req, res) => {
+  let connection;
+  try {
+    const { id, uid } = req.body;
+    if (!id && !uid) {
+      return res.status(400).json({ msg: "User ID or UID is required", success: false });
     }
 
-    await query(`DELETE FROM user WHERE uid = ?`, [user.uid]);
+    const [user] = await query(
+      `SELECT id, uid, email, role FROM user WHERE id = ? OR uid = ?`,
+      [id || null, uid || null]
+    );
 
-    await query(`DELETE FROM meta_api WHERE uid = ?`, [user.uid]);
-    res.json({ success: true, msg: "User was deleted" });
+    if (!user) {
+      return res.status(404).json({ msg: "User not found", success: false });
+    }
+
+    const currentAdminUid = req.decode?.uid;
+    const rootAdmins = await query(`SELECT uid, email FROM admin`, []);
+    const protectedAdminUids = new Set(
+      rootAdmins.map((a) => a.uid).concat(currentAdminUid ? [currentAdminUid] : [])
+    );
+
+    if (user.role === "admin" || protectedAdminUids.has(user.uid)) {
+      return res.status(403).json({
+        success: false,
+        msg: "Administrator accounts cannot be deleted.",
+      });
+    }
+
+    const pool = con.promise();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    await safelyDeleteUserTenantData(connection, user);
+
+    await connection.commit();
+
+    logger.log(`[Admin Audit] Admin ${currentAdminUid} deleted user ${user.uid} (${user.email})`);
+
+    res.json({ success: true, msg: "User was deleted successfully." });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (_) {}
+    }
+    logger.error("Admin del_user error:", err);
+    res.status(500).json({ msg: "Something went wrong", success: false });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+// Bulk delete users (transactional, safe & audited)
+router.post("/delete_users", adminValidator, async (req, res) => {
+  let connection;
+  try {
+    const rawIds = req.body.userIds || req.body.ids || req.body.uids;
+
+    if (!Array.isArray(rawIds) || rawIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        msg: "Please provide a non-empty array of user identifiers to delete.",
+      });
+    }
+
+    if (rawIds.length > 100) {
+      return res.status(400).json({
+        success: false,
+        msg: "Cannot delete more than 100 users at once.",
+      });
+    }
+
+    const currentAdminUid = req.decode?.uid;
+
+    // Fetch existing root admin identifiers to prevent deletion
+    const rootAdmins = await query(`SELECT uid, email FROM admin`, []);
+    const protectedAdminUids = new Set(
+      rootAdmins.map((a) => a.uid).concat(currentAdminUid ? [currentAdminUid] : [])
+    );
+    const protectedAdminEmails = new Set(rootAdmins.map((a) => a.email?.toLowerCase()));
+
+    for (const rawId of rawIds) {
+      if (protectedAdminUids.has(String(rawId))) {
+        return res.status(400).json({
+          success: false,
+          msg: "Protected system administrator accounts cannot be deleted.",
+        });
+      }
+    }
+
+    // Lookup users to delete
+    const placeholders = rawIds.map(() => "?").join(",");
+    const users = await query(
+      `SELECT id, uid, email, role FROM user WHERE id IN (${placeholders}) OR uid IN (${placeholders})`,
+      [...rawIds, ...rawIds]
+    );
+
+    if (users.length === 0) {
+      return res.status(404).json({
+        success: false,
+        msg: "No matching users found to delete.",
+      });
+    }
+
+    // Filter out protected accounts
+    const validUsersToDelete = [];
+    const protectedUsers = [];
+
+    for (const u of users) {
+      if (
+        u.role === "admin" ||
+        protectedAdminUids.has(u.uid) ||
+        protectedAdminEmails.has(u.email?.toLowerCase())
+      ) {
+        protectedUsers.push(u.email || u.uid);
+      } else {
+        validUsersToDelete.push(u);
+      }
+    }
+
+    if (validUsersToDelete.length === 0) {
+      return res.status(403).json({
+        success: false,
+        msg: "Selected user accounts are protected system administrators and cannot be deleted.",
+      });
+    }
+
+    // Begin atomic transaction
+    const pool = con.promise();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const deletedIds = [];
+    for (const user of validUsersToDelete) {
+      await safelyDeleteUserTenantData(connection, user);
+      deletedIds.push(user.id);
+    }
+
+    await connection.commit();
+
+    logger.log(
+      `[Admin Audit] Admin ${currentAdminUid} deleted ${validUsersToDelete.length} users:`,
+      validUsersToDelete.map((u) => u.uid)
+    );
+
+    res.json({
+      success: true,
+      deletedCount: validUsersToDelete.length,
+      deletedIds,
+      msg: `Successfully deleted ${validUsersToDelete.length} user(s).${
+        protectedUsers.length > 0 ? ` (${protectedUsers.length} protected accounts were skipped)` : ""
+      }`,
+    });
+  } catch (err) {
+    if (connection) {
+      try {
+        await connection.rollback();
+      } catch (_) {}
+    }
+    logger.error("Admin delete_users error:", err);
+    res.status(500).json({
+      success: false,
+      msg: "Failed to delete users. Database transaction rolled back.",
+    });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
+  }
+});
+
+// Explicit action to manually verify a user's email
+router.post("/verify_user_email", adminValidator, async (req, res) => {
+  try {
+    const { uid, id } = req.body;
+    if (!uid && !id) {
+      return res.status(400).json({ success: false, msg: "User UID or ID is required" });
+    }
+
+    const [user] = await query(
+      `SELECT id, uid, email, email_verified_at FROM user WHERE uid = ? OR id = ?`,
+      [uid || null, id || null]
+    );
+
+    if (!user) {
+      return res.status(404).json({ success: false, msg: "User not found" });
+    }
+
+    await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [user.uid]);
+    // Also mark any pending email verification records as used
+    await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE email = ? AND used_at IS NULL`, [
+      user.email,
+    ]);
+
+    logger.log(`[Admin Audit] Admin ${req.decode?.uid} manually verified email for ${user.email} (${user.uid})`);
+
+    res.json({
+      success: true,
+      msg: `Email for ${user.email} marked as verified.`,
+    });
+  } catch (err) {
+    logger.error("verify_user_email error:", err);
+    res.status(500).json({ success: false, msg: "Failed to verify user email" });
   }
 });
 

@@ -29,20 +29,28 @@ export async function POST(request: NextRequest) {
 
     let data = await backendRes.json();
 
-    if (data.email_unverified) {
-      return NextResponse.json(
+    if (
+      data.email_unverified ||
+      data.code === 'EMAIL_VERIFICATION_REQUIRED' ||
+      backendRes.status === 403
+    ) {
+      const resp = NextResponse.json(
         {
           success: false,
+          code: 'EMAIL_VERIFICATION_REQUIRED',
           email_unverified: true,
           email: data.email || email,
           msg: data.msg || 'Please verify your email address before logging in.',
         },
         { status: 403 }
       );
+      resp.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      resp.headers.set('Pragma', 'no-cache');
+      return resp;
     }
 
     // If default user login returned invalid credentials, fallback to agent login if no role was specified
-    if ((!data.token || data.success === false) && !body.role) {
+    if ((!data.token || data.success === false) && !body.role && backendRes.status !== 403) {
       const agentRes = await fetch(`${API_BASE_URL}/api/agent/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,10 +63,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!data.token) {
-      return NextResponse.json(
-        { success: false, msg: data.msg || 'Invalid credentials' },
+      const resp = NextResponse.json(
+        { success: false, code: data.code || 'INVALID_CREDENTIALS', msg: data.msg || 'Invalid credentials' },
         { status: 401 }
       );
+      resp.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      resp.headers.set('Pragma', 'no-cache');
+      return resp;
     }
 
     const token = data.token;
@@ -133,6 +144,8 @@ export async function POST(request: NextRequest) {
       role: resolvedRole,
       msg: 'Login successful',
     });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
 
     const isSecure = request.nextUrl.protocol === 'https:';
 

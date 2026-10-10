@@ -21,6 +21,8 @@ export interface AdminUserListItem {
   createdAt?: string;
   tokenVersion?: number;
   is_blocked?: number | boolean;
+  email_verified_at?: string | null;
+  email_status?: 'verified' | 'unverified' | 'pending' | 'unknown';
 }
 
 export type { AdminUserDetails } from './analytics';

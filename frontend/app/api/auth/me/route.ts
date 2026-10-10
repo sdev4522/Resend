@@ -91,6 +91,25 @@ export async function GET(request: NextRequest) {
 
     const data = await backendRes.json();
 
+    // Specific check: if backend rejected with EMAIL_VERIFICATION_REQUIRED (403)
+    if (data?.code === 'EMAIL_VERIFICATION_REQUIRED' || backendRes.status === 403) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          code: 'EMAIL_VERIFICATION_REQUIRED',
+          email_unverified: true,
+          msg: data.msg || 'Please verify your email address before accessing your dashboard.',
+          logout: true,
+        },
+        { status: 403 }
+      );
+      response.cookies.delete(SESSION_COOKIE_NAME);
+      response.cookies.delete(ROLE_COOKIE_NAME);
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      return response;
+    }
+
     // Check if session invalid or expired
     if (!backendRes.ok || data.logout || data.success === false) {
       const response = NextResponse.json(
@@ -109,6 +128,25 @@ export async function GET(request: NextRequest) {
     // Strip password and format user & workspace context
     const rawUserData = data.data || {};
     const { password: _, ...userData } = rawUserData;
+
+    // Strict security check: User account must be email-verified
+    if (role === 'user' && !userData.email_verified_at) {
+      const response = NextResponse.json(
+        {
+          success: false,
+          code: 'EMAIL_VERIFICATION_REQUIRED',
+          email_unverified: true,
+          msg: 'Please verify your email address before accessing your dashboard.',
+          logout: true,
+        },
+        { status: 403 }
+      );
+      response.cookies.delete(SESSION_COOKIE_NAME);
+      response.cookies.delete(ROLE_COOKIE_NAME);
+      response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      response.headers.set('Pragma', 'no-cache');
+      return response;
+    }
 
     // Parse plan JSON string if needed
     let parsedPlan = null;
@@ -196,12 +234,15 @@ export async function GET(request: NextRequest) {
       addons: data.addon || [],
     };
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       user: cleanUser,
       role,
       workspace,
     });
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    response.headers.set('Pragma', 'no-cache');
+    return response;
   } catch (error: any) {
     console.error('Me route error:', error);
     return NextResponse.json(
