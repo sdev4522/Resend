@@ -69,19 +69,49 @@ ln -sfn "$RESEND_SESSIONS_DIR" "$NEW_RELEASE/backend/sessions"
 
 FRONTEND_CHANGED=1
 BACKEND_CHANGED=1
+FRONTEND_DEPS_CHANGED=1
+BACKEND_DEPS_CHANGED=1
 if [[ -n "$CURRENT_RELEASE" ]]; then
   CHANGED_FILES="$(git -C "$RESEND_REPOSITORY_DIR" diff --name-only "$CURRENT_SHA" "$TARGET_SHA")"
   FRONTEND_CHANGED=0; BACKEND_CHANGED=0
   grep -qE '^(frontend/|ecosystem\.production\.config\.cjs$)' <<<"$CHANGED_FILES" && FRONTEND_CHANGED=1 || true
   grep -qE '^(backend/|ecosystem\.production\.config\.cjs$)' <<<"$CHANGED_FILES" && BACKEND_CHANGED=1 || true
+  FRONTEND_DEPS_CHANGED=0; BACKEND_DEPS_CHANGED=0
+  grep -qE '^frontend/(package\.json|package-lock\.json)$' <<<"$CHANGED_FILES" && FRONTEND_DEPS_CHANGED=1 || true
+  grep -qE '^backend/(package\.json|package-lock\.json)$' <<<"$CHANGED_FILES" && BACKEND_DEPS_CHANGED=1 || true
 fi
 
-log "validating immutable release"
+log "deployment scope: frontend=${FRONTEND_CHANGED} backend=${BACKEND_CHANGED} frontend-deps=${FRONTEND_DEPS_CHANGED} backend-deps=${BACKEND_DEPS_CHANGED}"
 if (( FRONTEND_CHANGED )); then
-  ( cd "$NEW_RELEASE/frontend" && npm ci && npm run build )
+  if (( FRONTEND_DEPS_CHANGED )); then
+    log "installing frontend dependencies from package-lock.json"
+    ( cd "$NEW_RELEASE/frontend" && npm ci )
+  else
+    [[ -d "$CURRENT_RELEASE/frontend/node_modules" ]] || die "previous frontend dependencies are unavailable"
+    ln -sfn "$CURRENT_RELEASE/frontend/node_modules" "$NEW_RELEASE/frontend/node_modules"
+    log "reusing frontend dependencies; package lock is unchanged"
+  fi
+  log "building frontend with server-only production environment"
+  ( cd "$NEW_RELEASE/frontend" && npm run build )
+elif [[ -n "$CURRENT_RELEASE" ]]; then
+  [[ -d "$CURRENT_RELEASE/frontend/node_modules" && -d "$CURRENT_RELEASE/frontend/.next" ]] || die "previous frontend runtime is unavailable"
+  ln -sfn "$CURRENT_RELEASE/frontend/node_modules" "$NEW_RELEASE/frontend/node_modules"
+  ln -sfn "$CURRENT_RELEASE/frontend/.next" "$NEW_RELEASE/frontend/.next"
+  log "preserving existing frontend runtime; no frontend files changed"
 fi
 if (( BACKEND_CHANGED )); then
-  ( cd "$NEW_RELEASE/backend" && npm ci )
+  if (( BACKEND_DEPS_CHANGED )); then
+    log "installing backend production dependencies from package-lock.json"
+    ( cd "$NEW_RELEASE/backend" && npm ci --omit=dev )
+  else
+    [[ -d "$CURRENT_RELEASE/backend/node_modules" ]] || die "previous backend dependencies are unavailable"
+    ln -sfn "$CURRENT_RELEASE/backend/node_modules" "$NEW_RELEASE/backend/node_modules"
+    log "reusing backend dependencies; package lock is unchanged"
+  fi
+elif [[ -n "$CURRENT_RELEASE" ]]; then
+  [[ -d "$CURRENT_RELEASE/backend/node_modules" ]] || die "previous backend dependencies are unavailable"
+  ln -sfn "$CURRENT_RELEASE/backend/node_modules" "$NEW_RELEASE/backend/node_modules"
+  log "preserving existing backend runtime; no backend files changed"
 fi
 
 ROLLED_BACK=0

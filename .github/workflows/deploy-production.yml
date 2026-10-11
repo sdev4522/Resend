@@ -14,41 +14,84 @@ concurrency:
 
 jobs:
   validate-and-deploy:
-    # This workflow has no pull_request trigger and only permits main refs.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 30
-
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Identify deployment scope
+        id: changes
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          TARGET_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -Eeuo pipefail
+          frontend=false; backend=false; shared=false
+          if [[ "$EVENT_NAME" == workflow_dispatch || ! "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "$BEFORE_SHA^{commit}" 2>/dev/null; then
+            frontend=true; backend=true; shared=true
+          else
+            files="$(git diff --name-only "$BEFORE_SHA" "$TARGET_SHA")"
+            grep -qE '^frontend/' <<<"$files" && frontend=true || true
+            grep -qE '^backend/' <<<"$files" && backend=true || true
+            grep -qE '^(ecosystem\.production\.config\.cjs|scripts/deploy-production\.sh|\.github/workflows/deploy-production\.yml)$' <<<"$files" && shared=true || true
+            [[ "$shared" == true ]] && { frontend=true; backend=true; }
+          fi
+          echo "frontend=$frontend" >> "$GITHUB_OUTPUT"
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "shared=$shared" >> "$GITHUB_OUTPUT"
+          echo "Deploying commit $TARGET_SHA; frontend=$frontend backend=$backend shared=$shared"
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
 
       - name: Validate frontend
+        if: steps.changes.outputs.frontend == 'true'
         working-directory: frontend
         run: |
+          set -Eeuo pipefail
+          echo 'Installing frontend dependencies from package-lock.json; npm cache is enabled.'
           npm ci
           npm run typecheck
           npm run lint
+          echo 'Building validation artifact; the server rebuild uses its private production environment.'
           npm run build
 
-      - name: Configure SSH
+      - name: Validate backend dependency graph
+        if: steps.changes.outputs.backend == 'true'
+        working-directory: backend
+        run: npm ci --omit=dev --ignore-scripts
+
+      - name: Configure and verify SSH
         env:
-          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
+          set -Eeuo pipefail
+          for required in DEPLOY_HOST DEPLOY_USER DEPLOY_PORT DEPLOY_SSH_KEY SSH_KNOWN_HOSTS; do
+            [[ -n "${!required}" ]] || { echo "::error::Required deployment secret is not configured: $required"; exit 1; }
+          done
+          [[ "$DEPLOY_PORT" =~ ^[0-9]{1,5}$ ]] && (( DEPLOY_PORT >= 1 && DEPLOY_PORT <= 65535 )) || { echo '::error::DEPLOY_PORT must be a valid TCP port.'; exit 1; }
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 600 ~/.ssh/known_hosts
+          umask 077
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/id_ed25519 ~/.ssh/known_hosts
+          known_host="$DEPLOY_HOST"; [[ "$DEPLOY_PORT" == 22 ]] || known_host="[$DEPLOY_HOST]:$DEPLOY_PORT"
+          ssh-keygen -F "$known_host" -f ~/.ssh/known_hosts >/dev/null || { echo "::error::SSH_KNOWN_HOSTS has no verified entry for $known_host."; exit 1; }
+          echo "Verified known-hosts entry is configured for $known_host."
 
       - name: Deploy validated commit
         env:
@@ -57,10 +100,6 @@ jobs:
           DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
-          test -n "$DEPLOY_HOST"
-          test -n "$DEPLOY_USER"
-          test -n "$DEPLOY_PORT"
-          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_SHA='$DEPLOY_SHA' /var/www/Resend/current/scripts/deploy-production.sh"
+          set -Eeuo pipefail
+          echo "Starting server deployment for commit: $DEPLOY_SHA"
+          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_SHA='$DEPLOY_SHA' /var/www/Resend/current/scripts/deploy-production.sh"

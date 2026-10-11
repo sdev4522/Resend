@@ -11,13 +11,30 @@ changes Nginx. Backend environment and Baileys session data live outside Git.
 - `DEPLOY_HOST` — server hostname or IP.
 - `DEPLOY_PORT` — SSH port, normally `22`.
 - `DEPLOY_USER` — restricted Unix deployment user.
-- `DEPLOY_SSH_PRIVATE_KEY` — private half of a dedicated Ed25519 deploy key.
-- `DEPLOY_KNOWN_HOSTS` — output of `ssh-keyscan -H -p PORT HOST`, verified
+- `DEPLOY_SSH_KEY` — private half of a dedicated Ed25519 deploy key.
+- `SSH_KNOWN_HOSTS` — output of `ssh-keyscan -H -p PORT HOST`, verified
   out-of-band before storing.
 
 Add these under **Repository Settings → Secrets and variables → Actions**. Put
 the `production` environment behind required reviewers if human approval is
 desired; the workflow targets that environment.
+
+The workflow rejects missing SSH settings before writing files. It requires the
+known-hosts secret to include `DEPLOY_HOST` (or `[DEPLOY_HOST]:DEPLOY_PORT` for
+a non-22 port) and connects with `StrictHostKeyChecking=yes`. Capture and
+verify the host fingerprint out-of-band before storing it.
+
+## Build and dependency policy
+
+Actions performs a clean frontend validation build. The server rebuilds only a
+frontend-changing release because Next.js rewrites embed production public
+environment values, which deliberately remain unavailable to GitHub Actions.
+Shipping an artifact would require a standalone-output migration plus copying
+static/public runtime files and exposing build-time configuration to CI.
+
+For source-only changes, the server reuses the previous release's dependencies.
+`npm ci` runs only for a first release or when the relevant package manifest or
+lockfile changes; backend installs use `--omit=dev`.
 
 ## One-time, reviewed server migration
 
