@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+# Build a detached release before changing the live symlink. This script is
+# intentionally server-only: it reads deployment values from /etc/resend.
+set -Eeuo pipefail
+IFS=$'\n\t'
+
+DEPLOY_ROOT="${DEPLOY_ROOT:-/var/www/Resend}"
+DEPLOY_CONFIG="${DEPLOY_CONFIG:-/etc/resend/deploy.env}"
+LOCK_FILE="${DEPLOY_ROOT}/deploy.lock"
+
+log() { printf '[deploy] %s\n' "$*"; }
+die() { log "ERROR: $*" >&2; exit 1; }
+
+[[ -r "$DEPLOY_CONFIG" ]] || die "server deployment config is missing: $DEPLOY_CONFIG"
+# shellcheck disable=SC1090
+source "$DEPLOY_CONFIG"
+
+: "${RESEND_REPOSITORY_DIR:=${DEPLOY_ROOT}/repository}"
+: "${RESEND_RELEASES_DIR:=${DEPLOY_ROOT}/releases}"
+: "${RESEND_CURRENT_DIR:=${DEPLOY_ROOT}/current}"
+: "${RESEND_SHARED_DIR:=${DEPLOY_ROOT}/shared}"
+: "${RESEND_FRONTEND_ENV_FILE:=${RESEND_SHARED_DIR}/frontend.env}"
+: "${RESEND_BACKEND_ENV_FILE:=${RESEND_SHARED_DIR}/backend.env}"
+: "${RESEND_SESSIONS_DIR:=${RESEND_SHARED_DIR}/sessions}"
+: "${RESEND_FRONTEND_PORT:=3000}"
+: "${RESEND_BACKEND_PORT:=3010}"
+: "${RESEND_FRONTEND_PM2_NAME:?Set the discovered frontend PM2 name in deploy.env}"
+: "${RESEND_BACKEND_PM2_NAME:?Set the discovered backend PM2 name in deploy.env}"
+
+for command in git npm pm2 curl flock; do command -v "$command" >/dev/null || die "required command not found: $command"; done
+[[ -d "$DEPLOY_ROOT" ]] || die "unexpected deployment root: $DEPLOY_ROOT"
+[[ -d "$RESEND_REPOSITORY_DIR/.git" ]] || die "repository is not initialized: $RESEND_REPOSITORY_DIR"
+[[ -f "$RESEND_REPOSITORY_DIR/frontend/package-lock.json" ]] || die "frontend lockfile is missing"
+[[ -f "$RESEND_REPOSITORY_DIR/backend/package-lock.json" ]] || die "backend lockfile is missing"
+[[ -f "$RESEND_FRONTEND_ENV_FILE" ]] || die "frontend production environment file is missing"
+[[ -f "$RESEND_BACKEND_ENV_FILE" ]] || die "backend production environment file is missing"
+[[ -d "$RESEND_SESSIONS_DIR" ]] || die "persistent sessions directory is missing"
+
+exec 9>"$LOCK_FILE"
+flock -n 9 || { log "another deployment is already running"; exit 75; }
+
+git -C "$RESEND_REPOSITORY_DIR" diff --quiet || die "repository has tracked local changes; refusing to overwrite them"
+git -C "$RESEND_REPOSITORY_DIR" diff --cached --quiet || die "repository has staged local changes; refusing to overwrite them"
+git -C "$RESEND_REPOSITORY_DIR" fetch --prune origin main
+
+TARGET_SHA="${DEPLOY_SHA:-$(git -C "$RESEND_REPOSITORY_DIR" rev-parse origin/main)}"
+git -C "$RESEND_REPOSITORY_DIR" rev-parse --verify --quiet "${TARGET_SHA}^{commit}" >/dev/null || die "invalid target commit"
+git -C "$RESEND_REPOSITORY_DIR" merge-base --is-ancestor "$TARGET_SHA" origin/main || die "target commit is not on origin/main"
+
+CURRENT_RELEASE=""
+CURRENT_SHA=""
+if [[ -L "$RESEND_CURRENT_DIR" ]]; then
+  CURRENT_RELEASE="$(readlink -f "$RESEND_CURRENT_DIR")"
+  [[ "$CURRENT_RELEASE" == "$RESEND_RELEASES_DIR"/* ]] || die "current link points outside the releases directory"
+  CURRENT_SHA="$(git -C "$CURRENT_RELEASE" rev-parse HEAD)"
+fi
+
+NEW_RELEASE="${RESEND_RELEASES_DIR}/${TARGET_SHA}"
+mkdir -p "$RESEND_RELEASES_DIR"
+if [[ ! -d "$NEW_RELEASE" ]]; then
+  log "preparing release ${TARGET_SHA}"
+  git -C "$RESEND_REPOSITORY_DIR" worktree add --detach "$NEW_RELEASE" "$TARGET_SHA"
+fi
+
+[[ "$(git -C "$NEW_RELEASE" rev-parse HEAD)" == "$TARGET_SHA" ]] || die "release SHA verification failed"
+ln -sfn "$RESEND_FRONTEND_ENV_FILE" "$NEW_RELEASE/frontend/.env.production.local"
+ln -sfn "$RESEND_BACKEND_ENV_FILE" "$NEW_RELEASE/backend/.env"
+ln -sfn "$RESEND_SESSIONS_DIR" "$NEW_RELEASE/backend/sessions"
+
+FRONTEND_CHANGED=1
+BACKEND_CHANGED=1
+if [[ -n "$CURRENT_RELEASE" ]]; then
+  CHANGED_FILES="$(git -C "$RESEND_REPOSITORY_DIR" diff --name-only "$CURRENT_SHA" "$TARGET_SHA")"
+  FRONTEND_CHANGED=0; BACKEND_CHANGED=0
+  grep -qE '^(frontend/|ecosystem\.production\.config\.cjs$)' <<<"$CHANGED_FILES" && FRONTEND_CHANGED=1 || true
+  grep -qE '^(backend/|ecosystem\.production\.config\.cjs$)' <<<"$CHANGED_FILES" && BACKEND_CHANGED=1 || true
+fi
+
+log "validating immutable release"
+if (( FRONTEND_CHANGED )); then
+  ( cd "$NEW_RELEASE/frontend" && npm ci && npm run build )
+fi
+if (( BACKEND_CHANGED )); then
+  ( cd "$NEW_RELEASE/backend" && npm ci )
+fi
+
+ROLLED_BACK=0
+rollback() {
+  local status=$?
+  if (( ROLLED_BACK == 0 )) && [[ -n "$CURRENT_RELEASE" ]]; then
+    ROLLED_BACK=1
+    log "deployment failed; restoring previous release"
+    ln -sfn "$CURRENT_RELEASE" "$RESEND_CURRENT_DIR"
+    export RESEND_CURRENT_DIR RESEND_FRONTEND_PM2_NAME RESEND_BACKEND_PM2_NAME RESEND_FRONTEND_PORT RESEND_BACKEND_PORT
+    if (( FRONTEND_CHANGED )); then pm2 startOrReload "$CURRENT_RELEASE/ecosystem.production.config.cjs" --only "$RESEND_FRONTEND_PM2_NAME" --update-env || true; fi
+    if (( BACKEND_CHANGED )); then pm2 startOrReload "$CURRENT_RELEASE/ecosystem.production.config.cjs" --only "$RESEND_BACKEND_PM2_NAME" --update-env || true; fi
+  fi
+  exit "$status"
+}
+trap rollback ERR
+
+log "switching to ${TARGET_SHA}"
+ln -sfn "$NEW_RELEASE" "$RESEND_CURRENT_DIR"
+export RESEND_CURRENT_DIR RESEND_FRONTEND_PM2_NAME RESEND_BACKEND_PM2_NAME RESEND_FRONTEND_PORT RESEND_BACKEND_PORT
+
+if (( FRONTEND_CHANGED )); then
+  pm2 startOrReload "$NEW_RELEASE/ecosystem.production.config.cjs" --only "$RESEND_FRONTEND_PM2_NAME" --update-env
+fi
+if (( BACKEND_CHANGED )); then
+  pm2 startOrReload "$NEW_RELEASE/ecosystem.production.config.cjs" --only "$RESEND_BACKEND_PM2_NAME" --update-env
+fi
+
+if (( FRONTEND_CHANGED )); then
+  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${RESEND_FRONTEND_PORT}/" >/dev/null
+fi
+if (( BACKEND_CHANGED )); then
+  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${RESEND_BACKEND_PORT}/v1/health" >/dev/null
+fi
+
+trap - ERR
+log "SUCCESS: deployed ${TARGET_SHA} (frontend=${FRONTEND_CHANGED}, backend=${BACKEND_CHANGED})"
