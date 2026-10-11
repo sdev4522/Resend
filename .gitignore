@@ -16,7 +16,7 @@ Docs/
 *.swp
 *.swo
 
-# Server-only release deployment state
+# Server-only release deployment state okss
 /current
 /.releases/
 /.deploy-shared/
