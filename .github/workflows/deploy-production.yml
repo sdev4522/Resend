@@ -124,4 +124,4 @@ jobs:
         run: |
           set -Eeuo pipefail
           echo "Starting server deployment for commit: $DEPLOY_SHA"
-          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_SHA='$DEPLOY_SHA' /var/www/Resend/current/scripts/deploy-production.sh"
+          ssh -i ~/.ssh/id_ed25519 -p "$DEPLOY_PORT" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" "$DEPLOY_USER@$DEPLOY_HOST" "DEPLOY_SHA='$DEPLOY_SHA' /var/www/Resend/scripts/deploy-production.sh"

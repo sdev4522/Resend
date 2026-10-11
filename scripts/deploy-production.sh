@@ -15,10 +15,12 @@ die() { log "ERROR: $*" >&2; exit 1; }
 # shellcheck disable=SC1090
 source "$DEPLOY_CONFIG"
 
-: "${RESEND_REPOSITORY_DIR:=${DEPLOY_ROOT}/repository}"
-: "${RESEND_RELEASES_DIR:=${DEPLOY_ROOT}/releases}"
+# The existing production checkout is the Git source. `current` is created only
+# after the one-time release migration; do not use it to launch this script.
+: "${RESEND_REPOSITORY_DIR:=${DEPLOY_ROOT}}"
+: "${RESEND_RELEASES_DIR:=${DEPLOY_ROOT}/.releases}"
 : "${RESEND_CURRENT_DIR:=${DEPLOY_ROOT}/current}"
-: "${RESEND_SHARED_DIR:=${DEPLOY_ROOT}/shared}"
+: "${RESEND_SHARED_DIR:=${DEPLOY_ROOT}/.deploy-shared}"
 : "${RESEND_FRONTEND_ENV_FILE:=${RESEND_SHARED_DIR}/frontend.env}"
 : "${RESEND_BACKEND_ENV_FILE:=${RESEND_SHARED_DIR}/backend.env}"
 : "${RESEND_SESSIONS_DIR:=${RESEND_SHARED_DIR}/sessions}"
@@ -35,6 +37,7 @@ for command in git npm pm2 curl flock; do command -v "$command" >/dev/null || di
 [[ -f "$RESEND_FRONTEND_ENV_FILE" ]] || die "frontend production environment file is missing"
 [[ -f "$RESEND_BACKEND_ENV_FILE" ]] || die "backend production environment file is missing"
 [[ -d "$RESEND_SESSIONS_DIR" ]] || die "persistent sessions directory is missing"
+[[ ! -e "$RESEND_CURRENT_DIR" || -L "$RESEND_CURRENT_DIR" ]] || die "current exists but is not a symbolic link"
 
 exec 9>"$LOCK_FILE"
 flock -n 9 || { log "another deployment is already running"; exit 75; }

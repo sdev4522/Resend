@@ -1,6 +1,7 @@
 # Production deployment
 
-This deployment uses immutable Git worktrees in `/var/www/Resend/releases` and
+This deployment uses the existing Git checkout at `/var/www/Resend`, immutable
+Git worktrees in `/var/www/Resend/.releases`, and
 the `/var/www/Resend/current` symlink as the PM2 working directory. A candidate
 release is dependency-installed and frontend-built before `current` changes.
 The script never runs migrations, `git reset --hard`, `pm2 restart all`, or
@@ -66,23 +67,22 @@ RESEND_FRONTEND_PORT=3000
 RESEND_BACKEND_PORT=3010
 ```
 
-Prepare the release repository and durable data. Copy (do not move or delete)
+Prepare durable data. Copy (do not move or delete)
 the existing production environment and sessions after verifying their current
 locations. The config values must match the current listening ports and Nginx;
 the checked-in Nginx template is not changed.
 
 ```bash
-sudo install -d -o "$USER" -g "$USER" -m 750 /var/www/Resend/{repository,releases,shared}
-git clone --origin origin https://github.com/sdev4522/Resend.git /var/www/Resend/repository
-mkdir -p /var/www/Resend/shared/sessions
-cp -p /path/to/current/backend/.env /var/www/Resend/shared/backend.env
-cp -a /path/to/current/backend/sessions/. /var/www/Resend/shared/sessions/
-cp -p /path/to/current/frontend/.env.local /var/www/Resend/shared/frontend.env
-chmod 640 /var/www/Resend/shared/backend.env /var/www/Resend/shared/frontend.env
+sudo install -d -o "$USER" -g "$USER" -m 750 /var/www/Resend/.releases /var/www/Resend/.deploy-shared
+mkdir -p /var/www/Resend/.deploy-shared/sessions
+cp -p /var/www/Resend/backend/.env /var/www/Resend/.deploy-shared/backend.env
+cp -a /var/www/Resend/backend/sessions/. /var/www/Resend/.deploy-shared/sessions/
+cp -p /var/www/Resend/frontend/.env.local /var/www/Resend/.deploy-shared/frontend.env
+chmod 640 /var/www/Resend/.deploy-shared/backend.env /var/www/Resend/.deploy-shared/frontend.env
 ```
 
-For the first release, run `DEPLOY_SHA=$(git -C /var/www/Resend/repository
-rev-parse origin/main) /var/www/Resend/repository/scripts/deploy-production.sh`
+For the first release, run `DEPLOY_SHA=$(git -C /var/www/Resend
+rev-parse origin/main) /var/www/Resend/scripts/deploy-production.sh`
 in a maintenance window and review its output. It makes the `current` symlink
 and starts/reloads only the explicitly named PM2 apps. Confirm both local health
 URLs and the public URLs before removing the old checkout. Do **not** delete the
@@ -90,13 +90,13 @@ old checkout until this has been verified.
 
 ## Rollback
 
-List available immutable releases with `ls /var/www/Resend/releases`. To roll
+List available immutable releases with `ls /var/www/Resend/.releases`. To roll
 back, atomically repoint `current` to a previously known-good SHA and reload
 only the two configured processes using that release's ecosystem file:
 
 ```bash
 SHA=known-good-commit-sha
-ln -sfn "/var/www/Resend/releases/$SHA" /var/www/Resend/current
+ln -sfn "/var/www/Resend/.releases/$SHA" /var/www/Resend/current
 set -a; . /etc/resend/deploy.env; set +a
 export RESEND_CURRENT_DIR=/var/www/Resend/current
 pm2 startOrReload "/var/www/Resend/current/ecosystem.production.config.cjs" --only "$RESEND_FRONTEND_PM2_NAME" --update-env

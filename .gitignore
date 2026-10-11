@@ -15,3 +15,8 @@ Docs/
 # Editor temporary files
 *.swp
 *.swo
+
+# Server-only release deployment state
+/current
+/.releases/
+/.deploy-shared/
