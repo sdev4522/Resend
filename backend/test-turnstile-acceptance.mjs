@@ -66,6 +66,29 @@ async function runTests() {
       fail('Helper should reject invalid token', err);
     }
 
+    // 2b. Expired token rejection
+    try {
+      const res = await verifyTurnstileToken({
+        token: 'expired_dummy_token_12345',
+        clientIp: '127.0.0.1',
+        action: 'signup',
+      });
+      assert.strictEqual(res.success, false, 'Should fail on expired token');
+      pass('Helper rejects expired token via Cloudflare siteverify');
+    } catch (err) {
+      fail('Helper should reject expired token', err);
+    }
+
+    // 2c. Null/undefined token
+    try {
+      const res = await verifyTurnstileToken({ token: null, clientIp: '127.0.0.1' });
+      assert.strictEqual(res.success, false, 'Should fail on null token');
+      assert.strictEqual(res.msg, 'Please complete the security verification.');
+      pass('Helper rejects null token with user-friendly message');
+    } catch (err) {
+      fail('Helper should reject null token', err);
+    }
+
     // --- INTEGRATION TESTS FOR SIGNUP ENDPOINT ---
     console.log('\n--- Phase 2: Testing POST /api/user/signup Endpoint Protection ---');
 
@@ -136,6 +159,38 @@ async function runTests() {
       pass('Endpoint blocks signup with invalid token and prevents user creation');
     } catch (err) {
       fail('Invalid token test failed', err);
+    }
+
+    // 4b. Signup with expired Turnstile token
+    try {
+      const testEmailExpired = `${testEmailBase}_expiredtoken@example.com`;
+      const expiredIp = `198.51.100.${Math.floor(Math.random() * 200 + 10)}`;
+      const res = await fetch(`${BASE_URL}/signup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-forwarded-for': expiredIp,
+        },
+        body: JSON.stringify({
+          name: 'Bot Attempt Expired',
+          email: testEmailExpired,
+          password: 'password123',
+          mobile_with_country_code: '+15551234567',
+          acceptPolicy: true,
+          turnstileToken: 'expired_dummy_token_55555',
+        }),
+      });
+
+      const data = await res.json();
+      assert.strictEqual(res.status, 400, 'Should return HTTP 400 on expired token');
+      assert.strictEqual(data.success, false, 'Should fail');
+
+      // Verify user was NOT created in DB
+      const user = await query('SELECT * FROM user WHERE email = ?', [testEmailExpired]);
+      assert.strictEqual(user.length, 0, 'User must NOT be created on expired token');
+      pass('Endpoint blocks signup with expired token and prevents user creation');
+    } catch (err) {
+      fail('Expired token test failed', err);
     }
 
     // 5. Successful signup with valid Turnstile token

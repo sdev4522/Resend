@@ -44,7 +44,10 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
   // If using test key, route explicit test failure tokens to Cloudflare test fail key
   if (
     secretKey === CLOUDFLARE_TEST_SECRET &&
-    (token.startsWith("fake_") || token.startsWith("forged_") || token.startsWith("invalid_"))
+    (token.startsWith("fake_") ||
+      token.startsWith("forged_") ||
+      token.startsWith("invalid_") ||
+      token.startsWith("expired_"))
   ) {
     secretKey = CLOUDFLARE_TEST_FAIL_SECRET;
   }
