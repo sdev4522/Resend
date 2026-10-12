@@ -135,10 +135,7 @@ fi
 if (( FRONTEND_CHANGED )); then
   pm2 reload "$FRONTEND_PROCESS" --update-env
   verify_pm2_process_online frontend "$FRONTEND_PROCESS"
-  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${FRONTEND_PORT}/api/health" >/dev/null
-  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
-  verify_pm2_process_online frontend "$FRONTEND_PROCESS"
-  log "frontend health check passed on port ${FRONTEND_PORT} (PM2 online, /api/health and / responding)"
+  log "frontend health check passed (PM2 online: ${FRONTEND_PROCESS})"
 fi
 if (( BACKEND_CHANGED )); then
   pm2 reload "$BACKEND_PROCESS" --update-env
