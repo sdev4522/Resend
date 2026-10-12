@@ -33,6 +33,22 @@ global.process.stdout.write(`${pm2Process.name}\t${port}`);
 NODE
 }
 
+verify_pm2_process_online() {
+  local application="$1"
+  local process_name="$2"
+  node - "$application" "$process_name" <<'NODE'
+const { execFileSync } = require("child_process");
+const [application, name] = process.argv.slice(2);
+const processes = JSON.parse(execFileSync("pm2", ["jlist"], { encoding: "utf8" }));
+const match = processes.find((p) => p.name === name);
+if (!match) throw new Error(`expected PM2 process ${name} not found`);
+const status = match.pm2_env?.status;
+if (status !== "online") {
+  throw new Error(`PM2 process ${name} (${application}) is not online; status="${status}"`);
+}
+NODE
+}
+
 for command in git npm node pm2 curl flock; do command -v "$command" >/dev/null || die "required command not found: $command"; done
 [[ "$DEPLOY_ROOT" == /var/www/Resend ]] || die "unexpected deployment root: $DEPLOY_ROOT"
 [[ -d "$DEPLOY_ROOT/.git" ]] || die "production repository is not initialized: $DEPLOY_ROOT"
@@ -118,13 +134,18 @@ fi
 
 if (( FRONTEND_CHANGED )); then
   pm2 reload "$FRONTEND_PROCESS" --update-env
+  verify_pm2_process_online frontend "$FRONTEND_PROCESS"
+  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${FRONTEND_PORT}/api/health" >/dev/null
   curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${FRONTEND_PORT}/" >/dev/null
-  log "frontend health check passed on port ${FRONTEND_PORT}"
+  verify_pm2_process_online frontend "$FRONTEND_PROCESS"
+  log "frontend health check passed on port ${FRONTEND_PORT} (PM2 online, /api/health and / responding)"
 fi
 if (( BACKEND_CHANGED )); then
   pm2 reload "$BACKEND_PROCESS" --update-env
+  verify_pm2_process_online backend "$BACKEND_PROCESS"
   curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${BACKEND_PORT}/v1/health" >/dev/null
-  log "backend health check passed on port ${BACKEND_PORT}"
+  verify_pm2_process_online backend "$BACKEND_PROCESS"
+  log "backend health check passed on port ${BACKEND_PORT} (PM2 online, /v1/health responding)"
 fi
 
 log "SUCCESS: deployed ${TARGET_SHA}"
