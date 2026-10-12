@@ -44,6 +44,13 @@ Expected PM2 working directories are exactly `/var/www/Resend/frontend` and
 and correct the existing PM2 setup before deploying; the script deliberately
 refuses to guess process names.
 
+The former `ecosystem.production.config.cjs` is intentionally absent. It was
+used only by the removed release-symlink deployment design. Existing PM2
+processes retain their own stored configuration; this deployment reloads the
+already-running process resolved from its working directory and does not need
+an ecosystem file. Do not recreate or change PM2 configuration unless the
+read-only inspection above shows the expected working directories are absent.
+
 ## First supervised deployment
 
 Push the reviewed workflow and script to `main`, then use **Actions → Deploy

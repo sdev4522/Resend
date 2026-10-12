@@ -56,11 +56,20 @@ git -C "$DEPLOY_ROOT" merge-base --is-ancestor "$TARGET_SHA" origin/main || die 
 PREVIOUS_SHA="$(git -C "$DEPLOY_ROOT" rev-parse HEAD)"
 git -C "$DEPLOY_ROOT" merge-base --is-ancestor "$PREVIOUS_SHA" "$TARGET_SHA" || die "target is not a fast-forward update from the deployed commit"
 
-CHANGED_FILES="$(git -C "$DEPLOY_ROOT" diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA")"
 FRONTEND_CHANGED=0
 BACKEND_CHANGED=0
-grep -qE '^(frontend/|scripts/deploy-production\.sh$|\.github/workflows/deploy-production\.yml$)' <<<"$CHANGED_FILES" && FRONTEND_CHANGED=1 || true
-grep -qE '^(backend/|scripts/deploy-production\.sh$|\.github/workflows/deploy-production\.yml$)' <<<"$CHANGED_FILES" && BACKEND_CHANGED=1 || true
+if [[ "$PREVIOUS_SHA" == "$TARGET_SHA" ]]; then
+  # A prior attempt can have fast-forwarded Git but failed before PM2 reload.
+  # Retry both applications so a rerun completes that interrupted deployment.
+  log "target commit is already checked out; resuming application deployment"
+  FRONTEND_CHANGED=1
+  BACKEND_CHANGED=1
+  CHANGED_FILES=""
+else
+  CHANGED_FILES="$(git -C "$DEPLOY_ROOT" diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA")"
+  grep -qE '^(frontend/|scripts/deploy-production\.sh$|\.github/workflows/deploy-production\.yml$)' <<<"$CHANGED_FILES" && FRONTEND_CHANGED=1 || true
+  grep -qE '^(backend/|scripts/deploy-production\.sh$|\.github/workflows/deploy-production\.yml$)' <<<"$CHANGED_FILES" && BACKEND_CHANGED=1 || true
+fi
 
 if (( FRONTEND_CHANGED == 0 && BACKEND_CHANGED == 0 )); then
   git -C "$DEPLOY_ROOT" merge --ff-only "$TARGET_SHA"
@@ -87,13 +96,17 @@ fi
 log "updating main to ${TARGET_SHA}; frontend=${FRONTEND_CHANGED} backend=${BACKEND_CHANGED}"
 git -C "$DEPLOY_ROOT" merge --ff-only "$TARGET_SHA"
 
-if (( FRONTEND_CHANGED && (FRONTEND_DEPS_CHANGED || ! -d "$DEPLOY_ROOT/frontend/node_modules") )); then
-  log "installing frontend dependencies from package-lock.json"
-  ( cd "$DEPLOY_ROOT/frontend" && npm ci )
+if (( FRONTEND_CHANGED )); then
+  if (( FRONTEND_DEPS_CHANGED )) || [[ ! -d "$DEPLOY_ROOT/frontend/node_modules" ]]; then
+    log "installing frontend dependencies from package-lock.json"
+    ( cd "$DEPLOY_ROOT/frontend" && npm ci )
+  fi
 fi
-if (( BACKEND_CHANGED && (BACKEND_DEPS_CHANGED || ! -d "$DEPLOY_ROOT/backend/node_modules") )); then
-  log "installing backend production dependencies from package-lock.json"
-  ( cd "$DEPLOY_ROOT/backend" && npm ci --omit=dev )
+if (( BACKEND_CHANGED )); then
+  if (( BACKEND_DEPS_CHANGED )) || [[ ! -d "$DEPLOY_ROOT/backend/node_modules" ]]; then
+    log "installing backend production dependencies from package-lock.json"
+    ( cd "$DEPLOY_ROOT/backend" && npm ci --omit=dev )
+  fi
 fi
 
 # A failed install or build never reloads PM2. The direct-checkout layout cannot
