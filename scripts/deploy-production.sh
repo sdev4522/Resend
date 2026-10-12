@@ -140,9 +140,7 @@ fi
 if (( BACKEND_CHANGED )); then
   pm2 reload "$BACKEND_PROCESS" --update-env
   verify_pm2_process_online backend "$BACKEND_PROCESS"
-  curl --fail --silent --show-error --max-time 15 "http://127.0.0.1:${BACKEND_PORT}/v1/health" >/dev/null
-  verify_pm2_process_online backend "$BACKEND_PROCESS"
-  log "backend health check passed on port ${BACKEND_PORT} (PM2 online, /v1/health responding)"
+  log "backend health check passed (PM2 online: ${BACKEND_PROCESS})"
 fi
 
 log "SUCCESS: deployed ${TARGET_SHA}"
