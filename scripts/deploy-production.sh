@@ -10,6 +10,21 @@ LOCK_FILE="${DEPLOY_ROOT}/deploy.lock"
 
 log() { printf '[deploy] %s\n' "$*"; }
 die() { log "ERROR: $*" >&2; exit 1; }
+require_single_line_value() {
+  local variable_name="$1"
+  local value="${!variable_name:-}"
+  [[ -n "$value" ]] || die "required deployment setting is missing: ${variable_name}"
+  [[ "$value" != *$'\n'* && "$value" != *$'\r'* ]] || die "deployment setting must be a single line: ${variable_name}"
+}
+validate_port() {
+  local variable_name="$1"
+  local value="${!variable_name}"
+  [[ "$value" =~ ^[0-9]{1,5}$ ]] && (( 10#$value >= 1 && 10#$value <= 65535 )) || die "${variable_name} must be a TCP port between 1 and 65535"
+}
+validate_absolute_path() {
+  local variable_name="$1"
+  [[ "${!variable_name}" == /* ]] || die "${variable_name} must be an absolute path"
+}
 
 [[ -r "$DEPLOY_CONFIG" ]] || die "server deployment config is missing: $DEPLOY_CONFIG"
 # shellcheck disable=SC1090
@@ -26,8 +41,13 @@ source "$DEPLOY_CONFIG"
 : "${RESEND_SESSIONS_DIR:=${RESEND_SHARED_DIR}/sessions}"
 : "${RESEND_FRONTEND_PORT:=3000}"
 : "${RESEND_BACKEND_PORT:=3010}"
-: "${RESEND_FRONTEND_PM2_NAME:?Set the discovered frontend PM2 name in deploy.env}"
-: "${RESEND_BACKEND_PM2_NAME:?Set the discovered backend PM2 name in deploy.env}"
+require_single_line_value RESEND_FRONTEND_PM2_NAME
+require_single_line_value RESEND_BACKEND_PM2_NAME
+validate_port RESEND_FRONTEND_PORT
+validate_port RESEND_BACKEND_PORT
+for path_variable in RESEND_REPOSITORY_DIR RESEND_RELEASES_DIR RESEND_CURRENT_DIR RESEND_SHARED_DIR RESEND_FRONTEND_ENV_FILE RESEND_BACKEND_ENV_FILE RESEND_SESSIONS_DIR; do
+  validate_absolute_path "$path_variable"
+done
 
 for command in git npm pm2 curl flock; do command -v "$command" >/dev/null || die "required command not found: $command"; done
 [[ -d "$DEPLOY_ROOT" ]] || die "unexpected deployment root: $DEPLOY_ROOT"

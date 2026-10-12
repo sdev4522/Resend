@@ -49,22 +49,42 @@ node -e 'for (const p of require("/tmp/resend-pm2.json")) console.log(p.name, p.
 ```
 
 Choose the two discovered names (one frontend, one backend), then create the
-server-only config with restrictive permissions:
+server-only config with restrictive permissions. Replace `DEPLOY_USER` with the
+same Unix account named by the GitHub `DEPLOY_USER` secret; it needs read access
+to this deployment-only file:
 
 ```bash
-sudo install -d -m 750 /etc/resend
-sudo install -m 640 /dev/null /etc/resend/deploy.env
+sudo install -d -o root -g DEPLOY_USER -m 750 /etc/resend
+sudo install -o root -g DEPLOY_USER -m 640 /dev/null /etc/resend/deploy.env
 sudoedit /etc/resend/deploy.env
 ```
 
-Set only these non-secret deployment settings in that file (replace the two
-PM2 names with the output above):
+The only required values are the exact PM2 names from the command above. These
+are deployment controls, not application configuration; do **not** place
+database credentials, JWT keys, API tokens, or `backend/.env` values here.
 
 ```bash
 RESEND_FRONTEND_PM2_NAME='DISCOVERED_FRONTEND_NAME'
 RESEND_BACKEND_PM2_NAME='DISCOVERED_BACKEND_NAME'
-RESEND_FRONTEND_PORT=3000
-RESEND_BACKEND_PORT=3010
+```
+
+`RESEND_FRONTEND_PORT` and `RESEND_BACKEND_PORT` are optional and default to
+`3000` and `3010`; set them only after checking the actual PM2/Nginx listener
+ports. The repository, release, shared-data, current-symlink, environment-file,
+and sessions paths are also optional overrides. Their defaults are documented in
+[`deploy.env.example`](deploy.env.example). The deployment branch is always
+`origin/main` and is not configurable through this file.
+
+Validate the configuration and paths without deploying or restarting anything:
+
+```bash
+sudo -u DEPLOY_USER bash -n /etc/resend/deploy.env
+sudo -u DEPLOY_USER bash -c 'set -a; . /etc/resend/deploy.env; set +a; test -n "$RESEND_FRONTEND_PM2_NAME"; test -n "$RESEND_BACKEND_PM2_NAME"'
+sudo -u DEPLOY_USER test -d /var/www/Resend/.git
+sudo -u DEPLOY_USER test -x /var/www/Resend/scripts/deploy-production.sh
+sudo -u DEPLOY_USER git -C /var/www/Resend remote get-url origin
+pm2 jlist > /tmp/resend-pm2.json
+node -e 'for (const p of require("/tmp/resend-pm2.json")) console.log(p.name, p.pm2_env.pm_cwd, p.pm2_env.env?.PORT || p.pm2_env.env?.BACKEND_PORT || "")'
 ```
 
 Prepare durable data. Copy (do not move or delete)
