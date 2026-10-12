@@ -25,7 +25,7 @@ if (matches.length !== 1) {
 }
 const pm2Process = matches[0];
 const env = pm2Process.pm2_env?.env || {};
-const port = application === "frontend" ? (env.PORT || 3000) : (env.BACKEND_PORT || env.PORT || 3010);
+const port = application === "frontend" ? (env.PORT || 3000) : (env.BACKEND_PORT || env.PORT || 3001);
 if (!/^\d{1,5}$/.test(String(port)) || Number(port) < 1 || Number(port) > 65535) {
   throw new Error(`invalid ${application} port in PM2 environment: ${port}`);
 }
