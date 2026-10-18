@@ -61,8 +61,8 @@ async function runTestSuite() {
   const testUid = `test_uid_${Date.now().toString(36)}`;
   
   await query(
-    `INSERT INTO user (uid, name, email, password, role, is_blocked, trial, subscription_status, tokenVersion)
-     VALUES (?, ?, ?, ?, 'user', 0, 0, NULL, 0)`,
+    `INSERT INTO user (uid, name, email, password, role, is_blocked, trial, subscription_status, tokenVersion, email_verified_at)
+     VALUES (?, ?, ?, ?, 'user', 0, 0, NULL, 0, NOW())`,
     [testUid, "Test Acceptance User", testEmail, "hashed_pw_test"]
   );
 
