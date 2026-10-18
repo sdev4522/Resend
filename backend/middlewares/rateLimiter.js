@@ -63,17 +63,32 @@ async function checkBucket(bucketKey, limit, windowSizeMs = 60000) {
 }
 
 /**
+ * Extract trusted client IP, prioritizing Cloudflare / Nginx headers over raw X-Forwarded-For
+ */
+function getClientIp(req) {
+  if (req.headers["cf-connecting-ip"]) {
+    return req.headers["cf-connecting-ip"].trim();
+  }
+  if (req.headers["x-real-ip"]) {
+    return req.headers["x-real-ip"].trim();
+  }
+  if (req.ip && req.ip !== "::1" && req.ip !== "127.0.0.1") {
+    return req.ip;
+  }
+  if (req.headers["x-forwarded-for"]) {
+    return req.headers["x-forwarded-for"].split(",")[0].trim();
+  }
+  return req.socket?.remoteAddress || "unknown_ip";
+}
+
+/**
  * IP-level Rate Limiter (Layer 1 - Flood & Brute-force protection)
  */
 function ipRateLimiter() {
   return async (req, res, next) => {
     if (!RATE_LIMIT_ENABLED) return next();
 
-    const clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.headers["x-real-ip"] ||
-      req.socket.remoteAddress ||
-      "unknown_ip";
+    const clientIp = getClientIp(req);
 
     const bucketKey = `ip:${clientIp}`;
     const result = await checkBucket(bucketKey, DEFAULT_LIMITS.IP_REQ_PER_MIN);
@@ -206,11 +221,7 @@ function authRateLimiter({ limit = 10, windowSizeMs = 60000, prefix = "auth" } =
   return async (req, res, next) => {
     if (!RATE_LIMIT_ENABLED) return next();
 
-    const clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.headers["x-real-ip"] ||
-      req.socket.remoteAddress ||
-      "unknown_ip";
+    const clientIp = getClientIp(req);
 
     const bucketKey = `${prefix}:${clientIp}`;
     const result = await checkBucket(bucketKey, limit, windowSizeMs);
@@ -245,11 +256,7 @@ function signupRateLimiter({
   return async (req, res, next) => {
     if (!RATE_LIMIT_ENABLED) return next();
 
-    const clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.headers["x-real-ip"] ||
-      req.socket.remoteAddress ||
-      "unknown_ip";
+    const clientIp = getClientIp(req);
 
     // 1. Burst protection (prevent rapid repeated requests from same IP)
     const burstKey = `signup_burst:${clientIp}`;
@@ -280,6 +287,7 @@ function signupRateLimiter({
 }
 
 module.exports = {
+  getClientIp,
   ipRateLimiter,
   apiRateLimiter,
   authRateLimiter,

@@ -20,17 +20,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!turnstileToken) {
+    if (!turnstileToken || typeof turnstileToken !== 'string' || !turnstileToken.trim()) {
       return NextResponse.json(
         { success: false, msg: 'Please complete the security verification.' },
         { status: 400 }
       );
     }
 
-    // Extract client IP to pass through reverse proxy
+    // Extract client IP safely, prioritizing Cloudflare / Nginx headers
     const clientIp =
+      request.headers.get('cf-connecting-ip')?.trim() ||
+      request.headers.get('x-real-ip')?.trim() ||
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
       '';
 
     // Call real backend signup
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(clientIp ? { 'x-forwarded-for': clientIp, 'x-real-ip': clientIp } : {}),
+        ...(clientIp ? { 'x-real-ip': clientIp, 'x-forwarded-for': clientIp } : {}),
       },
       body: JSON.stringify({
         name,

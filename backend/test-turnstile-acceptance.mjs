@@ -89,6 +89,33 @@ async function runTests() {
       fail('Helper should reject null token', err);
     }
 
+    // 2d. Oversized token (> 2048 chars)
+    try {
+      const longToken = 'a'.repeat(2049);
+      const res = await verifyTurnstileToken({ token: longToken, clientIp: '127.0.0.1' });
+      assert.strictEqual(res.success, false, 'Should fail on oversized token');
+      assert.strictEqual(res.msg, 'Please complete the security verification.');
+      pass('Helper rejects oversized token exceeding 2048 characters');
+    } catch (err) {
+      fail('Helper should reject oversized token', err);
+    }
+
+    // 2e. Fail-closed when secret is missing in production
+    try {
+      const origEnv = process.env.NODE_ENV;
+      const origKey = process.env.TURNSTILE_SECRET_KEY;
+      delete process.env.TURNSTILE_SECRET_KEY;
+      process.env.NODE_ENV = 'production';
+      const res = await verifyTurnstileToken({ token: 'test_token', clientIp: '127.0.0.1' });
+      assert.strictEqual(res.success, false, 'Should fail closed when secret is missing in production');
+      assert.strictEqual(res.code, 'CONFIGURATION_ERROR');
+      process.env.NODE_ENV = origEnv;
+      if (origKey) process.env.TURNSTILE_SECRET_KEY = origKey;
+      pass('Helper fails closed when TURNSTILE_SECRET_KEY is missing in production');
+    } catch (err) {
+      fail('Missing secret in production test failed', err);
+    }
+
     // --- INTEGRATION TESTS FOR SIGNUP ENDPOINT ---
     console.log('\n--- Phase 2: Testing POST /api/user/signup Endpoint Protection ---');
 

@@ -27,7 +27,27 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({ email, password }),
     });
 
-    let data = await backendRes.json();
+    let data: any = {};
+    try {
+      data = await backendRes.json();
+    } catch {
+      data = { success: false, msg: backendRes.statusText || 'Internal server error' };
+    }
+
+    // Propagate internal server errors with their true HTTP 5xx status and code
+    if (backendRes.status >= 500) {
+      const resp = NextResponse.json(
+        {
+          success: false,
+          code: data.code || 'INTERNAL_SERVER_ERROR',
+          msg: data.msg || 'Internal server error',
+        },
+        { status: backendRes.status }
+      );
+      resp.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      resp.headers.set('Pragma', 'no-cache');
+      return resp;
+    }
 
     if (
       data.email_unverified ||
@@ -56,16 +76,23 @@ export async function POST(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
-      const agentData = await agentRes.json();
-      if (agentData.token) {
-        data = agentData;
-      }
+      try {
+        const agentData = await agentRes.json();
+        if (agentData.token) {
+          data = agentData;
+        }
+      } catch {}
     }
 
     if (!data.token) {
+      const statusCode = backendRes.status >= 400 ? backendRes.status : 401;
       const resp = NextResponse.json(
-        { success: false, code: data.code || 'INVALID_CREDENTIALS', msg: data.msg || 'Invalid credentials' },
-        { status: 401 }
+        {
+          success: false,
+          code: data.code || (statusCode === 401 ? 'INVALID_CREDENTIALS' : 'AUTH_ERROR'),
+          msg: data.msg || 'Invalid credentials',
+        },
+        { status: statusCode }
       );
       resp.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
       resp.headers.set('Pragma', 'no-cache');

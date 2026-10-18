@@ -33,20 +33,23 @@ router.post("/login", authRateLimiter({ limit: 10, prefix: "admin_login" }), asy
     if (!email || !password) {
       return res.status(400).json({
         success: false,
+        code: "INVALID_REQUEST",
         msg: "Please fill email and password",
       });
     }
 
+    const cleanEmail = email.toString().toLowerCase().trim();
+
     const userFind = await query(`SELECT * FROM admin WHERE email = ?`, [
-      email,
+      cleanEmail,
     ]);
     if (userFind.length < 1) {
-      return res.status(401).json({ success: false, msg: "Invalid credentials" });
+      return res.status(401).json({ success: false, code: "INVALID_CREDENTIALS", msg: "Invalid credentials" });
     }
 
     const compare = await bcrypt.compare(password, userFind[0].password);
     if (!compare) {
-      return res.status(401).json({ success: false, msg: "Invalid credentials" });
+      return res.status(401).json({ success: false, code: "INVALID_CREDENTIALS", msg: "Invalid credentials" });
     }
 
     // ✅ tokenVersion in payload — NO password in token, 24h expiration
@@ -64,7 +67,7 @@ router.post("/login", authRateLimiter({ limit: 10, prefix: "admin_login" }), asy
     res.json({ success: true, token });
   } catch (err) {
     logger.error("[Admin Login Error]", err);
-    res.status(500).json({ success: false, msg: "Internal server error" });
+    res.status(500).json({ success: false, code: "INTERNAL_ERROR", msg: "Internal server error" });
   }
 });
 

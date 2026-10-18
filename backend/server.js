@@ -1,8 +1,8 @@
-require("dotenv").config({ silent: true });
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const fs = require("fs");
-const path = require("path");
 const fileUpload = require("express-fileupload");
 const nodeCleanup = require("node-cleanup");
 const { initCampaign } = require("./loops/campaignBeta.js");
@@ -108,6 +108,8 @@ function isPlainObject(value) {
 }
 
 const app = express();
+// Trust 1 reverse proxy hop (Nginx) to resolve client IP correctly
+app.set("trust proxy", 1);
 const currentDir = process.cwd();
 
 // ─── Parse allowed hostnames from env (protocol & trailing slash agnostic) ───

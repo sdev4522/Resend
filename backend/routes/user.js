@@ -38,7 +38,7 @@ const {
 } = require("../middlewares/plan.js");
 const crypto = require("crypto");
 const { recoverEmail, verificationOtpEmail } = require("../emails/returnEmails.js");
-const { authRateLimiter, signupRateLimiter } = require("../middlewares/rateLimiter.js");
+const { authRateLimiter, signupRateLimiter, getClientIp } = require("../middlewares/rateLimiter.js");
 const { verifyTurnstileToken } = require("../utils/turnstile.js");
 const moment = require("moment");
 const fetch = require("node-fetch");
@@ -328,11 +328,7 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
     const { email, name, password, mobile_with_country_code, acceptPolicy, turnstileToken } =
       req.body;
 
-    const clientIp =
-      req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
-      req.headers["x-real-ip"] ||
-      req.socket.remoteAddress ||
-      "unknown_ip";
+    const clientIp = getClientIp(req);
 
     // 1. Mandatory Cloudflare Turnstile Verification
     const turnstileCheck = await verifyTurnstileToken({
@@ -344,6 +340,7 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
     if (!turnstileCheck.success) {
       return res.status(400).json({
         success: false,
+        code: turnstileCheck.code || "SECURITY_VERIFICATION_FAILED",
         msg: turnstileCheck.msg || "Security verification failed. Please try again.",
       });
     }

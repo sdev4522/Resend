@@ -23,14 +23,15 @@ const ALLOWED_HOSTNAMES = new Set([
  * @param {string} [options.clientIp] - Client IP address
  * @param {string} [options.action] - Expected action (e.g. 'signup')
  * @param {string} [options.secretKey] - Optional secret key override for testing
- * @returns {Promise<{ success: boolean, msg?: string, data?: any }>}
+ * @returns {Promise<{ success: boolean, code?: string, msg?: string, data?: any }>}
  */
 async function verifyTurnstileToken({ token, clientIp, action = "signup", secretKey: customSecret } = {}) {
-  // 1. Reject missing or empty tokens
-  if (!token || typeof token !== "string" || token.trim() === "") {
-    logger.warn(`[Turnstile] Missing verification token from IP: ${clientIp || "unknown"}`);
+  // 1. Reject missing, empty, non-string, or oversized tokens
+  if (!token || typeof token !== "string" || token.trim() === "" || token.length > 2048) {
+    logger.warn(`[Turnstile] Missing or invalid token format from IP: ${clientIp || "unknown"}`);
     return {
       success: false,
+      code: "INVALID_TOKEN",
       msg: "Please complete the security verification.",
     };
   }
@@ -56,6 +57,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
     logger.error("[Turnstile] TURNSTILE_SECRET_KEY is not configured in production environment.");
     return {
       success: false,
+      code: "CONFIGURATION_ERROR",
       msg: "Security verification is currently unavailable. Please try again later.",
     };
   }
@@ -66,7 +68,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
       response: token.trim(),
     };
 
-    if (clientIp && clientIp !== "unknown_ip") {
+    if (clientIp && clientIp !== "unknown_ip" && clientIp !== "127.0.0.1") {
       payload.remoteip = clientIp;
     }
 
@@ -83,6 +85,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
       logger.warn(`[Turnstile] Siteverify HTTP error: ${response.status} from Cloudflare endpoint`);
       return {
         success: false,
+        code: "UPSTREAM_ERROR",
         msg: "Security verification failed. Please try again.",
       };
     }
@@ -98,6 +101,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
       );
       return {
         success: false,
+        code: "VERIFICATION_REJECTED",
         msg: "Security verification failed. Please try again.",
       };
     }
@@ -111,6 +115,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
       );
       return {
         success: false,
+        code: "ACTION_MISMATCH",
         msg: "Security verification failed. Please try again.",
       };
     }
@@ -125,7 +130,12 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
         } catch (_) {}
       }
 
-      const isAllowed = ALLOWED_HOSTNAMES.has(lowerHost) || (envHost && lowerHost === envHost);
+      const isAllowed =
+        ALLOWED_HOSTNAMES.has(lowerHost) ||
+        lowerHost === "resend.in" ||
+        lowerHost.endsWith(".resend.in") ||
+        (envHost && lowerHost === envHost);
+
       if (!isAllowed) {
         logger.warn(
           `[Turnstile Hostname Mismatch] Host '${result.hostname}' not in allowed list from IP: ${
@@ -134,6 +144,7 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
         );
         return {
           success: false,
+          code: "HOSTNAME_MISMATCH",
           msg: "Security verification failed. Please try again.",
         };
       }
@@ -149,11 +160,16 @@ async function verifyTurnstileToken({ token, clientIp, action = "signup", secret
   } catch (err) {
     if (err.name === "TimeoutError" || err.name === "AbortError") {
       logger.warn(`[Turnstile Timeout] Verification timed out after ${TIMEOUT_MS}ms for IP: ${clientIp || "unknown"}`);
-    } else {
-      logger.error("[Turnstile Error] Unexpected error during verification:", err.message);
+      return {
+        success: false,
+        code: "VERIFICATION_TIMEOUT",
+        msg: "Security verification failed. Please try again.",
+      };
     }
+    logger.error("[Turnstile Error] Unexpected error during verification:", err.message);
     return {
       success: false,
+      code: "VERIFICATION_ERROR",
       msg: "Security verification failed. Please try again.",
     };
   }

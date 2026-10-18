@@ -233,11 +233,9 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
           }}
           onError={() => {
             setTurnstileToken('');
-            setError('Security verification failed. Please try again.');
           }}
           onTimeout={() => {
             setTurnstileToken('');
-            setError('Security verification timed out. Please retry.');
           }}
         />
       </div>
