@@ -60,6 +60,11 @@ const { MercadoPagoConfig, Preference, Payment } = require("mercadopago");
 const axios = require("axios");
 const logger = require("../utils/logger.js");
 const {
+  getGoogleAuthConfig,
+  verifyGoogleIdToken,
+  exchangeGoogleCode,
+} = require("../helper/googleAuth.js");
+const {
   sendCarouselTemplateMessage,
   sendCatalogTemplateMessage,
 } = require("../loops/campaignBeta.js");
@@ -224,100 +229,256 @@ router.post("/login_with_facebook", async (req, res) => {
   }
 });
 
-// google login
-router.post("/login_with_google", async (req, res) => {
+// public google auth config
+router.get("/google_auth_config", async (req, res) => {
   try {
-    const { token } = req.body;
+    const config = await getGoogleAuthConfig();
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+    return res.json({
+      success: true,
+      enabled: Boolean(config.isActive && config.isConfigured),
+      client_id: config.isActive ? config.clientId : "",
+    });
+  } catch (err) {
+    logger.error("Error in google_auth_config:", err);
+    return res.json({ success: false, enabled: false, client_id: "" });
+  }
+});
 
-    if (!token) {
-      return res.json({
+// google login & signup
+router.post("/login_with_google", authRateLimiter({ limit: 15, prefix: "google_login" }), async (req, res) => {
+  try {
+    const { token, idToken, code, redirect_uri, redirectUri } = req.body;
+
+    const rawToken = idToken || token;
+    if (!rawToken && !code) {
+      return res.status(400).json({
         success: false,
-        msg: "Token is missing",
+        code: "TOKEN_MISSING",
+        msg: "Google credential token or authorization code is required.",
       });
     }
 
-    const googleRes = await axios.get(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      },
+    const config = await getGoogleAuthConfig();
+    if (!config.isActive || !config.isConfigured) {
+      return res.status(403).json({
+        success: false,
+        code: "GOOGLE_AUTH_DISABLED",
+        msg: "Google authentication is currently disabled by administrator.",
+      });
+    }
+
+    let verifiedResult;
+    if (code) {
+      verifiedResult = await exchangeGoogleCode({
+        code,
+        redirectUri: redirect_uri || redirectUri || "postmessage",
+        clientId: config.clientId,
+        clientSecret: config.clientSecret,
+      });
+    } else {
+      verifiedResult = await verifyGoogleIdToken({
+        idToken: rawToken,
+        clientId: config.clientId,
+      });
+    }
+
+    if (!verifiedResult.success) {
+      return res.status(401).json({
+        success: false,
+        code: verifiedResult.code || "INVALID_TOKEN",
+        msg: verifiedResult.error || "Google identity verification failed.",
+      });
+    }
+
+    const { email: verifiedEmail, sub: googleSub, name: verifiedName } = verifiedResult.payload;
+    const cleanEmail = (verifiedEmail || "").toLowerCase().trim();
+
+    if (!cleanEmail) {
+      return res.status(400).json({
+        success: false,
+        code: "EMAIL_MISSING",
+        msg: "Verified email address not found in Google token.",
+      });
+    }
+
+    // 1. Strict Administrator Protection:
+    // Never allow administrator privileges or admin authentication via public Google sign-in.
+    const adminFind = await query(
+      "SELECT id, email FROM admin WHERE LOWER(TRIM(email)) = ? LIMIT 1",
+      [cleanEmail]
+    );
+    if (adminFind.length > 0) {
+      return res.status(403).json({
+        success: false,
+        code: "ADMIN_NOT_ALLOWED",
+        msg: "Administrator accounts cannot authenticate via public Google sign-in.",
+      });
+    }
+
+    // 2. Lookup existing user in user table
+    const userFind = await query(
+      "SELECT * FROM user WHERE LOWER(TRIM(email)) = ? LIMIT 1",
+      [cleanEmail]
     );
 
-    const { email, email_verified, name } = googleRes.data;
+    if (userFind.length > 0) {
+      const existingUser = userFind[0];
 
-    if (!email || !email_verified) {
-      return res.json({
-        success: false,
-        msg: "Could not complete Google login",
-      });
-    }
+      // Check if user is suspended / blocked
+      if (existingUser.is_blocked) {
+        return res.status(403).json({
+          success: false,
+          code: "ACCOUNT_BLOCKED",
+          msg: "This account has been suspended. Please contact support.",
+        });
+      }
 
-    const getUser = await query(`SELECT * FROM user WHERE email = ?`, [email]);
+      // Safe identity linking check (Edge Case 13):
+      // If account is already linked to a different Google Subject ID, reject to prevent account hijacking
+      if (existingUser.google_id && existingUser.google_id !== googleSub) {
+        return res.status(409).json({
+          success: false,
+          code: "ACCOUNT_LINKED_TO_DIFFERENT_GOOGLE",
+          msg: "This account is linked to a different Google account.",
+        });
+      }
 
-    // NEW USER
-    if (getUser.length < 1) {
-      const uid = randomstring.generate();
-
-      const randomPassword = randomstring.generate(24);
-
-      const hasPass = await bcrypt.hash(randomPassword, 10);
-
-      await query(
-        `INSERT INTO user (name, uid, email, password, tokenVersion, email_verified_at) VALUES (?,?,?,?,?, CURRENT_TIMESTAMP)`,
-        [name, uid, email.toLowerCase().trim(), hasPass, 0],
-      );
+      // Link Google ID if not yet linked, and mark email as verified (Google verified it)
+      if (!existingUser.google_id || !existingUser.email_verified_at) {
+        await query(
+          "UPDATE user SET google_id = COALESCE(google_id, ?), email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP) WHERE uid = ?",
+          [googleSub, existingUser.uid]
+        );
+      }
 
       const loginToken = sign(
         {
-          uid,
+          uid: existingUser.uid,
           role: "user",
-          tokenVersion: 0,
+          email: cleanEmail,
+          tokenVersion: existingUser.tokenVersion || 0,
           emailVerified: true,
         },
         process.env.JWTKEY,
         {
           expiresIn: "7d",
-        },
+        }
       );
 
       res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
       return res.json({
         success: true,
         token: loginToken,
+        role: "user",
+        is_new_user: false,
+        msg: "Login successful",
       });
     }
 
-    // EXISTING USER
-    if (!getUser[0].email_verified_at) {
-      await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [getUser[0].uid]);
+    // 3. Lookup in agents table (if user account does not exist)
+    const agentFind = await query(
+      "SELECT * FROM agents WHERE LOWER(TRIM(email)) = ? LIMIT 1",
+      [cleanEmail]
+    );
+
+    if (agentFind.length > 0) {
+      const existingAgent = agentFind[0];
+
+      if (existingAgent.is_active !== 1) {
+        return res.status(403).json({
+          success: false,
+          code: "AGENT_DEACTIVATED",
+          msg: "Your agent account has been deactivated. Please contact your workspace administrator.",
+        });
+      }
+
+      const loginToken = sign(
+        {
+          uid: existingAgent.uid,
+          role: "agent",
+          email: existingAgent.email,
+          owner_uid: existingAgent.owner_uid,
+          tokenVersion: existingAgent.tokenVersion ?? 0,
+          emailVerified: true,
+        },
+        process.env.JWTKEY,
+        {
+          expiresIn: "24h",
+        }
+      );
+
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      return res.json({
+        success: true,
+        token: loginToken,
+        role: "agent",
+        is_new_user: false,
+        msg: "Agent login successful",
+      });
+    }
+
+    // 4. New User Registration with Google Identity
+    // Prevent duplicate Google ID collision across different email addresses
+    const existingGoogleUser = await query(
+      "SELECT id, email FROM user WHERE google_id = ? LIMIT 1",
+      [googleSub]
+    );
+    if (existingGoogleUser.length > 0) {
+      return res.status(409).json({
+        success: false,
+        code: "DUPLICATE_GOOGLE_ID",
+        msg: "This Google identity is already associated with another account.",
+      });
+    }
+
+    const newUid = randomstring.generate(16);
+    const randomPassword = randomstring.generate(32);
+    const hasPass = await bcrypt.hash(randomPassword, 10);
+    const resolvedName = (verifiedName || "").trim() || cleanEmail.split("@")[0];
+
+    await query(
+      `INSERT INTO user (name, uid, email, password, tokenVersion, email_verified_at, terms_accepted_at, google_id)
+       VALUES (?, ?, ?, ?, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`,
+      [resolvedName, newUid, cleanEmail, hasPass, googleSub]
+    );
+
+    // Assign standard 14-day Free Trial plan (matching POST /signup)
+    const getPlan = await query(
+      "SELECT * FROM plan WHERE is_trial = 1 OR title LIKE '%Trial%' ORDER BY id ASC LIMIT 1"
+    );
+    if (getPlan.length > 0) {
+      await updateUserPlan(getPlan[0], newUid, 14);
     }
 
     const loginToken = sign(
       {
-        uid: getUser[0].uid,
+        uid: newUid,
         role: "user",
-        tokenVersion: getUser[0].tokenVersion || 0,
+        email: cleanEmail,
+        tokenVersion: 0,
         emailVerified: true,
       },
       process.env.JWTKEY,
       {
         expiresIn: "7d",
-      },
+      }
     );
 
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return res.json({
       success: true,
       token: loginToken,
+      role: "user",
+      is_new_user: true,
+      msg: "Account created and logged in successfully",
     });
   } catch (err) {
-    logger.log(err);
-
-    return res.json({
+    logger.error("Error in login_with_google:", err);
+    return res.status(500).json({
       success: false,
-      msg: "Something went wrong",
+      code: "INTERNAL_ERROR",
+      msg: "Internal server error during Google authentication.",
     });
   }
 });

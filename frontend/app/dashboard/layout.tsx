@@ -26,7 +26,7 @@ export default function DashboardLayout({
       <SidebarInset className="min-w-0 flex flex-col h-[100dvh] overflow-hidden bg-background">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 lg:p-8 pb-safe">
-          <div className="mx-auto max-w-7xl w-full">
+          <div className="mx-auto w-full">
             {children}
           </div>
         </main>

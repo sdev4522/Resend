@@ -32,6 +32,13 @@ export interface CurrencySettingsData {
   supportedCurrencies: SupportedCurrencyItem[];
 }
 
+export interface GoogleAuthSettingsData {
+  google_client_id: string;
+  google_login_active: boolean;
+  has_client_secret: boolean;
+  is_configured: boolean;
+}
+
 export const adminApi = {
   getStats: () => {
     return api.get<{ success: boolean; data: AdminOverviewStats }>(API_ENDPOINTS.admin.stats);
@@ -115,6 +122,21 @@ export const adminApi = {
     rz_webhook_secret?: string;
   }) => {
     return api.post<{ success: boolean; msg: string }>('/api/admin/update_razorpay_settings', payload);
+  },
+
+  getGoogleAuthSettings: () => {
+    return api.get<{
+      success: boolean;
+      data: GoogleAuthSettingsData;
+    }>('/api/admin/get_google_auth_settings');
+  },
+
+  updateGoogleAuthSettings: (payload: {
+    google_client_id: string;
+    google_client_secret?: string;
+    google_login_active: boolean | number;
+  }) => {
+    return api.post<{ success: boolean; msg: string }>('/api/admin/update_google_auth_settings', payload);
   },
 
   getCurrencySettings: () => {

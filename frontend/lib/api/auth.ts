@@ -1,10 +1,18 @@
 import { api } from './client';
-import { LoginPayload, RegisterPayload, ForgotPasswordPayload, ResetPasswordPayload, AuthResponse } from '@/types/auth';
+import { LoginPayload, RegisterPayload, ForgotPasswordPayload, ResetPasswordPayload, AuthResponse, GoogleAuthPayload } from '@/types/auth';
 import { User } from '@/types/user';
 
 export const authApi = {
   login: (credentials: LoginPayload & { role?: 'user' | 'agent' | 'admin' }) => {
     return api.post<AuthResponse>('/api/auth/login', credentials);
+  },
+
+  loginWithGoogle: (payload: GoogleAuthPayload) => {
+    return api.post<AuthResponse>('/api/auth/google', payload);
+  },
+
+  getGoogleConfig: () => {
+    return api.get<{ success: boolean; enabled: boolean; clientId: string }>('/api/auth/google/config');
   },
 
   register: (payload: RegisterPayload & { mobile_with_country_code?: string; acceptPolicy?: boolean; turnstileToken?: string }) => {

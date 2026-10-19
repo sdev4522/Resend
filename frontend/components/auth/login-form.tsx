@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { GoogleAuthButton } from './google-auth-button';
 
 interface LoginFormProps {
   onSuccess?: () => void;
@@ -52,13 +53,31 @@ export function LoginForm({ onSuccess, onSwitchToRegister, initialError = null }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <Alert variant="destructive" className="py-2.5">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <AlertDescription className="text-xs">{error}</AlertDescription>
-        </Alert>
-      )}
+    <div className="space-y-4">
+      <GoogleAuthButton
+        text="signin_with"
+        onSuccess={onSuccess}
+        disabled={loading}
+      />
+
+      <div className="relative my-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-[11px] uppercase">
+          <span className="bg-background px-2 text-muted-foreground font-medium">
+            Or continue with email
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {error && (
+          <Alert variant="destructive" className="py-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertDescription className="text-xs">{error}</AlertDescription>
+          </Alert>
+        )}
 
       {unverifiedEmail && (
         <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 py-2.5">
@@ -155,5 +174,6 @@ export function LoginForm({ onSuccess, onSwitchToRegister, initialError = null }
         )}
       </div>
     </form>
+    </div>
   );
 }

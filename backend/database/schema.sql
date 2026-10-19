@@ -1428,9 +1428,11 @@ CREATE TABLE `user` (
   `subscription_status` varchar(50) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `terms_accepted_at` timestamp NULL DEFAULT NULL,
+  `google_id` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_uid` (`uid`(150)),
-  KEY `idx_user_is_blocked` (`is_blocked`)
+  KEY `idx_user_is_blocked` (`is_blocked`),
+  KEY `idx_user_google_id` (`google_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=106 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
@@ -1691,6 +1693,7 @@ CREATE TABLE `web_private` (
   `messenger_app_secret` longtext DEFAULT NULL,
   `messenger_app_id` longtext DEFAULT NULL,
   `rz_webhook_secret` text DEFAULT NULL,
+  `google_client_secret` text DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;

@@ -21,6 +21,7 @@ const logger = require("../utils/logger.js");
 const mysql = require("mysql2/promise");
 const { MongoClient } = require("mongodb");
 const { authRateLimiter } = require("../middlewares/rateLimiter.js");
+const { getGoogleAuthConfig } = require("../helper/googleAuth.js");
 
 function getQrHelper() {
   return require("../helper/addon/qr/index.js");
@@ -2188,13 +2189,16 @@ router.post("/de_wa_den_link", adminValidator, async (req, res) => {
   }
 });
 
-// get social login
-router.get("/get_social_login", async (req, res) => {
+// get social login (secured with adminValidator, sensitive credentials stripped)
+router.get("/get_social_login", adminValidator, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM web_public`, []);
-    res.json({ data: data[0], success: true });
+    const data = await query(`SELECT * FROM web_public LIMIT 1`, []);
+    const publicData = data[0] ? { ...data[0] } : {};
+    // Do not return raw application secrets
+    delete publicData.fb_login_app_sec;
+    res.json({ data: publicData, success: true });
   } catch (err) {
-    logger.log(err);
+    logger.error("get_social_login error:", err);
     res.json({ msg: "Something went wrong", err, success: false });
   }
 });
@@ -2211,20 +2215,86 @@ router.post("/update_social_login", adminValidator, async (req, res) => {
     } = req.body;
 
     await query(
-      `UPDATE web_public SET google_client_id = ?, google_login_active = ?, fb_login_app_id = ?, fb_login_app_sec = ?, fb_login_active = ?`,
+      `UPDATE web_public SET google_client_id = ?, google_login_active = ?, fb_login_app_id = ?, fb_login_app_sec = ?, fb_login_active = ? WHERE id = 1 OR id > 0 LIMIT 1`,
       [
-        google_client_id,
-        google_login_active,
-        fb_login_app_id,
-        fb_login_app_sec,
-        fb_login_active,
+        google_client_id || "",
+        google_login_active ? 1 : 0,
+        fb_login_app_id || "",
+        fb_login_app_sec || "",
+        fb_login_active || "",
       ],
     );
 
     res.json({ msg: "Settings updated", success: true });
   } catch (err) {
-    logger.log(err);
+    logger.error("update_social_login error:", err);
     res.json({ msg: "Something went wrong", err, success: false });
+  }
+});
+
+// get dedicated Google authentication settings
+router.get("/get_google_auth_settings", adminValidator, async (req, res) => {
+  try {
+    const { clientId, clientSecret, isActive, isConfigured } = await getGoogleAuthConfig();
+    res.json({
+      success: true,
+      data: {
+        google_client_id: clientId || "",
+        google_login_active: Boolean(isActive),
+        has_client_secret: Boolean(clientSecret && clientSecret.length > 0),
+        is_configured: isConfigured,
+      },
+    });
+  } catch (err) {
+    logger.error("get_google_auth_settings error:", err);
+    res.status(500).json({ success: false, msg: "Failed to get Google authentication settings" });
+  }
+});
+
+// update dedicated Google authentication settings
+router.post("/update_google_auth_settings", adminValidator, async (req, res) => {
+  try {
+    const { google_client_id, google_client_secret, google_login_active } = req.body;
+
+    const isActive = google_login_active === true || google_login_active === 1 || google_login_active === "1" ? 1 : 0;
+    const cleanClientId = typeof google_client_id === "string" ? google_client_id.trim() : "";
+
+    // 1. Update public configuration in web_public
+    await query(
+      `UPDATE web_public SET google_client_id = ?, google_login_active = ? WHERE id = 1 OR id > 0 LIMIT 1`,
+      [cleanClientId, isActive]
+    );
+
+    // 2. Update private secret in web_private ONLY if explicitly provided (never wipe when empty)
+    const hasNewSecret = typeof google_client_secret === "string" && google_client_secret.trim() !== "";
+    if (hasNewSecret) {
+      await query(
+        `UPDATE web_private SET google_client_secret = ? WHERE id = 1 OR id > 0 LIMIT 1`,
+        [google_client_secret.trim()]
+      );
+    }
+
+    // 3. Admin audit log
+    await query(
+      `INSERT INTO admin_audit_logs (admin_uid, action, target_type, target_id, details)
+       VALUES (?, ?, ?, ?, ?)`,
+      [
+        req.decode?.uid || "admin",
+        "SETTINGS_UPDATE",
+        "GOOGLE_AUTH",
+        "oauth_credentials",
+        JSON.stringify({
+          google_client_id: cleanClientId,
+          google_login_active: isActive,
+          secret_updated: hasNewSecret,
+        }),
+      ]
+    );
+
+    res.json({ success: true, msg: "Google authentication settings updated successfully" });
+  } catch (err) {
+    logger.error("update_google_auth_settings error:", err);
+    res.status(500).json({ success: false, msg: "Failed to update Google authentication settings" });
   }
 });
 

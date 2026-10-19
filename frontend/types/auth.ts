@@ -68,6 +68,13 @@ export interface WorkspaceContextType {
   waConnected?: boolean;
 }
 
+export interface GoogleAuthPayload {
+  idToken?: string;
+  token?: string;
+  code?: string;
+  redirectUri?: string;
+}
+
 export interface AuthContextType {
   user: User | null;
   role: UserRole | null;
@@ -77,6 +84,7 @@ export interface AuthContextType {
   isLoading: boolean;
   error: string | null;
   login: (credentials: LoginPayload) => Promise<void>;
+  loginWithGoogle: (payload: GoogleAuthPayload) => Promise<AuthResponse>;
   register: (payload: RegisterPayload) => Promise<{ email_verification_required?: boolean; email?: string }>;
   verifyEmail: (payload: VerifyEmailPayload) => Promise<AuthResponse>;
   resendVerification: (payload: ResendVerificationPayload) => Promise<{ success: boolean; msg?: string; cooldown?: number }>;

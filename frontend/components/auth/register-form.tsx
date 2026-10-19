@@ -13,6 +13,7 @@ import { Turnstile, TurnstileRef } from '@/components/security/turnstile';
 import { trackEvent } from '@/lib/analytics/tracker';
 import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { GoogleAuthButton } from './google-auth-button';
 
 interface RegisterFormProps {
   onSuccess?: () => void;
@@ -217,13 +218,31 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
-      {serverError && (
-        <Alert variant="destructive" className="py-2.5">
-          <AlertCircle className="h-4 w-4 shrink-0" />
-          <AlertDescription className="text-xs">{serverError}</AlertDescription>
-        </Alert>
-      )}
+    <div className="space-y-3.5">
+      <GoogleAuthButton
+        text="signup_with"
+        onSuccess={onSuccess}
+        disabled={loading}
+      />
+
+      <div className="relative my-1.5">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-[11px] uppercase">
+          <span className="bg-background px-2 text-muted-foreground font-medium">
+            Or register with email
+          </span>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
+        {serverError && (
+          <Alert variant="destructive" className="py-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <AlertDescription className="text-xs">{serverError}</AlertDescription>
+          </Alert>
+        )}
 
       {/* Field 1: Full Name */}
       <div className="space-y-1.5 text-start">
@@ -530,6 +549,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
         )}
       </div>
     </form>
+    </div>
   );
 }
 

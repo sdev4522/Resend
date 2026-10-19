@@ -103,6 +103,15 @@ export default function AdminSettingsPage() {
   const [fcmKey, setFcmKey] = useState('');
   const [savingFcm, setSavingFcm] = useState(false);
 
+  // Google OAuth states
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [googleClientSecret, setGoogleClientSecret] = useState('');
+  const [hasGoogleClientSecret, setHasGoogleClientSecret] = useState(false);
+  const [showGoogleSecret, setShowGoogleSecret] = useState(false);
+  const [googleLoginActive, setGoogleLoginActive] = useState(true);
+  const [isGoogleConfigured, setIsGoogleConfigured] = useState(false);
+  const [savingGoogle, setSavingGoogle] = useState(false);
+
   // Global theme settings states
   const { reloadTheme, applyPreview, resetToDefault } = useGlobalTheme();
   const [themePresets, setThemePresets] = useState<Array<{ id: string; name: string; description: string; isProtected: boolean; isActive: boolean }>>([]);
@@ -204,6 +213,19 @@ export default function AdminSettingsPage() {
         }
       } catch {
         // theme fetch fallback
+      }
+
+      // 8. Google OAuth settings
+      try {
+        const googleRes = await adminApi.getGoogleAuthSettings();
+        if (googleRes.success && googleRes.data) {
+          setGoogleClientId(googleRes.data.google_client_id || '');
+          setGoogleLoginActive(Boolean(googleRes.data.google_login_active));
+          setHasGoogleClientSecret(Boolean(googleRes.data.has_client_secret));
+          setIsGoogleConfigured(Boolean(googleRes.data.is_configured));
+        }
+      } catch (e) {
+        console.warn('Error loading Google auth settings:', e);
       }
 
     } catch (err: any) {
@@ -588,6 +610,31 @@ export default function AdminSettingsPage() {
     }
   };
 
+  const handleSaveGoogle = async () => {
+    setSavingGoogle(true);
+    try {
+      const res = await adminApi.updateGoogleAuthSettings({
+        google_client_id: googleClientId.trim(),
+        google_client_secret: googleClientSecret.trim() ? googleClientSecret.trim() : undefined,
+        google_login_active: googleLoginActive ? 1 : 0,
+      });
+      if (res.success) {
+        toast.success('Google authentication settings updated successfully');
+        if (googleClientSecret.trim()) {
+          setHasGoogleClientSecret(true);
+          setGoogleClientSecret('');
+        }
+        setIsGoogleConfigured(Boolean(googleClientId.trim()));
+      } else {
+        toast.error(res.msg || 'Failed to update Google authentication settings');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Error updating Google authentication settings');
+    } finally {
+      setSavingGoogle(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -627,6 +674,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="fcm" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
             <Bell className="h-3.5 w-3.5 text-primary" />
             Web Push (FCM)
+          </TabsTrigger>
+          <TabsTrigger value="google" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            Google OAuth
           </TabsTrigger>
           <TabsTrigger value="razorpay" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
             <CreditCard className="h-3.5 w-3.5 text-primary" />
@@ -959,6 +1010,195 @@ export default function AdminSettingsPage() {
                 </CardFooter>
               </Card>
             </form>
+          )}
+        </TabsContent>
+
+        {/* 0.3 GOOGLE OAUTH & OPENID CONNECT SETTINGS */}
+        <TabsContent value="google">
+          {loading ? (
+            <Card className="shadow-xs border p-6">
+              <Skeleton className="h-6 w-48 mb-2" />
+              <Skeleton className="h-4 w-72 mb-6" />
+              <div className="space-y-4">
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              <Card className="shadow-xs border">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-base font-semibold">Google OAuth & OpenID Connect</CardTitle>
+                        <CardDescription className="text-xs">
+                          Configure Google authentication credentials for user sign-in and account registration.
+                        </CardDescription>
+                      </div>
+                    </div>
+                    <div>
+                      {isGoogleConfigured && googleLoginActive ? (
+                        <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 gap-1.5 py-1 px-2.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Active & Configured
+                        </Badge>
+                      ) : isGoogleConfigured && !googleLoginActive ? (
+                        <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 gap-1.5 py-1 px-2.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                          Disabled
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="border-muted-foreground/30 bg-muted text-muted-foreground gap-1.5 py-1 px-2.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+                          Not Configured
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  {/* Enable / Disable Control */}
+                  <div className="flex items-center justify-between p-4 rounded-xl border bg-muted/30">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="google-login-active" className="text-sm font-semibold cursor-pointer">
+                        Enable Google Authentication
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        When enabled, users will see the &quot;Continue with Google&quot; button on sign-in and sign-up dialogs.
+                      </p>
+                    </div>
+                    <input
+                      id="google-login-active"
+                      type="checkbox"
+                      checked={googleLoginActive}
+                      onChange={(e) => setGoogleLoginActive(e.target.checked)}
+                      className="h-5 w-5 rounded-md border-input text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-600"
+                    />
+                  </div>
+
+                  {/* Google Client ID */}
+                  <div className="space-y-2">
+                    <Label htmlFor="google-client-id" className="text-xs font-semibold">
+                      Google OAuth Client ID
+                    </Label>
+                    <Input
+                      id="google-client-id"
+                      type="text"
+                      placeholder="e.g. 1234567890-abcdefg1234567.apps.googleusercontent.com"
+                      value={googleClientId}
+                      onChange={(e) => setGoogleClientId(e.target.value)}
+                      className="h-10 text-sm font-mono"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Public Web Application Client ID created in Google Cloud Console Credentials.
+                    </p>
+                  </div>
+
+                  {/* Google Client Secret */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="google-client-secret" className="text-xs font-semibold">
+                        Google OAuth Client Secret
+                      </Label>
+                      {hasGoogleClientSecret && (
+                        <span className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                          <Check className="h-3 w-3" /> Secret Configured on Server
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="google-client-secret"
+                        type={showGoogleSecret ? 'text' : 'password'}
+                        placeholder={
+                          hasGoogleClientSecret
+                            ? '•••••••••••••••• (Configured — leave blank to keep unchanged)'
+                            : 'Enter Google Client Secret (e.g. GOCSPX-xxxxxxxxxxxx)'
+                        }
+                        value={googleClientSecret}
+                        onChange={(e) => setGoogleClientSecret(e.target.value)}
+                        className="h-10 pr-10 text-sm font-mono"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowGoogleSecret(!showGoogleSecret)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                        tabIndex={-1}
+                        aria-label={showGoogleSecret ? 'Hide secret' : 'Show secret'}
+                      >
+                        {showGoogleSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      Masked for security. Secret is stored exclusively in private server configuration and is never returned to the client browser. Leave blank to preserve the existing stored secret.
+                    </p>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex items-center justify-between border-t pt-4">
+                  <div className="text-xs text-muted-foreground">
+                    Changes take effect immediately across all public auth dialogs and pages.
+                  </div>
+                  <Button
+                    onClick={handleSaveGoogle}
+                    disabled={savingGoogle}
+                    className="gap-2"
+                  >
+                    {savingGoogle ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Saving Settings...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        Save Google Settings
+                      </>
+                    )}
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Google Cloud Console Setup Guidance Card */}
+              <Card className="shadow-xs border bg-muted/10">
+                <CardHeader>
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary" />
+                    Google Cloud Console Configuration Guide
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Configure your OAuth 2.0 Client ID in the Google Cloud Console with these required URIs.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 text-xs">
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-foreground">1. Authorized JavaScript Origins</div>
+                    <div className="p-2.5 rounded-lg bg-background border font-mono text-[11px] space-y-1 select-all">
+                      <div>https://resend.in</div>
+                      <div>https://www.resend.in</div>
+                      <div className="text-muted-foreground">http://localhost:3000 (for local development)</div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-foreground">2. Authorized Redirect URIs</div>
+                    <div className="p-2.5 rounded-lg bg-background border font-mono text-[11px] space-y-1 select-all">
+                      <div>https://resend.in/api/auth/google/callback</div>
+                      <div>https://www.resend.in/api/auth/google/callback</div>
+                      <div className="text-muted-foreground">http://localhost:3000/api/auth/google/callback (for local development)</div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <div className="font-semibold text-foreground">3. OAuth Scopes Required</div>
+                    <p className="text-muted-foreground">
+                      Ensure <code className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-mono">email</code>, <code className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-mono">profile</code>, and <code className="bg-muted px-1.5 py-0.5 rounded text-[11px] font-mono">openid</code> are added to your OAuth Consent Screen.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           )}
         </TabsContent>
 

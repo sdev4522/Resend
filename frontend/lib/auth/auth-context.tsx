@@ -8,6 +8,7 @@ import {
   AuthStatus,
   LoginPayload,
   RegisterPayload,
+  GoogleAuthPayload,
   WorkspaceContextType,
 } from '@/types/auth';
 import { authApi } from '@/lib/api/auth';
@@ -118,6 +119,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginWithGoogle = async (payload: GoogleAuthPayload) => {
+    setStatus('AUTHENTICATING');
+    setError(null);
+    try {
+      const res = await authApi.loginWithGoogle(payload);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setRole(res.role || res.user.role || 'user');
+        setStatus('AUTHENTICATED');
+        await refreshUser();
+
+        // Redirect based on backend role
+        if (res.role === 'admin') {
+          router.push('/admin');
+        } else if (!res.user.timezone) {
+          router.push('/onboarding');
+        } else {
+          router.push('/dashboard');
+        }
+        return res;
+      } else {
+        throw new Error(res.msg || 'Google authentication failed');
+      }
+    } catch (err: any) {
+      setStatus('AUTH_ERROR');
+      setError(err.message || 'Google authentication failed');
+      throw err;
+    }
+  };
+
   const register = async (payload: RegisterPayload) => {
     setStatus('AUTHENTICATING');
     setError(null);
@@ -214,6 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         login,
+        loginWithGoogle,
         register,
         verifyEmail,
         resendVerification,
