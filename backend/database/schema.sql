@@ -1427,6 +1427,7 @@ CREATE TABLE `user` (
   `subscription_id` varchar(255) DEFAULT NULL,
   `subscription_status` varchar(50) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
+  `terms_accepted_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_uid` (`uid`(150)),
   KEY `idx_user_is_blocked` (`is_blocked`)

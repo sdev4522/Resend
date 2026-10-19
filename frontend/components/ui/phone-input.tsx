@@ -36,7 +36,12 @@ interface PhoneInputProps {
   disabled?: boolean;
   required?: boolean;
   error?: string | null;
+  helperText?: React.ReactNode;
+  autoComplete?: string;
   className?: string;
+  ariaDescribedBy?: string;
+  onBlur?: () => void;
+  onFocus?: () => void;
 }
 
 /**
@@ -76,7 +81,12 @@ export function PhoneInput({
   disabled = false,
   required = false,
   error,
+  helperText,
+  autoComplete = 'tel',
   className = '',
+  ariaDescribedBy,
+  onBlur,
+  onFocus,
 }: PhoneInputProps) {
   const initial = parsePhoneNumber(value);
   const [selectedCode, setSelectedCode] = useState<string>(initial.code || '+91');
@@ -108,6 +118,10 @@ export function PhoneInput({
     onChange(normalized);
   };
 
+  const describedBy =
+    ariaDescribedBy ||
+    (error ? `${id}-error` : helperText ? `${id}-helper` : undefined);
+
   return (
     <div className={`space-y-1.5 text-start ${className}`}>
       {label && (
@@ -117,7 +131,13 @@ export function PhoneInput({
         </Label>
       )}
 
-      <div className="flex rounded-md shadow-xs border border-input focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 overflow-hidden bg-background">
+      <div
+        className={`flex rounded-md shadow-xs border bg-background overflow-hidden transition-colors ${
+          error
+            ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive/30'
+            : 'border-input focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/30 dark:focus-within:border-emerald-500'
+        }`}
+      >
         {/* Country Code Selector */}
         <div className="relative shrink-0 border-r border-input bg-muted/30">
           <select
@@ -143,18 +163,32 @@ export function PhoneInput({
         <Input
           id={id}
           type="tel"
-          inputMode="numeric"
-          pattern="[0-9]*"
+          inputMode="tel"
+          autoComplete={autoComplete}
           placeholder={activeCountry.placeholder}
           required={required}
           value={phoneNumber}
           onChange={handlePhoneChange}
+          onBlur={onBlur}
+          onFocus={onFocus}
           disabled={disabled}
-          className="h-10 border-0 rounded-none focus-visible:ring-0 text-sm shadow-none"
+          aria-invalid={!!error}
+          aria-describedby={describedBy}
+          className="h-10 border-0 rounded-none focus-visible:ring-0 text-sm shadow-none placeholder:text-[#8b8b8b]"
         />
       </div>
 
-      {error && <p className="text-[11px] text-destructive">{error}</p>}
+      {helperText && !error && (
+        <p id={`${id}-helper`} className="text-[11px] text-muted-foreground leading-normal">
+          {helperText}
+        </p>
+      )}
+
+      {error && (
+        <p id={`${id}-error`} className="text-[11px] text-destructive leading-normal">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

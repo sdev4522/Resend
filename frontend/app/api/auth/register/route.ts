@@ -6,9 +6,16 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { name, email, password, mobile_with_country_code, acceptPolicy, turnstileToken } = body;
 
-    if (!name || !email || !password || !mobile_with_country_code) {
+    if (!email || !password || !mobile_with_country_code) {
       return NextResponse.json(
         { success: false, msg: 'Please fill all required details' },
+        { status: 400 }
+      );
+    }
+
+    if (typeof password !== 'string' || password.length < 8) {
+      return NextResponse.json(
+        { success: false, msg: 'Password must be at least 8 characters' },
         { status: 400 }
       );
     }
@@ -42,11 +49,11 @@ export async function POST(request: NextRequest) {
         ...(clientIp ? { 'x-real-ip': clientIp, 'x-forwarded-for': clientIp } : {}),
       },
       body: JSON.stringify({
-        name,
-        email,
+        ...(name ? { name: String(name).trim() } : {}),
+        email: String(email).trim().toLowerCase(),
         password,
         mobile_with_country_code,
-        acceptPolicy: true,
+        acceptPolicy: Boolean(acceptPolicy),
         turnstileToken,
       }),
     });

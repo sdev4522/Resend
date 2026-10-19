@@ -36,7 +36,7 @@ async function runSuite() {
   // 1. Registration form contains phone field
   await test(1, 'Registration Form: Schema & Phone field definition', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/components/auth/register-form.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/components/auth/register-form.tsx', 'utf8');
     assert(code.includes('PhoneInput'), 'Register form must include PhoneInput');
     assert(code.includes('mobile_with_country_code'), 'Register form must send mobile_with_country_code');
   });
@@ -44,7 +44,7 @@ async function runSuite() {
   // 2. India +91 is default
   await test(2, 'Phone Input: Defaults to India (+91) with country selector', async () => {
     const fs = await import('fs');
-    const phoneInputCode = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/components/ui/phone-input.tsx', 'utf8');
+    const phoneInputCode = fs.readFileSync('/home/sdev/Projects/Resend/frontend/components/ui/phone-input.tsx', 'utf8');
     assert(phoneInputCode.includes("'+91'"), 'Phone input must default to +91');
     assert(phoneInputCode.includes('COUNTRIES'), 'Phone input must maintain country definitions');
     assert(phoneInputCode.includes('India'), 'India must be supported');
@@ -272,7 +272,7 @@ async function runSuite() {
   // 16. Phone is not unnecessarily requested again
   await test(16, 'Onboarding Page Code: Pre-fills phone number from registration user state', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(code.includes('user.mobile_with_country_code || user.phone'), 'Must prefill phone from user context');
   });
 
@@ -343,7 +343,7 @@ async function runSuite() {
   // 20. Connected state is shown ONLY when backend confirms connection
   await test(20, 'WhatsApp Logic: Never shows Connected while QR card is linking', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(!code.includes("waStatus === 'connected' ? 'Connected' : 'Pending Link'"), 'Old contradictory badge removed');
     assert(code.includes("waStatus === 'CONNECTED'"), 'Must strictly use uppercase checked state');
     assert(code.includes("inst.status === 'ACTIVE'"), 'Must verify active status from backend');
@@ -352,7 +352,7 @@ async function runSuite() {
   // 21. WhatsApp skipped state works
   await test(21, 'WhatsApp Skipping: Stepper displays WhatsApp (Skipped)', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(code.includes("waStatus === 'SKIPPED'"), 'Must support SKIPPED state');
     assert(code.includes('WhatsApp (Skipped)'), 'Stepper must display WhatsApp (Skipped)');
   });
@@ -379,7 +379,7 @@ async function runSuite() {
   // 23. Team skip works
   await test(23, 'Team Skip: Allows proceeding to Step 4 without inviting an agent', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(code.includes('handleSkipAgent'), 'Must have handleSkipAgent');
     assert(code.includes('Skip for now'), 'Skip button must be present in Step 3');
   });
@@ -387,7 +387,7 @@ async function runSuite() {
   // 24. Final onboarding summary uses real data
   await test(24, 'Ready to Launch: Displays verified email, phone, and truthful WhatsApp status', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(code.includes('✓ Verified'), 'Must show verified email indicator in summary');
     assert(code.includes('Not connected'), 'Must show unlinked WhatsApp when not connected');
   });
@@ -395,7 +395,7 @@ async function runSuite() {
   // 25. Refresh resumes onboarding correctly
   await test(25, 'Resumability: Automatically resumes from Step 2 if Step 1 is already saved', async () => {
     const fs = await import('fs');
-    const code = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
+    const code = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
     assert(code.includes('setCurrentStep((prev) => (prev === 1 ? 2 : prev))'), 'Must advance step if profile configured');
   });
 
@@ -458,9 +458,9 @@ async function runSuite() {
   // 31. Mobile layout has no horizontal overflow
   await test(31, 'Mobile Responsive Layout: Container and form styles comply with constraints', async () => {
     const fs = await import('fs');
-    const onboardingCode = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/onboarding/page.tsx', 'utf8');
-    const verifyCode = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/app/(auth)/verify-email/page.tsx', 'utf8');
-    const phoneInputCode = fs.readFileSync('/home/sdev/Projects/wacrm-frontend/components/ui/phone-input.tsx', 'utf8');
+    const onboardingCode = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/onboarding/page.tsx', 'utf8');
+    const verifyCode = fs.readFileSync('/home/sdev/Projects/Resend/frontend/app/(auth)/verify-email/page.tsx', 'utf8');
+    const phoneInputCode = fs.readFileSync('/home/sdev/Projects/Resend/frontend/components/ui/phone-input.tsx', 'utf8');
 
     assert(!onboardingCode.includes('w-[800px]'), 'No fixed wide pixel widths in onboarding');
     assert(!verifyCode.includes('w-[800px]'), 'No fixed wide pixel widths in verify-email');

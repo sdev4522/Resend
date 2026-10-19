@@ -92,6 +92,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
   const [error, setError] = useState<string | null>(null);
 
   // Form State
+  const [fullName, setFullName] = useState<string>('');
   const [workspaceName, setWorkspaceName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
   const [timezone, setTimezone] = useState<string>('Asia/Kolkata');
@@ -121,6 +122,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
         const saved = sessionStorage.getItem('wacrm_onboarding_draft');
         if (saved) {
           const parsed = JSON.parse(saved);
+          if (parsed.fullName) setFullName(parsed.fullName);
           if (parsed.workspaceName) setWorkspaceName(parsed.workspaceName);
           if (parsed.phone) setPhone(parsed.phone);
           if (parsed.timezone) setTimezone(parsed.timezone);
@@ -136,6 +138,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
   // Pre-fill user details if empty
   useEffect(() => {
     if (user) {
+      if (!fullName && user.name) setFullName(user.name);
       if (!workspaceName && user.name) setWorkspaceName(user.name);
       if (!phone && user.mobile_with_country_code) setPhone(user.mobile_with_country_code);
       if (user.timezone) setTimezone(user.timezone);
@@ -148,6 +151,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
       sessionStorage.setItem(
         'wacrm_onboarding_draft',
         JSON.stringify({
+          fullName,
           workspaceName,
           phone,
           timezone,
@@ -156,7 +160,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
         })
       );
     }
-  }, [workspaceName, phone, timezone, selectedPlanId, currentStep]);
+  }, [fullName, workspaceName, phone, timezone, selectedPlanId, currentStep]);
 
   // Load real plans and currency detection from backend
   useEffect(() => {
@@ -211,6 +215,10 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
   // Step 1 Validation & Next
   const handleStep1Next = () => {
     setError(null);
+    if (!fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
     if (!workspaceName.trim()) {
       setError('Please enter your workspace or business name.');
       return;
@@ -245,9 +253,9 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
     setPaymentError(null);
 
     try {
-      // 1. Update user profile (workspace name, phone, timezone)
+      // 1. Update user profile (full name, workspace, phone, timezone)
       await api.post('/api/user/update_profile', {
-        name: workspaceName.trim(),
+        name: fullName.trim() || workspaceName.trim(),
         email: user?.email,
         mobile_with_country_code: phone.trim(),
         timezone,
@@ -302,7 +310,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
     try {
       // 1. Save workspace profile first
       await api.post('/api/user/update_profile', {
-        name: workspaceName.trim(),
+        name: fullName.trim() || workspaceName.trim(),
         email: user?.email,
         mobile_with_country_code: phone.trim(),
         timezone,
@@ -345,7 +353,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
         description: `${selectedPlan.title} Plan Subscription`,
         order_id: orderData.orderId,
         prefill: {
-          name: workspaceName.trim() || user?.name || '',
+          name: fullName.trim() || workspaceName.trim() || user?.name || '',
           email: user?.email || '',
           contact: phone.trim() || user?.mobile_with_country_code || '',
         },
@@ -578,6 +586,20 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
       </div>
 
       <div className="space-y-3.5 pt-1">
+        <div className="space-y-1.5">
+          <Label htmlFor="onboarding-full-name" className="text-xs font-semibold text-foreground">
+            Full Name <span className="text-destructive">*</span>
+          </Label>
+          <Input
+            id="onboarding-full-name"
+            placeholder="e.g. John Doe"
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="h-9 text-sm"
+          />
+        </div>
+
         <div className="space-y-1.5">
           <Label htmlFor="onboarding-ws-name" className="text-xs font-semibold text-foreground">
             Workspace Name <span className="text-destructive">*</span>

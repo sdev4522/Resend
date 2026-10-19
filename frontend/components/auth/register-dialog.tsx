@@ -23,11 +23,14 @@ export function RegisterDialog() {
             <MessageCircle className="h-6 w-6" />
           </div>
           <DialogTitle className="text-xl font-bold tracking-tight">
-            Create your Resend account
+            Start your free WhatsApp CRM trial
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground">
-            Start your 14-day WhatsApp CRM trial. No credit card required.
+          <DialogDescription className="text-xs text-muted-foreground max-w-sm">
+            Manage WhatsApp conversations, contacts, and campaigns from one workspace.
           </DialogDescription>
+          <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+            14 days free · No credit card required
+          </div>
         </DialogHeader>
         <div className="pt-2">
           <RegisterForm

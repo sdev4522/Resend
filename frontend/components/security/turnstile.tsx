@@ -9,6 +9,7 @@ import React, {
   useState,
 } from 'react';
 import { AlertCircle, RefreshCw, Loader2 } from 'lucide-react';
+import { useTheme } from 'next-themes';
 
 declare global {
   interface Window {
@@ -49,6 +50,8 @@ export interface TurnstileProps {
   onExpire?: () => void;
   onTimeout?: () => void;
   action?: string;
+  size?: 'normal' | 'compact' | 'flexible';
+  theme?: 'light' | 'dark' | 'auto';
   className?: string;
 }
 
@@ -127,7 +130,8 @@ function loadCloudflareTurnstileScript(): Promise<void> {
 }
 
 export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
-  ({ onSuccess, onError, onExpire, onTimeout, action = 'signup', className }, ref) => {
+  ({ onSuccess, onError, onExpire, onTimeout, action = 'signup', size = 'normal', theme, className }, ref) => {
+    const { resolvedTheme } = useTheme();
     const containerRef = useRef<HTMLDivElement>(null);
     const widgetIdRef = useRef<string | null>(null);
     const watchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -198,10 +202,20 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
           }
         }, VERIFICATION_TIMEOUT_MS);
 
+        const isDark =
+          resolvedTheme === 'dark' ||
+          (typeof document !== 'undefined' &&
+            (document.documentElement.classList.contains('dark') ||
+              document.body.classList.contains('dark')));
+
+        const activeTheme: 'light' | 'dark' | 'auto' =
+          theme || (isDark ? 'dark' : 'light');
+
         const id = turnstile.render(containerRef.current, {
           sitekey: siteKey,
           action,
-          theme: 'auto',
+          theme: activeTheme,
+          size,
           retry: 'auto',
           'refresh-expired': 'auto',
           callback: (token: string) => {
@@ -258,7 +272,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
       } finally {
         isRenderingRef.current = false;
       }
-    }, [siteKey, action, removeWidget, clearWatchdog]);
+    }, [siteKey, action, size, theme, resolvedTheme, removeWidget, clearWatchdog]);
 
     const reset = useCallback(() => {
       clearWatchdog();
@@ -319,10 +333,10 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
         {/* Turnstile widget container */}
         <div
           ref={containerRef}
-          className={`cf-turnstile-container ${
+          className={`cf-turnstile-container flex justify-center items-center w-full min-h-[65px] ${
             status === 'error' || status === 'timeout' || status === 'expired'
               ? 'hidden'
-              : 'block'
+              : 'flex'
           }`}
         />
 

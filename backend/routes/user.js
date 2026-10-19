@@ -345,8 +345,12 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
       });
     }
 
-    if (!email || !name || !password || !mobile_with_country_code) {
+    if (!email || !password || !mobile_with_country_code) {
       return res.json({ msg: "Please fill the details", success: false });
+    }
+
+    if (!password || typeof password !== "string" || password.length < 8) {
+      return res.json({ msg: "Password must be at least 8 characters", success: false });
     }
 
     if (!acceptPolicy) {
@@ -376,10 +380,11 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
 
     const haspass = await bcrypt.hash(password, 10);
     const uid = randomstring.generate();
+    const resolvedName = name && typeof name === "string" && name.trim() ? name.trim() : null;
 
     await query(
-      `INSERT INTO user (name, uid, email, password, mobile_with_country_code, email_verified_at) VALUES (?,?,?,?,?, NULL)`,
-      [name.trim(), uid, email.toLowerCase().trim(), haspass, cleanPhone],
+      `INSERT INTO user (name, uid, email, password, mobile_with_country_code, email_verified_at, terms_accepted_at) VALUES (?,?,?,?,?, NULL, CURRENT_TIMESTAMP)`,
+      [resolvedName, uid, email.toLowerCase().trim(), haspass, cleanPhone],
     );
 
     // Assign 14-day trial plan

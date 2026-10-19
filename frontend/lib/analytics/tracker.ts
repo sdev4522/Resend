@@ -10,6 +10,11 @@ export type AnalyticsEvent =
   | 'contact_submit_success'
   | 'contact_submit_fail'
   | 'auth_dialog_open'
+  | 'signup_view'
+  | 'field_focus'
+  | 'field_error'
+  | 'signup_submit'
+  | 'signup_success'
   | 'cookie_consent_accepted'
   | 'cookie_consent_declined';
 
@@ -51,6 +56,8 @@ function sanitizePayload(props: Record<string, any>): Record<string, any> {
     /cvv/i,
     /phone/i,
     /mobile/i,
+    /email/i,
+    /otp/i,
   ];
 
   for (const [key, val] of Object.entries(props)) {

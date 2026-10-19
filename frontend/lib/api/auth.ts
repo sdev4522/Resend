@@ -11,7 +11,7 @@ export const authApi = {
     return api.post<AuthResponse>('/api/auth/register', {
       ...payload,
       mobile_with_country_code: payload.mobile_with_country_code || payload.phone,
-      acceptPolicy: payload.acceptPolicy ?? true,
+      acceptPolicy: Boolean(payload.acceptPolicy),
       turnstileToken: payload.turnstileToken,
     });
   },
