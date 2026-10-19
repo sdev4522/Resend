@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ThemeProvider } from './theme-provider';
+import { ThemeProvider, ThemeConfig } from './theme-provider';
 import { AuthProvider } from '@/lib/auth/auth-context';
 import { CurrencyProvider } from '@/lib/currency/currency-context';
 import { AuthDialogProvider } from '@/components/auth/auth-dialog-context';
@@ -10,13 +10,20 @@ import { Toaster } from '@/components/ui/sonner';
 
 import { OnboardingProvider } from '@/components/onboarding/onboarding-provider';
 
-export function RootProvider({ children }: { children: React.ReactNode }) {
+export function RootProvider({
+  children,
+  initialThemeConfig,
+}: {
+  children: React.ReactNode;
+  initialThemeConfig?: ThemeConfig | null;
+}) {
   return (
     <ThemeProvider
       attribute="class"
       defaultTheme="system"
       enableSystem
       disableTransitionOnChange
+      initialConfig={initialThemeConfig}
     >
       <AuthProvider>
         <CurrencyProvider>

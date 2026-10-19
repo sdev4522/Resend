@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Golos_Text, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { RootProvider } from '@/components/providers/root-provider';
+import { generateThemeCss } from '@/lib/theme/theme-utils';
+import { getActiveThemeConfigServer } from '@/lib/theme/server-theme';
 import { CookieConsent } from '@/components/shared/cookie-consent';
 import { AnalyticsProvider } from '@/components/analytics/analytics-provider';
 import { siteConfig } from '@/config/site';
@@ -80,19 +82,37 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const initialThemeConfig = await getActiveThemeConfigServer();
+  const themeCss = generateThemeCss(initialThemeConfig);
+
   return (
     <html
       lang="en"
       suppressHydrationWarning
       className={`${golosText.variable} ${geistMono.variable} h-full antialiased`}
     >
+      <head>
+        {themeCss ? (
+          <style
+            id="wacrm-dynamic-theme"
+            dangerouslySetInnerHTML={{ __html: themeCss }}
+          />
+        ) : (
+          <style id="wacrm-dynamic-theme" />
+        )}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=document.getElementById('wacrm-dynamic-theme');if(!s||!s.textContent){var c=localStorage.getItem('wacrm_theme_css');if(c){if(!s){s=document.createElement('style');s.id='wacrm-dynamic-theme';document.head.appendChild(s);}s.textContent=c;}}}catch(e){}})();`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <RootProvider>
+        <RootProvider initialThemeConfig={initialThemeConfig}>
           <AnalyticsProvider>
             {children}
             <CookieConsent />

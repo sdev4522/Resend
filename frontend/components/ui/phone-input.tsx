@@ -132,11 +132,10 @@ export function PhoneInput({
       )}
 
       <div
-        className={`flex rounded-md shadow-xs border bg-background overflow-hidden transition-colors ${
-          error
-            ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive/30'
-            : 'border-input focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/30 dark:focus-within:border-emerald-500'
-        }`}
+        className={`flex rounded-md shadow-xs border bg-background overflow-hidden transition-colors ${error
+          ? 'border-destructive focus-within:ring-2 focus-within:ring-destructive/30'
+          : 'border-input focus-within:border-emerald-600 focus-within:ring-2 focus-within:ring-emerald-600/30 dark:focus-within:border-emerald-500'
+          }`}
       >
         {/* Country Code Selector */}
         <div className="relative shrink-0 border-r border-input bg-muted/30">
@@ -149,8 +148,8 @@ export function PhoneInput({
             aria-label="Country calling code"
           >
             {COUNTRIES.map((c) => (
-              <option key={`${c.country}-${c.code}`} value={c.code}>
-                {c.flag} {c.code} ({c.country})
+              <option className="text-white bg-black" key={`${c.country}-${c.code}`} value={c.code}>
+                {c.flag} {c.code}
               </option>
             ))}
           </select>

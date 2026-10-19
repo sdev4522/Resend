@@ -30,9 +30,13 @@ export function MarketingPricing() {
     try {
       const res = await billingApi.getPlans();
       if (res.success && Array.isArray(res.plans)) {
-        // Exclude trial from main pricing cards if trial is separated, or include if active
-        // Usually SaaS plans are active paid tiers (trial can be CTA)
-        const visiblePlans = res.plans.filter((p) => !p.is_trial || p.price > 0);
+        // Filter out any explicitly disabled or private plans if present, while preserving all public plans including the trial plan
+        const visiblePlans = res.plans.filter((p: any) => {
+          if (p.is_active === false || p.is_active === 0) return false;
+          if (p.status === 'inactive' || p.status === 'disabled' || p.status === 'archived') return false;
+          if (p.is_private === true || p.is_private === 1) return false;
+          return true;
+        });
         setPlans(visiblePlans);
         if (res.currency) setCurrency(res.currency);
         if (res.currencySymbol) setCurrencySymbol(res.currencySymbol);
@@ -192,8 +196,19 @@ export function MarketingPricing() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
+          <div
+            className={`grid gap-6 sm:gap-8 items-stretch ${
+              plans.length === 1
+                ? 'grid-cols-1 max-w-md mx-auto'
+                : plans.length === 2
+                ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
+                : plans.length === 3
+                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto'
+                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-7xl mx-auto'
+            }`}
+          >
             {plans.map((plan, index) => {
+              const isTrial = Boolean(plan.is_trial === 1 || plan.is_trial || String(plan.title || '').toLowerCase().includes('trial'));
               // Calculate monthly vs annual amounts
               const basePrice = plan.currencyPrices?.[currency] ?? plan.price;
               const strikePrice = plan.currencyStrikePrices?.[currency] ?? (plan.price_strike ? parseFloat(plan.price_strike) : null);
@@ -202,7 +217,10 @@ export function MarketingPricing() {
               let displayMonthlyPrice: number;
               let billingSummary: string;
 
-              if (billingPeriod === 'yearly') {
+              if (isTrial) {
+                displayMonthlyPrice = 0;
+                billingSummary = `${plan.plan_duration_in_days || 14}-day free trial · No credit card required`;
+              } else if (billingPeriod === 'yearly') {
                 if (isAnnualPlan) {
                   // Plan is natively annual
                   displayMonthlyPrice = Math.round((basePrice / 12) * 100) / 100;
@@ -225,7 +243,7 @@ export function MarketingPricing() {
               }
 
               const features = getPlanFeatureList(plan);
-              const isHighlighted = index === 1 || plan.is_popular;
+              const isHighlighted = Boolean(plan.is_popular || (!isTrial && (plans.length > 2 ? index === 1 : index === plans.length - 1)));
 
               return (
                 <div
@@ -250,27 +268,34 @@ export function MarketingPricing() {
                       <h3 className="text-xl font-bold text-foreground tracking-tight">
                         {plan.title}
                       </h3>
-                      <Badge variant="secondary" className="text-[11px] font-medium">
-                        {isAnnualPlan ? 'Annual' : 'Standard'}
+                      <Badge
+                        variant={isTrial ? "outline" : "secondary"}
+                        className={`text-[11px] font-medium ${
+                          isTrial
+                            ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+                            : ""
+                        }`}
+                      >
+                        {isTrial ? `${plan.plan_duration_in_days || 14}-Day Trial` : isAnnualPlan ? 'Annual' : 'Standard'}
                       </Badge>
                     </div>
 
                     <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                      {plan.short_description || 'Production-grade WhatsApp CRM & multi-agent automation platform.'}
+                      {plan.short_description || (isTrial ? 'Full access to test WhatsApp inbox, automation, and campaigns.' : 'Production-grade WhatsApp CRM & multi-agent automation platform.')}
                     </p>
 
                     {/* Price Block */}
                     <div className="mt-6 flex items-baseline gap-2">
-                      {strikePrice && strikePrice > displayMonthlyPrice && (
+                      {strikePrice && strikePrice > displayMonthlyPrice && !isTrial && (
                         <span className="line-through text-muted-foreground/50 text-xl font-mono mr-1">
                           {formatPrice(strikePrice)}
                         </span>
                       )}
                       <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground font-mono">
-                        {formatPrice(displayMonthlyPrice)}
+                        {isTrial ? 'Free' : formatPrice(displayMonthlyPrice)}
                       </span>
                       <span className="text-xs sm:text-sm text-muted-foreground">
-                        / month
+                        {isTrial ? `/ ${plan.plan_duration_in_days || 14} days` : '/ month'}
                       </span>
                     </div>
 
@@ -297,20 +322,32 @@ export function MarketingPricing() {
                   {/* CTA Action */}
                   <div className="mt-8 pt-6 border-t border-border/40">
                     {user ? (
-                      <Button
-                        variant={isHighlighted ? 'default' : 'outline'}
-                        className="w-full rounded-xl h-11 text-sm font-semibold gap-2"
-                        render={<Link href="/dashboard/billing" />}
-                      >
-                        Manage & Upgrade Plan <ArrowRight className="h-4 w-4" />
-                      </Button>
+                      isTrial ? (
+                        <Button
+                          variant="outline"
+                          className="w-full rounded-xl h-11 text-sm font-semibold gap-2 border-border/80 hover:border-foreground/40"
+                          render={<Link href="/dashboard" />}
+                        >
+                          Go to Dashboard <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={isHighlighted ? 'default' : 'outline'}
+                          className="w-full rounded-xl h-11 text-sm font-semibold gap-2"
+                          render={<Link href="/dashboard/billing" />}
+                        >
+                          Manage & Upgrade Plan <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      )
                     ) : (
                       <Button
                         variant={isHighlighted ? 'default' : 'outline'}
-                        className="w-full rounded-xl h-11 text-sm font-semibold gap-2"
+                        className={`w-full rounded-xl h-11 text-sm font-semibold gap-2 ${
+                          isTrial ? 'border-primary/50 text-foreground hover:bg-primary/10' : ''
+                        }`}
                         onClick={openRegister}
                       >
-                        Get Started <ArrowRight className="h-4 w-4" />
+                        {isTrial ? 'Start Free Trial' : 'Get Started'} <ArrowRight className="h-4 w-4" />
                       </Button>
                     )}
                   </div>

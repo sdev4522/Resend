@@ -459,7 +459,10 @@ router.get("/get-theme-config", (req, res) => {
     const data = readThemeById(activeId);
     res.json({
       success: true,
-      data,
+      data: {
+        ...data,
+        id: data.id || activeId,
+      },
       msg: "Theme configuration fetched successfully",
     });
   } catch (err) {
