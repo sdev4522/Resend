@@ -1,11 +1,8 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { MarketingNavbar } from '@/components/marketing/navbar';
-import { MarketingHero } from '@/components/marketing/hero';
 import { MarketingCapabilityMarquee } from '@/components/marketing/capability-marquee';
 import { MarketingBentoFeatures } from '@/components/marketing/bento-features';
 import { MarketingHowItWorks } from '@/components/marketing/how-it-works';
-import { MarketingProductShowcase } from '@/components/marketing/product-showcase';
 import { MarketingFeatureComparison } from '@/components/marketing/feature-comparison';
 import { MarketingPricing } from '@/components/marketing/pricing';
 import { MarketingFAQ } from '@/components/marketing/faq';
@@ -13,6 +10,7 @@ import { MarketingCTABanner } from '@/components/marketing/cta-banner';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
 import { siteConfig } from '@/config/site';
+import { Hero5 } from '@/components/ui/hero-5';
 
 export const metadata: Metadata = {
   title: {
@@ -113,6 +111,14 @@ export default function HomePage() {
               text: 'The Meta Cloud API connects directly through Meta’s servers for verified high-throughput messaging without phone dependency. The QR engine provides instant quick connection for existing numbers.',
             },
           },
+          {
+            '@type': 'Question',
+            name: 'Are there additional charges from Meta for WhatsApp conversations?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'If using Meta Cloud API, WhatsApp conversation charges are billed directly by Meta according to their official conversation pricing. Meta provides 1,000 free service conversations per month per business portfolio. QR connections use your regular phone plan without Meta conversation fees.',
+            },
+          },
         ],
       },
     ],
@@ -124,12 +130,12 @@ export default function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      {/* Section 1: Navigation */}
-      <MarketingNavbar />
 
-      <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
+
+
+      <main className="flex-1 pb-16 sm:pb-0">
         {/* Section 2: Hero */}
-        <MarketingHero />
+        <Hero5 />
 
         {/* Section 3: Capability Marquee */}
         <MarketingCapabilityMarquee />
@@ -140,26 +146,23 @@ export default function HomePage() {
         {/* Section 5: How It Works */}
         <MarketingHowItWorks />
 
-        {/* Section 6: Product Workflow Showcase */}
-        <MarketingProductShowcase />
-
-        {/* Section 7: Feature Comparison */}
+        {/* Section 6: Feature Comparison */}
         <MarketingFeatureComparison />
 
-        {/* Section 8: Pricing Preview */}
+        {/* Section 7: Pricing Preview */}
         <MarketingPricing />
 
-        {/* Section 9: FAQ */}
+        {/* Section 8: FAQ */}
         <MarketingFAQ />
 
-        {/* Section 10: Final CTA */}
+        {/* Section 9: Final CTA */}
         <MarketingCTABanner />
       </main>
 
       {/* Mobile Sticky CTA Bar */}
       <StickyMobileCTA />
 
-      {/* Section 11: Footer */}
+      {/* Section 10: Footer */}
       <MarketingFooter />
     </div>
   );

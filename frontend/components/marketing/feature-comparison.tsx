@@ -1,18 +1,26 @@
 'use client';
 
 import React from 'react';
-import { Check, X, HelpCircle, ShieldCheck, Sparkles } from 'lucide-react';
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Check, X, HelpCircle, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
 
 interface ComparisonRow {
   capability: string;
   description: string;
   resend: 'yes' | 'plan';
-  resendLabel?: string;
+  resendLabel: string;
   manual: 'no' | 'limited' | 'capped';
-  manualLabel?: string;
+  manualLabel: string;
 }
 
 const COMPARISON_DATA: ComparisonRow[] = [
@@ -34,7 +42,7 @@ const COMPARISON_DATA: ComparisonRow[] = [
   },
   {
     capability: 'Official Meta Cloud API Direct Connection',
-    description: 'Direct server-to-server connection through Meta Graph API with official verification compliance.',
+    description: 'Direct server-to-server connection through Meta Graph API with enterprise verification compliance.',
     resend: 'yes',
     resendLabel: 'Included (Dual Engine)',
     manual: 'no',
@@ -118,70 +126,68 @@ export function MarketingFeatureComparison() {
         </p>
       </div>
 
-      {/* Comparison Table Container */}
+      {/* Comparison Table Container with Real shadcn/ui Table Primitives */}
       <div className="rounded-2xl border border-border/80 bg-card shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left border-collapse">
-            <thead>
-              <tr className="border-b border-border/70 bg-muted/30">
-                <th className="py-4 px-6 text-sm font-semibold text-foreground w-[45%]">
-                  Operational Capability
-                </th>
-                <th className="py-4 px-6 text-sm font-semibold text-primary w-[30%] bg-primary/5 border-x border-border/60">
+        <Table className="min-w-[640px]">
+          <TableHeader>
+            <TableRow className="border-b border-border/70 bg-muted/30 hover:bg-muted/30">
+              <TableHead className="py-4 px-6 text-sm font-semibold text-foreground w-[45%]">
+                Operational Capability
+              </TableHead>
+              <TableHead className="py-4 px-6 text-sm font-semibold text-primary w-[30%] bg-primary/5 border-x border-border/60">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  <span>Resend Platform</span>
+                </div>
+              </TableHead>
+              <TableHead className="py-4 px-6 text-sm font-semibold text-muted-foreground w-[25%]">
+                Standard WhatsApp App
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {COMPARISON_DATA.map((row) => (
+              <TableRow key={row.capability} className="hover:bg-muted/20 transition-colors">
+                <TableCell className="py-4 px-6 whitespace-normal">
+                  <p className="font-semibold text-foreground text-sm">{row.capability}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                    {row.description}
+                  </p>
+                </TableCell>
+
+                {/* Resend Cell */}
+                <TableCell className="py-4 px-6 bg-primary/5 border-x border-border/60 font-medium whitespace-normal">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <span>Resend Platform</span>
+                    <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+                      <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                    </div>
+                    <span className="text-foreground text-xs sm:text-sm font-medium">
+                      {row.resendLabel}
+                    </span>
                   </div>
-                </th>
-                <th className="py-4 px-6 text-sm font-semibold text-muted-foreground w-[25%]">
-                  Standard WhatsApp App
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/50 text-xs sm:text-sm">
-              {COMPARISON_DATA.map((row) => (
-                <tr key={row.capability} className="hover:bg-muted/20 transition-colors">
-                  <td className="py-4 px-6">
-                    <p className="font-semibold text-foreground text-sm">{row.capability}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                      {row.description}
-                    </p>
-                  </td>
+                </TableCell>
 
-                  {/* Resend Cell */}
-                  <td className="py-4 px-6 bg-primary/5 border-x border-border/60 font-medium">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
-                        <Check className="h-3.5 w-3.5 stroke-[2.5]" />
+                {/* Manual App Cell */}
+                <TableCell className="py-4 px-6 text-muted-foreground font-normal whitespace-normal">
+                  <div className="flex items-center gap-2">
+                    {row.manual === 'no' ? (
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                        <X className="h-3.5 w-3.5 stroke-[2.5]" />
                       </div>
-                      <span className="text-foreground text-xs sm:text-sm font-medium">
-                        {row.resendLabel}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Manual App Cell */}
-                  <td className="py-4 px-6 text-muted-foreground font-normal">
-                    <div className="flex items-center gap-2">
-                      {row.manual === 'no' ? (
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                          <X className="h-3.5 w-3.5 stroke-[2.5]" />
-                        </div>
-                      ) : (
-                        <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                          <HelpCircle className="h-3.5 w-3.5" />
-                        </div>
-                      )}
-                      <span className="text-xs text-muted-foreground">
-                        {row.manualLabel}
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    ) : (
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        <HelpCircle className="h-3.5 w-3.5" />
+                      </div>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {row.manualLabel}
+                    </span>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
 
         {/* Bottom CTA bar */}
         <div className="border-t border-border/70 bg-muted/20 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -195,6 +201,7 @@ export function MarketingFeatureComparison() {
             className="rounded-full px-6 text-xs font-semibold cursor-pointer shrink-0"
           >
             Start Free Trial
+            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Button>
         </div>
       </div>

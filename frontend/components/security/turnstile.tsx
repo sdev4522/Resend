@@ -326,18 +326,16 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
 
     return (
       <div
-        className={`flex flex-col justify-center items-center min-h-[65px] my-1 transition-opacity duration-200 ${
-          className || ''
-        }`}
+        className={`flex flex-col justify-center items-center h-auto my-1 transition-opacity duration-200 ${className || ''
+          }`}
       >
         {/* Turnstile widget container */}
         <div
           ref={containerRef}
-          className={`cf-turnstile-container flex justify-center items-center w-full min-h-[65px] ${
-            status === 'error' || status === 'timeout' || status === 'expired'
-              ? 'hidden'
-              : 'flex'
-          }`}
+          className={`cf-turnstile-container flex justify-center items-center w-full h-auto ${status === 'error' || status === 'timeout' || status === 'expired'
+            ? 'hidden'
+            : 'flex'
+            }`}
         />
 
         {/* Loading placeholder before Turnstile renders */}

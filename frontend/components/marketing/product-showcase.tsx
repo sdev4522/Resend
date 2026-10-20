@@ -128,13 +128,13 @@ export function MarketingProductShowcase() {
           variant="outline"
           className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3"
         >
-          Product Workflows
+          Hands-On Workflows
         </Badge>
         <h2 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
-          Everything You Need to Run WhatsApp at Scale
+          Explore Daily Operations in Resend
         </h2>
         <p className="mt-3 text-base sm:text-lg text-muted-foreground">
-          Purpose-built operational tools for customer success agents, sales reps, and growth teams.
+          See how your team handles incoming chats, launches verified broadcasts, and builds automated customer self-service flows.
         </p>
       </div>
 

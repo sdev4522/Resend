@@ -63,7 +63,7 @@ export default function PricingPage() {
       },
       {
         '@type': 'Product',
-        name: 'WaCRM Platform Subscription',
+        name: 'Resend Platform Subscription',
         description: 'WhatsApp CRM, automation, and collaborative multi-agent inbox platform subscription plans',
         offers: {
           '@type': 'AggregateOffer',
@@ -86,7 +86,7 @@ export default function PricingPage() {
       />
       <MarketingNavbar />
       <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
-        <MarketingPricing />
+        <MarketingPricing isPageHeading />
         <MarketingFAQ />
         <MarketingCTABanner />
       </main>

@@ -7,7 +7,7 @@ const TRUST_PILLARS = [
   {
     icon: ShieldCheck,
     title: 'Meta Cloud API Direct',
-    desc: 'Official Graph API compliance with verified sender identity & zero risk of account ban.',
+    desc: 'Official Graph API compliance with verified sender identity adhering to Meta Business policies.',
   },
   {
     icon: Radio,

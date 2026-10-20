@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/shared/theme-toggle';
 import { UserNav } from '@/components/shared/user-nav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
-import { Menu, MessageSquareQuote } from 'lucide-react';
+import { Menu, MessageSquareQuote, ArrowRight } from 'lucide-react';
 
 export function MarketingNavbar() {
   const { isAuthenticated, user } = useAuth();
@@ -18,34 +18,52 @@ export function MarketingNavbar() {
   const destinationDashboard = user?.role === 'admin' ? '/admin' : '/dashboard';
 
   return (
-    <nav className="fixed z-50 top-6 inset-x-4 h-14 xs:h-16 bg-background/80 backdrop-blur-sm border max-w-screen-xl mx-auto rounded-full transition-all">
-      <div className="h-full flex items-center justify-between mx-auto px-4 sm:px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40  backdrop-blur-md transition-colors">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <Link href="/" className="flex items-center gap-2 font-bold tracking-tight text-foreground text-lg">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <MessageSquareQuote className="h-4 w-4" />
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 font-bold tracking-tight text-foreground text-lg transition-opacity hover:opacity-90"
+        >
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+            <MessageSquareQuote className="h-4.5 w-4.5" />
           </div>
-          <span>Resend</span>
+          <span className="font-semibold text-lg tracking-tight">Resend</span>
         </Link>
 
         {/* Desktop Menu */}
-        <div className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-          <Link href="/#features" className="hover:text-foreground transition-colors">
+        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-muted-foreground">
+          <Link
+            href="/#features"
+            className="hover:text-foreground transition-colors"
+          >
             Features
           </Link>
-          <Link href="/#how-it-works" className="hover:text-foreground transition-colors">
+          <Link
+            href="/#how-it-works"
+            className="hover:text-foreground transition-colors"
+          >
             How It Works
           </Link>
-          <Link href="/#comparison" className="hover:text-foreground transition-colors">
+          <Link
+            href="/#comparison"
+            className="hover:text-foreground transition-colors"
+          >
             Comparison
           </Link>
-          <Link href="/#pricing" className="hover:text-foreground transition-colors">
+          <Link
+            href="/#pricing"
+            className="hover:text-foreground transition-colors"
+          >
             Pricing
           </Link>
-          <Link href="/#faq" className="hover:text-foreground transition-colors">
+          <Link
+            href="/#faq"
+            className="hover:text-foreground transition-colors"
+          >
             FAQ
           </Link>
-        </div>
+        </nav>
 
         {/* Action Controls */}
         <div className="flex items-center gap-3">
@@ -56,126 +74,124 @@ export function MarketingNavbar() {
               <Button
                 render={<Link href={destinationDashboard} />}
                 variant="outline"
-                className="rounded-full h-9 px-4 text-sm font-medium"
+                size="sm"
+                className="h-9 px-4 text-xs font-semibold rounded-lg"
               >
                 Dashboard
               </Button>
               <UserNav />
             </div>
           ) : (
-            <>
+            <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={openLogin}
-                className="hidden sm:inline-flex rounded-full h-9 px-4 text-sm font-medium"
+                className="hidden sm:inline-flex h-9 px-3.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
               >
                 Sign In
               </Button>
               <Button
+                size="sm"
                 onClick={openRegister}
-                className="hidden xs:inline-flex rounded-full h-9 px-4 text-sm font-medium shadow-xs"
+                className="h-9 px-4 text-xs font-semibold rounded-lg shadow-xs cursor-pointer"
               >
-                Get Started Free
+                Get Started
+                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
               </Button>
-            </>
+            </div>
           )}
 
           {/* Mobile Navigation Sheet */}
           <div className="md:hidden">
             <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-              <SheetTrigger render={<Button variant="outline" size="icon" className="rounded-full h-9 w-9" />}>
+              <SheetTrigger render={<Button variant="outline" size="icon" className="h-9 w-9 rounded-lg" />}>
                 <Menu className="h-4 w-4" />
               </SheetTrigger>
               <SheetContent side="right" className="w-72">
                 <SheetTitle className="flex items-center gap-2 font-bold text-lg">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                     <MessageSquareQuote className="h-3.5 w-3.5" />
                   </div>
                   <span>Resend</span>
                 </SheetTitle>
 
-                <div className="mt-8 flex flex-col gap-4 text-base font-medium">
+                <div className="mt-8 flex flex-col gap-4 text-sm font-medium">
                   <Link
                     href="/#features"
                     onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="text-muted-foreground hover:text-foreground py-2 transition-colors"
                   >
                     Features
                   </Link>
                   <Link
                     href="/#how-it-works"
                     onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="text-muted-foreground hover:text-foreground py-2 transition-colors"
                   >
                     How It Works
                   </Link>
                   <Link
                     href="/#comparison"
                     onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="text-muted-foreground hover:text-foreground py-2 transition-colors"
                   >
                     Comparison
                   </Link>
                   <Link
                     href="/#pricing"
                     onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="text-muted-foreground hover:text-foreground py-2 transition-colors"
                   >
                     Pricing
                   </Link>
                   <Link
                     href="/#faq"
                     onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                    className="text-muted-foreground hover:text-foreground py-2 transition-colors"
                   >
                     FAQ
                   </Link>
-                  <Link
-                    href="/contact"
-                    onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
-                  >
-                    Contact
-                  </Link>
-                </div>
 
-                <div className="mt-8 pt-6 border-t flex flex-col gap-3">
-                  {isAuthenticated ? (
-                    <Button
-                      render={<Link href={destinationDashboard} onClick={() => setSheetOpen(false)} />}
-                      className="w-full rounded-full"
-                    >
-                      Go to Dashboard
-                    </Button>
-                  ) : (
-                    <>
+                  <div className="mt-6 pt-6 border-t flex flex-col gap-2.5">
+                    {isAuthenticated ? (
                       <Button
-                        variant="outline"
-                        className="w-full rounded-full"
-                        onClick={() => {
-                          setSheetOpen(false);
-                          openLogin();
-                        }}
+                        render={<Link href={destinationDashboard} />}
+                        className="w-full rounded-lg"
+                        onClick={() => setSheetOpen(false)}
                       >
-                        Sign In
+                        Go to Dashboard
                       </Button>
-                      <Button
-                        className="w-full rounded-full"
-                        onClick={() => {
-                          setSheetOpen(false);
-                          openRegister();
-                        }}
-                      >
-                        Get Started Free
-                      </Button>
-                    </>
-                  )}
+                    ) : (
+                      <>
+                        <Button
+                          variant="outline"
+                          className="w-full rounded-lg"
+                          onClick={() => {
+                            setSheetOpen(false);
+                            openLogin();
+                          }}
+                        >
+                          Sign In
+                        </Button>
+                        <Button
+                          className="w-full rounded-lg"
+                          onClick={() => {
+                            setSheetOpen(false);
+                            openRegister();
+                          }}
+                        >
+                          Get Started Free
+                        </Button>
+                      </>
+                    )}
+                  </div>
                 </div>
               </SheetContent>
             </Sheet>
           </div>
         </div>
       </div>
-    </nav>
+    </header>
   );
 }

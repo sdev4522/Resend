@@ -23,7 +23,7 @@ export function StickyMobileCTA() {
     >
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold truncate text-foreground">
-          Scale on WhatsApp
+          Resend WhatsApp CRM
         </p>
         <p className="text-[11px] text-muted-foreground truncate">
           Official Cloud API &amp; Multi-Agent Inbox
@@ -36,7 +36,7 @@ export function StickyMobileCTA() {
           onClick={openRegister}
           className="rounded-full h-8 px-3.5 text-xs font-medium cursor-pointer"
         >
-          Get Started <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
+          Free Trial <ArrowUpRight className="ml-1 h-3.5 w-3.5" />
         </Button>
         <button
           onClick={() => setDismissed(true)}

@@ -3,6 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { MessageSquareQuote, Mail, ShieldCheck } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { siteConfig } from '@/config/site';
 
 export function MarketingFooter() {
@@ -81,8 +82,10 @@ export function MarketingFooter() {
           </div>
         </div>
 
+        <Separator className="my-8" />
+
         {/* Bottom copyright */}
-        <div className="mt-12 pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Resend. All rights reserved.</p>
           <div className="flex items-center gap-2 text-xs">
             <ShieldCheck className="h-4 w-4 text-primary" />

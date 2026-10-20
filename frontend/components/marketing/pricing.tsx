@@ -12,7 +12,7 @@ import { useAuthDialog } from '@/components/auth/auth-dialog-context';
 import { billingApi } from '@/lib/api/billing';
 import { SubscriptionPlan } from '@/types/billing';
 
-export function MarketingPricing() {
+export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: boolean } = {}) {
   const { user } = useAuth();
   const { openRegister } = useAuthDialog();
 
@@ -124,13 +124,19 @@ export function MarketingPricing() {
     <div id="pricing" className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
       <div className="text-center max-w-3xl mx-auto">
         <Badge variant="outline" className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3">
-          Authoritative SaaS Billing
+          Simple &amp; Transparent Billing
         </Badge>
-        <h2 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-          Predictable Pricing. Zero Hidden Fees.
-        </h2>
+        {isPageHeading ? (
+          <h1 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+            Transparent Pricing for Every Stage of Growth
+          </h1>
+        ) : (
+          <h2 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+            Transparent Pricing for Every Stage of Growth
+          </h2>
+        )}
         <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-          Powered directly by our production billing engine. Upgrade, downgrade, or adjust licenses anytime with full prorated balance management.
+          Platform plans include software access, team seats, contact storage, and automation workflows. Start with a 14-day free trial—no credit card required.
         </p>
 
         {/* Toggle */}
@@ -197,15 +203,14 @@ export function MarketingPricing() {
           </div>
         ) : (
           <div
-            className={`grid gap-6 sm:gap-8 items-stretch ${
-              plans.length === 1
-                ? 'grid-cols-1 max-w-md mx-auto'
-                : plans.length === 2
+            className={`grid gap-6 sm:gap-8 items-stretch ${plans.length === 1
+              ? 'grid-cols-1 max-w-md mx-auto'
+              : plans.length === 2
                 ? 'grid-cols-1 md:grid-cols-2 max-w-4xl mx-auto'
                 : plans.length === 3
-                ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto'
-                : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-7xl mx-auto'
-            }`}
+                  ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 max-w-6xl mx-auto'
+                  : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-7xl mx-auto'
+              }`}
           >
             {plans.map((plan, index) => {
               const isTrial = Boolean(plan.is_trial === 1 || plan.is_trial || String(plan.title || '').toLowerCase().includes('trial'));
@@ -248,11 +253,10 @@ export function MarketingPricing() {
               return (
                 <div
                   key={plan.id}
-                  className={`relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 transition-all duration-200 ${
-                    isHighlighted
-                      ? 'border-2 border-primary bg-card/90 shadow-xl shadow-primary/5'
-                      : 'border border-border/70 bg-card hover:border-foreground/30'
-                  }`}
+                  className={`relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 transition-all duration-200 ${isHighlighted
+                    ? 'border-2 border-primary bg-card/90 shadow-xl shadow-primary/5'
+                    : 'border border-border/70 bg-card hover:border-foreground/30'
+                    }`}
                 >
                   {isHighlighted && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
@@ -270,18 +274,22 @@ export function MarketingPricing() {
                       </h3>
                       <Badge
                         variant={isTrial ? "outline" : "secondary"}
-                        className={`text-[11px] font-medium ${
-                          isTrial
-                            ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
-                            : ""
-                        }`}
+                        className={`text-[11px] font-medium ${isTrial
+                          ? "border-primary/40 text-primary bg-primary/10"
+                          : ""
+                          }`}
                       >
                         {isTrial ? `${plan.plan_duration_in_days || 14}-Day Trial` : isAnnualPlan ? 'Annual' : 'Standard'}
                       </Badge>
                     </div>
 
                     <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
-                      {plan.short_description || (isTrial ? 'Full access to test WhatsApp inbox, automation, and campaigns.' : 'Production-grade WhatsApp CRM & multi-agent automation platform.')}
+                      {plan.short_description ||
+                        (isTrial
+                          ? '14 days of full access to test WhatsApp team inbox, campaigns, and chatbot automation.'
+                          : isAnnualPlan
+                            ? 'High-volume tier for established businesses running multi-agent support and larger contact databases.'
+                            : 'Standard tier for growing businesses managing customer conversations and broadcast campaigns.')}
                     </p>
 
                     {/* Price Block */}
@@ -342,9 +350,8 @@ export function MarketingPricing() {
                     ) : (
                       <Button
                         variant={isHighlighted ? 'default' : 'outline'}
-                        className={`w-full rounded-xl h-11 text-sm font-semibold gap-2 ${
-                          isTrial ? 'border-primary/50 text-foreground hover:bg-primary/10' : ''
-                        }`}
+                        className={`w-full rounded-xl h-11 text-sm font-semibold gap-2 ${isTrial ? 'border-primary/50 text-foreground hover:bg-primary/10' : ''
+                          }`}
                         onClick={openRegister}
                       >
                         {isTrial ? 'Start Free Trial' : 'Get Started'} <ArrowRight className="h-4 w-4" />
@@ -356,6 +363,22 @@ export function MarketingPricing() {
             })}
           </div>
         )}
+      </div>
+
+      {/* WhatsApp Messaging Transparency Callout */}
+      <div className="mt-12 w-full max-w-4xl mx-auto rounded-2xl border border-border/70 bg-card p-6 sm:p-7 text-xs text-muted-foreground leading-relaxed space-y-2.5">
+        <h4 className="text-sm font-semibold text-foreground">
+          Understanding WhatsApp Messaging Charges
+        </h4>
+        <p>
+          <strong className="text-foreground">Resend Platform Subscription:</strong> Covers your software license, shared team inbox seats, contact CRM, broadcast manager, automation flow builder, and developer API tools.
+        </p>
+        <p>
+          <strong className="text-foreground">Meta Cloud API Conversations:</strong> When connecting through the official Meta WhatsApp Cloud API, messaging conversation fees are paid directly to Meta via your Meta Business Manager payment method based on standard per-conversation rates. Meta provides 1,000 free Service (customer-initiated) conversations each month per Meta Business Account.
+        </p>
+        <p>
+          <strong className="text-foreground">QR Device Connections:</strong> When connecting through our instant QR scan engine, messages are sent over your phone carrier or data plan without Meta conversation fees.
+        </p>
       </div>
 
       {/* Trust & Enterprise Callout */}

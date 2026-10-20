@@ -78,6 +78,14 @@ export default function FAQPage() {
       },
       {
         '@type': 'Question',
+        name: 'Are there additional charges from Meta for WhatsApp conversations?',
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: 'If using Meta Cloud API, WhatsApp conversation charges are billed directly by Meta according to official conversation rates. Meta includes 1,000 free service conversations per month per business portfolio. QR connections use your regular phone plan without Meta conversation fees.',
+        },
+      },
+      {
+        '@type': 'Question',
         name: 'How does billing work and can I cancel?',
         acceptedAnswer: {
           '@type': 'Answer',
@@ -95,7 +103,7 @@ export default function FAQPage() {
       />
       <MarketingNavbar />
       <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
-        <MarketingFAQ />
+        <MarketingFAQ isPageHeading />
         <MarketingCTABanner />
       </main>
       <StickyMobileCTA />

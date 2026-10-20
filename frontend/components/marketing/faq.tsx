@@ -2,6 +2,13 @@
 
 import React from 'react';
 import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import {
   MessageSquare,
   ShieldCheck,
   Users,
@@ -10,8 +17,9 @@ import {
   Code2,
   Clock,
   FileText,
+  ArrowRight,
+  Receipt,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 
 const FAQ_ITEMS = [
   {
@@ -31,6 +39,12 @@ const FAQ_ITEMS = [
     question: 'What is the difference between Meta Cloud API and QR-based connections?',
     answer:
       'Meta Cloud API connects directly via Meta’s enterprise infrastructure, ensuring official policy compliance, high message throughput, and zero phone battery/connectivity dependency. The QR engine allows instant plug-and-play connection without waiting for business verification.',
+  },
+  {
+    icon: Receipt,
+    question: 'Are there additional charges from Meta for WhatsApp conversations?',
+    answer:
+      'Yes, if you use the official Meta Cloud API. Meta charges for WhatsApp conversations based on categories (Marketing, Utility, Authentication, and Service). Service conversations (customer-initiated inquiries) include 1,000 free conversations per month per Meta Business Account. Resend subscription plans cover software access, team seats, and platform tools, while Meta conversation fees are paid directly to Meta via your Meta Business Manager payment method. If you connect via our QR scan engine, messages use your regular mobile plan without Meta conversation charges.',
   },
   {
     icon: FileText,
@@ -64,7 +78,7 @@ const FAQ_ITEMS = [
   },
 ];
 
-export function MarketingFAQ() {
+export function MarketingFAQ({ isPageHeading = false }: { isPageHeading?: boolean } = {}) {
   return (
     <section id="faq" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-border/50">
       <div className="max-w-4xl mx-auto">
@@ -75,31 +89,43 @@ export function MarketingFAQ() {
           >
             Clear Answers
           </Badge>
-          <h2 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
-            Frequently Asked Questions
-          </h2>
+          {isPageHeading ? (
+            <h1 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
+              Frequently Asked Questions
+            </h1>
+          ) : (
+            <h2 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
+              Frequently Asked Questions
+            </h2>
+          )}
           <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
             Transparent answers regarding WhatsApp connectivity, multi-agent collaboration, and billing.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {FAQ_ITEMS.map((item) => (
-            <div
-              key={item.question}
-              className="rounded-2xl border border-border/70 bg-card p-6 space-y-3 hover:border-foreground/20 transition-colors shadow-2xs"
-            >
-              <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
-                <item.icon className="h-4 w-4" />
-              </div>
-              <h3 className="font-semibold text-base text-foreground leading-snug">
-                {item.question}
-              </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                {item.answer}
-              </p>
-            </div>
-          ))}
+        {/* Real shadcn/ui Accordion */}
+        <div className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-xs">
+          <Accordion defaultValue={['item-0']} className="w-full">
+            {FAQ_ITEMS.map((item, index) => (
+              <AccordionItem
+                key={item.question}
+                value={`item-${index}`}
+                className="py-1"
+              >
+                <AccordionTrigger className="text-base font-semibold text-foreground hover:no-underline hover:text-primary gap-4 py-4 cursor-pointer">
+                  <div className="flex items-center gap-3 text-left">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <item.icon className="h-4 w-4" />
+                    </div>
+                    <span>{item.question}</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground leading-relaxed pl-11 pr-4 pb-4">
+                  {item.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
         </div>
 
         {/* Support Link */}
@@ -113,9 +139,9 @@ export function MarketingFAQ() {
           <div className="pt-2">
             <a
               href="/contact"
-              className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
+              className="inline-flex items-center text-xs font-semibold text-primary hover:underline gap-1"
             >
-              Contact Sales &amp; Support →
+              Contact Sales &amp; Support <ArrowRight className="h-3 w-3" />
             </a>
           </div>
         </div>

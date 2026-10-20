@@ -15,12 +15,46 @@ import { Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GoogleAuthButton } from './google-auth-button';
 
-interface RegisterFormProps {
+export interface RegisterFormProps {
   onSuccess?: () => void;
+  onRegistered?: (email: string) => void;
   onSwitchToLogin?: () => void;
+  initialValues?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+  };
+  onValuesChange?: (values: { name: string; email: string; phone: string }) => void;
 }
 
-export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) {
+/* ---------- Shared styles (44px touch targets, 16px text on mobile = no iOS zoom) ---------- */
+const inputBase =
+  'h-11 text-base sm:text-sm border-input placeholder:text-muted-foreground/70 transition-colors';
+const inputOk =
+  'focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600/30 dark:focus-visible:border-emerald-500';
+const inputBad = 'border-destructive focus-visible:ring-destructive/30';
+
+function FieldError({ id, message }: { id: string; message: string | null }) {
+  if (!message) return null;
+  return (
+    <p
+      id={id}
+      role="alert"
+      className="flex items-start gap-1.5 text-xs leading-snug text-destructive animate-in fade-in slide-in-from-top-1 duration-200"
+    >
+      <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+      <span>{message}</span>
+    </p>
+  );
+}
+
+export function RegisterForm({
+  onSuccess,
+  onRegistered,
+  onSwitchToLogin,
+  initialValues,
+  onValuesChange,
+}: RegisterFormProps) {
   const { register } = useAuth();
   const router = useRouter();
 
@@ -31,16 +65,29 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   const passwordInputId = useId();
   const consentInputId = useId();
 
-  // Form State — 4 fields + explicit unchecked consent
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  // Form State
+  const [name, setName] = useState(initialValues?.name || '');
+  const [email, setEmail] = useState(initialValues?.email || '');
+  const [phone, setPhone] = useState(initialValues?.phone || '');
   const [password, setPassword] = useState('');
   const [acceptPolicy, setAcceptPolicy] = useState(false); // Unchecked by default per DPDP/GDPR
   const [showPassword, setShowPassword] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+
+  // Sync initialValues if updated from parent
+  useEffect(() => {
+    if (initialValues?.name !== undefined && initialValues.name !== name) {
+      setName(initialValues.name);
+    }
+    if (initialValues?.email !== undefined && initialValues.email !== email) {
+      setEmail(initialValues.email);
+    }
+    if (initialValues?.phone !== undefined && initialValues.phone !== phone) {
+      setPhone(initialValues.phone);
+    }
+  }, [initialValues?.name, initialValues?.email, initialValues?.phone, name, email, phone]);
 
   // Field validation and interaction state
   const [touched, setTouched] = useState<{
@@ -70,7 +117,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   const getNameError = (val: string): string | null => {
     const trimmed = (val || '').trim();
     if (!trimmed) return 'Please enter your full name.';
-    if (trimmed.length < 2) return 'Full name must be at least 2 characters.';
+    if (trimmed.length < 2) return 'Name must be at least 2 characters.';
     return null;
   };
 
@@ -85,9 +132,9 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
 
   const getPhoneError = (val: string): string | null => {
     const cleaned = (val || '').trim();
-    if (!cleaned) return 'Please enter your WhatsApp phone number.';
+    if (!cleaned) return 'Please enter your WhatsApp number.';
     if (!/^\+[0-9]{8,16}$/.test(cleaned)) {
-      return 'Please provide a valid phone number with country calling code (e.g. +91 98765 43210).';
+      return 'Enter a valid number with country code, e.g. +91 98765 43210.';
     }
     return null;
   };
@@ -100,7 +147,7 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
 
   const getConsentError = (accepted: boolean): string | null => {
     if (!accepted) {
-      return 'Please agree to the Terms of Service and Privacy Policy to continue.';
+      return 'Please agree to the Terms and Privacy Policy to continue.';
     }
     return null;
   };
@@ -128,6 +175,9 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
     }
     return { score: 3, label: 'Strong', colorClass: 'bg-emerald-500 text-emerald-600 dark:text-emerald-400' };
   }, [password]);
+
+  const strengthBarClass = passwordStrength.colorClass.split(' ')[0];
+  const strengthTextClass = passwordStrength.colorClass.split(' ').slice(1).join(' ');
 
   // Active validation errors
   const nameError = (touched.name || submitted) ? getNameError(name) : null;
@@ -202,11 +252,14 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
       const completionTime = mountTimeRef.current ? Date.now() - mountTimeRef.current : 0;
       trackEvent('signup_success', { duration_ms: completionTime });
 
-      if (onSuccess) {
-        onSuccess();
+      if (onRegistered) {
+        onRegistered(cleanEmail);
+      } else {
+        if (onSuccess) {
+          onSuccess();
+        }
+        router.push(`/verify-email?email=${encodeURIComponent(cleanEmail)}`);
       }
-
-      router.push(`/verify-email?email=${encodeURIComponent(cleanEmail)}`);
     } catch (err: any) {
       setServerError(err.message || 'Registration failed. Please try again.');
       // Reset Turnstile token on failure while preserving user form data
@@ -218,22 +271,19 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
   };
 
   return (
-    <div className="space-y-3.5">
+    <div className="space-y-4">
       <GoogleAuthButton
         text="signup_with"
         onSuccess={onSuccess}
         disabled={loading}
       />
 
-      <div className="relative my-1.5">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-[11px] uppercase">
-          <span className="bg-background px-2 text-muted-foreground font-medium">
-            Or register with email
-          </span>
-        </div>
+      {/* Divider */}
+      <div
+        role="separator"
+        className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border"
+      >
+        or
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
@@ -244,311 +294,262 @@ export function RegisterForm({ onSuccess, onSwitchToLogin }: RegisterFormProps) 
           </Alert>
         )}
 
-      {/* Field 1: Full Name */}
-      <div className="space-y-1.5 text-start">
-        <Label htmlFor={nameInputId} className="text-sm font-semibold text-foreground">
-          Full Name
-        </Label>
-        <Input
-          id={nameInputId}
-          type="text"
-          placeholder="e.g. John Doe"
-          required
-          autoComplete="name"
-          value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-            if (serverError) setServerError(null);
-          }}
-          onBlur={() => handleBlur('name')}
-          onFocus={() => handleFocus('name')}
-          disabled={loading}
-          aria-invalid={Boolean(nameError)}
-          aria-describedby={nameError ? `${nameInputId}-error` : undefined}
-          className={cn(
-            'h-10 text-sm border-input placeholder:text-[#8b8b8b] dark:placeholder:text-zinc-400 transition-colors',
-            nameError
-              ? 'border-destructive focus-visible:ring-destructive/30'
-              : 'focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600/30 dark:focus-visible:border-emerald-500'
-          )}
-        />
-        {nameError && (
-          <p
-            id={`${nameInputId}-error`}
-            className="text-[11px] text-destructive flex items-center gap-1.5 pt-0.5 leading-normal"
-          >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{nameError}</span>
-          </p>
-        )}
-      </div>
-
-      {/* Field 2: Email Address */}
-      <div className="space-y-1.5 text-start">
-        <Label htmlFor={emailInputId} className="text-sm font-semibold text-foreground">
-          Email address
-        </Label>
-        <Input
-          id={emailInputId}
-          type="email"
-          placeholder="name@company.com"
-          required
-          autoComplete="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (serverError) setServerError(null);
-          }}
-          onBlur={() => handleBlur('email')}
-          onFocus={() => handleFocus('email')}
-          disabled={loading}
-          aria-invalid={Boolean(emailError)}
-          aria-describedby={emailError ? `${emailInputId}-error` : undefined}
-          className={cn(
-            'h-10 text-sm border-input placeholder:text-[#8b8b8b] dark:placeholder:text-zinc-400 transition-colors',
-            emailError
-              ? 'border-destructive focus-visible:ring-destructive/30'
-              : 'focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600/30 dark:focus-visible:border-emerald-500'
-          )}
-        />
-        {emailError && (
-          <p
-            id={`${emailInputId}-error`}
-            className="text-[11px] text-destructive flex items-center gap-1.5 pt-0.5 leading-normal"
-          >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{emailError}</span>
-          </p>
-        )}
-      </div>
-
-      {/* Field 3: WhatsApp Phone Number with country calling code */}
-      <div className="space-y-1.5 text-start">
-        <PhoneInput
-          id={phoneInputId}
-          label="WhatsApp Phone Number"
-          required={false}
-          value={phone}
-          onChange={(val) => {
-            setPhone(val);
-            if (serverError) setServerError(null);
-          }}
-          onBlur={() => handleBlur('phone')}
-          onFocus={() => handleFocus('phone')}
-          disabled={loading}
-          error={phoneError}
-          helperText="We'll use this number to verify your account and connect your WhatsApp workspace."
-          className="w-full"
-        />
-      </div>
-
-      {/* Field 4: Password with persistent helper text and live strength feedback */}
-      <div className="space-y-1.5 text-start">
-        <Label htmlFor={passwordInputId} className="text-sm font-semibold text-foreground">
-          Password
-        </Label>
-        <div className="relative">
+        {/* Full Name */}
+        <div className="space-y-1.5 text-start">
+          <Label htmlFor={nameInputId} className="text-sm font-medium text-foreground">
+            Full name
+          </Label>
           <Input
-            id={passwordInputId}
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Min 8 characters"
+            id={nameInputId}
+            type="text"
+            placeholder="John Doe"
             required
-            minLength={8}
-            autoComplete="new-password"
-            value={password}
+            autoComplete="name"
+            autoCapitalize="words"
+            value={name}
             onChange={(e) => {
-              setPassword(e.target.value);
+              const val = e.target.value;
+              setName(val);
               if (serverError) setServerError(null);
+              onValuesChange?.({ name: val, email, phone });
             }}
-            onBlur={() => handleBlur('password')}
-            onFocus={() => handleFocus('password')}
+            onBlur={() => handleBlur('name')}
+            onFocus={() => handleFocus('name')}
             disabled={loading}
-            aria-invalid={Boolean(passwordError)}
-            aria-describedby={
-              passwordError
-                ? `${passwordInputId}-error`
-                : `${passwordInputId}-helper ${passwordInputId}-strength`
-            }
-            className={cn(
-              'h-10 pr-10 text-sm border-input placeholder:text-[#8b8b8b] dark:placeholder:text-zinc-400 transition-colors',
-              passwordError
-                ? 'border-destructive focus-visible:ring-destructive/30'
-                : 'focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600/30 dark:focus-visible:border-emerald-500'
-            )}
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? `${nameInputId}-error` : undefined}
+            className={cn(inputBase, nameError ? inputBad : inputOk)}
           />
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 cursor-pointer transition-colors"
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
+          <FieldError id={`${nameInputId}-error`} message={nameError} />
         </div>
 
-        {/* Persistent helper text */}
-        <p id={`${passwordInputId}-helper`} className="text-[11px] text-muted-foreground leading-normal">
-          Use at least 8 characters.
-        </p>
+        {/* Email */}
+        <div className="space-y-1.5 text-start">
+          <Label htmlFor={emailInputId} className="text-sm font-medium text-foreground">
+            Email
+          </Label>
+          <Input
+            id={emailInputId}
+            type="email"
+            inputMode="email"
+            placeholder="name@company.com"
+            required
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            value={email}
+            onChange={(e) => {
+              const val = e.target.value;
+              setEmail(val);
+              if (serverError) setServerError(null);
+              onValuesChange?.({ name, email: val, phone });
+            }}
+            onBlur={() => handleBlur('email')}
+            onFocus={() => handleFocus('email')}
+            disabled={loading}
+            aria-invalid={Boolean(emailError)}
+            aria-describedby={emailError ? `${emailInputId}-error` : undefined}
+            className={cn(inputBase, emailError ? inputBad : inputOk)}
+          />
+          <FieldError id={`${emailInputId}-error`} message={emailError} />
+        </div>
 
-        {/* Live Password Strength Meter */}
-        {password.length > 0 && (
-          <div
-            id={`${passwordInputId}-strength`}
-            className="pt-1 space-y-1.5"
-            aria-live="polite"
-          >
-            <div className="flex items-center justify-between text-[11px]">
-              <span className="text-muted-foreground">Password strength:</span>
-              <span className={cn('font-semibold', passwordStrength.colorClass)}>
+        {/* WhatsApp Phone Number */}
+        <div className="text-start">
+          <PhoneInput
+            id={phoneInputId}
+            label="WhatsApp number"
+            required={false}
+            value={phone}
+            onChange={(val) => {
+              setPhone(val);
+              if (serverError) setServerError(null);
+              onValuesChange?.({ name, email, phone: val });
+            }}
+            onBlur={() => handleBlur('phone')}
+            onFocus={() => handleFocus('phone')}
+            disabled={loading}
+            error={phoneError}
+            helperText="We'll use this number to verify your account and connect your WhatsApp workspace."
+            className="w-full"
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-1.5 text-start">
+          <Label htmlFor={passwordInputId} className="text-sm font-medium text-foreground">
+            Password
+          </Label>
+          <div className="relative">
+            <Input
+              id={passwordInputId}
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Min 8 characters"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (serverError) setServerError(null);
+              }}
+              onBlur={() => handleBlur('password')}
+              onFocus={() => handleFocus('password')}
+              disabled={loading}
+              aria-invalid={Boolean(passwordError)}
+              aria-describedby={
+                passwordError
+                  ? `${passwordInputId}-error`
+                  : `${passwordInputId}-helper ${passwordInputId}-strength`
+              }
+              className={cn(inputBase, 'pr-11', passwordError ? inputBad : inputOk)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+
+          {/* Persistent helper text */}
+          <p id={`${passwordInputId}-helper`} className="text-[11px] text-muted-foreground leading-normal">
+            Use at least 8 characters.
+          </p>
+
+          {/* Compact live strength meter (appears only while typing) */}
+          {password.length > 0 && !passwordError && (
+            <div
+              id={`${passwordInputId}-strength`}
+              className="flex items-center gap-2.5 pt-0.5"
+              aria-live="polite"
+            >
+              <div className="grid flex-1 grid-cols-3 gap-1">
+                {[1, 2, 3].map((n) => (
+                  <div
+                    key={n}
+                    className={cn(
+                      'h-1 rounded-full transition-colors duration-300',
+                      passwordStrength.score >= n ? strengthBarClass : 'bg-muted'
+                    )}
+                  />
+                ))}
+              </div>
+              <span className={cn('w-14 text-right text-xs font-medium', strengthTextClass)}>
                 {passwordStrength.label}
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-1.5 h-1.5 w-full">
-              <div
-                className={cn(
-                  'h-full rounded-full transition-colors',
-                  passwordStrength.score >= 1 ? passwordStrength.colorClass.split(' ')[0] : 'bg-muted'
-                )}
-              />
-              <div
-                className={cn(
-                  'h-full rounded-full transition-colors',
-                  passwordStrength.score >= 2 ? passwordStrength.colorClass.split(' ')[0] : 'bg-muted'
-                )}
-              />
-              <div
-                className={cn(
-                  'h-full rounded-full transition-colors',
-                  passwordStrength.score >= 3 ? passwordStrength.colorClass.split(' ')[0] : 'bg-muted'
-                )}
-              />
-            </div>
-          </div>
-        )}
+          )}
 
-        {passwordError && (
-          <p
-            id={`${passwordInputId}-error`}
-            className="text-[11px] text-destructive flex items-center gap-1.5 pt-0.5 leading-normal"
-          >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{passwordError}</span>
-          </p>
-        )}
-      </div>
-
-      {/* Controlled Terms and Privacy Policy Consent Checkbox (unchecked by default) */}
-      <div className="space-y-1 text-start pt-0.5">
-        <div className="flex items-start gap-2.5">
-          <input
-            id={consentInputId}
-            type="checkbox"
-            checked={acceptPolicy}
-            onChange={(e) => {
-              setAcceptPolicy(e.target.checked);
-              setTouched((prev) => ({ ...prev, consent: true }));
-              if (serverError) setServerError(null);
-            }}
-            aria-invalid={Boolean(consentError)}
-            aria-describedby={consentError ? `${consentInputId}-error` : undefined}
-            className="h-4 w-4 rounded-sm border-input text-emerald-600 focus:ring-emerald-500 dark:border-zinc-700 mt-0.5 cursor-pointer accent-emerald-600"
-          />
-          <Label
-            htmlFor={consentInputId}
-            className="text-xs text-muted-foreground leading-snug cursor-pointer select-none"
-          >
-            I agree to the{' '}
-            <Link
-              href="/terms"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary font-semibold underline underline-offset-2 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              Terms of Service
-            </Link>{' '}
-            and{' '}
-            <Link
-              href="/privacy"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary font-semibold underline underline-offset-2 hover:text-primary/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              Privacy Policy
-            </Link>
-          </Label>
+          <FieldError id={`${passwordInputId}-error`} message={passwordError} />
         </div>
 
-        {consentError && (
-          <p
-            id={`${consentInputId}-error`}
-            className="text-[11px] text-destructive flex items-center gap-1.5 pl-6 pt-0.5 leading-normal"
-          >
-            <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-            <span>{consentError}</span>
-          </p>
-        )}
-      </div>
+        {/* Consent (unchecked by default) */}
+        <div className="space-y-1.5 text-start">
+          <div className="flex items-start gap-2.5">
+            <input
+              id={consentInputId}
+              type="checkbox"
+              checked={acceptPolicy}
+              onChange={(e) => {
+                setAcceptPolicy(e.target.checked);
+                setTouched((prev) => ({ ...prev, consent: true }));
+                if (serverError) setServerError(null);
+              }}
+              aria-invalid={Boolean(consentError)}
+              aria-describedby={consentError ? `${consentInputId}-error` : undefined}
+              className="mt-0.5 h-[18px] w-[18px] shrink-0 cursor-pointer rounded-sm border-input accent-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+            />
+            <Label
+              htmlFor={consentInputId}
+              className="cursor-pointer select-none text-[13px] font-normal leading-snug text-muted-foreground"
+            >
+              I agree to the{' '}
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                Privacy Policy
+              </Link>
+            </Label>
+          </div>
+          <div className="pl-7">
+            <FieldError id={`${consentInputId}-error`} message={consentError} />
+          </div>
+        </div>
 
-      {/* Cloudflare Turnstile (Standard Verification) */}
-      <div className="flex justify-center py-1">
-        <Turnstile
-          ref={turnstileRef}
-          action="signup"
-          size="normal"
-          onSuccess={(token) => {
-            setTurnstileToken(token);
-            setServerError(null);
-          }}
-          onExpire={() => {
-            setTurnstileToken('');
-          }}
-          onError={() => {
-            setTurnstileToken('');
-          }}
-          onTimeout={() => {
-            setTurnstileToken('');
-          }}
-        />
-      </div>
+        {/* Cloudflare Turnstile */}
+        <div className="flex h-auto justify-center">
+          <Turnstile
+            ref={turnstileRef}
+            action="signup"
+            size="normal"
+            onSuccess={(token) => {
+              setTurnstileToken(token);
+              setServerError(null);
+            }}
+            onExpire={() => {
+              setTurnstileToken('');
+            }}
+            onError={() => {
+              setTurnstileToken('');
+            }}
+            onTimeout={() => {
+              setTurnstileToken('');
+            }}
+          />
+        </div>
 
-      {/* Submit Button */}
-      <Button
-        type="submit"
-        className="w-full h-10 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-600 dark:hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer"
-        disabled={loading || !turnstileToken}
-      >
-        {loading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Starting free trial...
-          </>
-        ) : (
-          'Start free trial'
-        )}
-      </Button>
+        {/* Submit */}
+        <Button
+          type="submit"
+          className="h-11 w-full cursor-pointer rounded-lg  text-sm font-semibold text-white shadow-sm transition-all hover:scale-105 active:scale-[0.99]"
+          disabled={loading || !turnstileToken}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Starting free trial...
+            </>
+          ) : (
+            'Start free trial'
+          )}
+        </Button>
 
-      {/* Clearly visible Sign-in navigation */}
-      <div className="text-center text-sm text-muted-foreground pt-1">
-        Already have an account?{' '}
-        {onSwitchToLogin ? (
-          <button
-            type="button"
-            onClick={onSwitchToLogin}
-            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline cursor-pointer ml-0.5"
-          >
-            Sign in
-          </button>
-        ) : (
-          <Link
-            href="/login"
-            className="text-emerald-600 dark:text-emerald-400 font-semibold hover:underline ml-0.5"
-          >
-            Sign in
-          </Link>
-        )}
-      </div>
-    </form>
+        {/* Sign-in navigation */}
+        <p className="pt-0.5 text-center text-sm text-muted-foreground">
+          Already have an account?{' '}
+          {onSwitchToLogin ? (
+            <button
+              type="button"
+              onClick={onSwitchToLogin}
+              className="ml-0.5 cursor-pointer font-semibold text-primary hover:underline"
+            >
+              Sign in
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="ml-0.5 font-semibold text-emerald-600 hover:underline dark:text-emerald-400"
+            >
+              Sign in
+            </Link>
+          )}
+        </p>
+      </form>
     </div>
   );
 }
