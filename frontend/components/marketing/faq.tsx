@@ -4,76 +4,63 @@ import React from 'react';
 import {
   MessageSquare,
   ShieldCheck,
-  Zap,
   Users,
-  CreditCard,
   Radio,
   Send,
   Code2,
   Clock,
+  FileText,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const FAQ_ITEMS = [
   {
     icon: MessageSquare,
-    question: 'What is Resend?',
+    question: 'How do I get started with Resend?',
     answer:
-      'Resend is an official B2B customer relationship management and team inbox platform for WhatsApp. It allows teams to consolidate WhatsApp conversations, automate routine interactions, run broadcast campaigns, and collaborate seamlessly from a single workspace.',
+      'Getting started takes under 5 minutes. Sign up for a free 14-day trial, create your workspace, and choose your preferred WhatsApp connection method (Meta Cloud API or instant QR scan). You can immediately start inviting agents and receiving conversations.',
   },
   {
     icon: Radio,
-    question: 'How does WhatsApp integration work?',
+    question: 'What is required to connect WhatsApp?',
     answer:
-      'Resend supports direct integration with Meta’s official WhatsApp Business Cloud API for enterprise deliverability and high message limits. For businesses with existing numbers, we also offer high-speed QR instance connectivity for rapid setup.',
-  },
-  {
-    icon: Users,
-    question: 'Can multiple agents respond from the same number?',
-    answer:
-      'Yes. Your entire team can log in simultaneously, view shared customer conversations, assign chats to specific agents, add internal collaboration notes, and reply without disconnecting other agents.',
+      'For Meta Cloud API, you need a Meta Business Account and a phone number not currently registered on personal WhatsApp. For our QR engine, you simply scan a QR code with any active WhatsApp or WhatsApp Business number on your phone.',
   },
   {
     icon: ShieldCheck,
-    question: 'Can I connect multiple WhatsApp numbers?',
+    question: 'What is the difference between Meta Cloud API and QR-based connections?',
     answer:
-      'Depending on your subscription tier, you can connect multiple official WhatsApp numbers to one central workspace and route incoming conversations by department (e.g. Sales, Support, Operations).',
+      'Meta Cloud API connects directly via Meta’s enterprise infrastructure, ensuring official policy compliance, high message throughput, and zero phone battery/connectivity dependency. The QR engine allows instant plug-and-play connection without waiting for business verification.',
   },
   {
-    icon: Radio,
-    question: 'What is the difference between Cloud API and QR instances?',
+    icon: FileText,
+    question: 'Are WhatsApp templates subject to approval?',
     answer:
-      'The Meta Cloud API connects directly through Meta’s servers, ensuring official verification, zero dependency on a physical phone, and unlimited scalability. QR instances allow quick connection of standard WhatsApp accounts without undergoing business verification.',
+      'Yes. Outbound broadcast messages initiated by the business must use Meta-approved templates per WhatsApp Business policy. You can create, edit, and submit templates directly within Resend, and Meta typically reviews them within minutes to a few hours.',
+  },
+  {
+    icon: Users,
+    question: 'Can multiple team members manage conversations from one number?',
+    answer:
+      'Yes. Your entire team can log in simultaneously with dedicated agent credentials, answer customer queries from the shared number, assign tickets to specific agents, and leave private internal notes without disconnecting other members.',
   },
   {
     icon: Send,
-    question: 'Can I send marketing broadcasts and campaigns?',
+    question: 'How do campaigns and broadcast usage limits work?',
     answer:
-      'Yes. You can broadcast Meta-approved template messages to segmented contact lists. Resend includes built-in rate limiting and delivery pacing to protect your account health and reputation.',
-  },
-  {
-    icon: Zap,
-    question: 'Can I automate conversations without code?',
-    answer:
-      'Yes. Our visual Flow Builder and keyword chatbot rules enable you to create automated multi-step decision trees, menu options, button replies, and conditional branches with an intuitive visual editor.',
-  },
-  {
-    icon: Code2,
-    question: 'Does Resend have a Developer REST API?',
-    answer:
-      'Yes. Our public REST API (v1) and HMAC-SHA256 verified webhooks allow you to send messages, manage contacts, query analytics, and trigger external workflows from your internal systems, CRM, or e-commerce store.',
-  },
-  {
-    icon: CreditCard,
-    question: 'How does billing work and can I cancel?',
-    answer:
-      'Billing is transparent and calculated using real-time SaaS rates. You can choose monthly or annual billing directly from your workspace dashboard, and upgrade, downgrade, or cancel your subscription at any time with prorated adjustments.',
+      'You can dispatch personalized template broadcasts to segmented contact lists. Broadcast limits follow your Meta Business messaging tier (Tier 1: 1,000 unique recipients/day, Tier 2: 10,000, Tier 3: 100,000). Resend includes built-in rate limiting to protect your account health.',
   },
   {
     icon: Clock,
-    question: 'How does the free trial work?',
+    question: 'What is included in the 14-day free trial?',
     answer:
-      'New workspaces receive a 10-day trial with full access to test the multi-agent inbox, connect a WhatsApp number, build automated chatbot rules, and explore all core capabilities before committing.',
+      'The 14-day free trial provides full access to our collaborative multi-agent inbox, contact CRM, template management, and automation rules. No credit card is required to sign up, and you can upgrade to a paid tier whenever you are ready.',
+  },
+  {
+    icon: Code2,
+    question: 'Does Resend offer a Developer REST API & Webhooks?',
+    answer:
+      'Yes. Our REST API and HMAC-SHA256 verified inbound webhooks allow you to trigger automated transactional messages, sync contact lists with your CRM, and receive real-time message event payloads into your backend systems.',
   },
 ];
 
@@ -82,14 +69,17 @@ export function MarketingFAQ() {
     <section id="faq" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-border/50">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-14">
-          <Badge variant="outline" className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3">
-            Got Questions?
+          <Badge
+            variant="outline"
+            className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3"
+          >
+            Clear Answers
           </Badge>
-          <h2 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
+          <h2 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
             Frequently Asked Questions
           </h2>
-          <p className="mt-3 text-base sm:text-lg text-muted-foreground">
-            Clear, honest answers about our WhatsApp integration, multi-agent collaboration, and billing.
+          <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
+            Transparent answers regarding WhatsApp connectivity, multi-agent collaboration, and billing.
           </p>
         </div>
 
@@ -97,7 +87,7 @@ export function MarketingFAQ() {
           {FAQ_ITEMS.map((item) => (
             <div
               key={item.question}
-              className="rounded-2xl border border-border/60 bg-card p-6 space-y-3 hover:border-foreground/20 transition-colors"
+              className="rounded-2xl border border-border/70 bg-card p-6 space-y-3 hover:border-foreground/20 transition-colors shadow-2xs"
             >
               <div className="h-9 w-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
                 <item.icon className="h-4 w-4" />
@@ -113,19 +103,19 @@ export function MarketingFAQ() {
         </div>
 
         {/* Support Link */}
-        <div className="mt-12 p-6 rounded-2xl border border-border/60 bg-muted/20 text-center space-y-2">
+        <div className="mt-12 p-6 rounded-2xl border border-border/70 bg-muted/20 text-center space-y-2">
           <h4 className="text-sm font-semibold text-foreground">
-            Have a question not listed here?
+            Have a custom requirement or question?
           </h4>
           <p className="text-xs text-muted-foreground">
-            Our engineering and customer support team is available to assist with custom integrations.
+            Our support and engineering team is available to assist with onboarding and custom API workflows.
           </p>
           <div className="pt-2">
             <a
               href="/contact"
               className="inline-flex items-center text-xs font-semibold text-primary hover:underline"
             >
-              Contact Support &amp; Sales →
+              Contact Sales &amp; Support →
             </a>
           </div>
         </div>

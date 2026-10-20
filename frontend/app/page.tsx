@@ -2,10 +2,11 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { MarketingNavbar } from '@/components/marketing/navbar';
 import { MarketingHero } from '@/components/marketing/hero';
-import { MarketingTrustBar } from '@/components/marketing/trust-bar';
-import { MarketingProductShowcase } from '@/components/marketing/product-showcase';
+import { MarketingCapabilityMarquee } from '@/components/marketing/capability-marquee';
+import { MarketingBentoFeatures } from '@/components/marketing/bento-features';
 import { MarketingHowItWorks } from '@/components/marketing/how-it-works';
-import { MarketingUseCases } from '@/components/marketing/use-cases';
+import { MarketingProductShowcase } from '@/components/marketing/product-showcase';
+import { MarketingFeatureComparison } from '@/components/marketing/feature-comparison';
 import { MarketingPricing } from '@/components/marketing/pricing';
 import { MarketingFAQ } from '@/components/marketing/faq';
 import { MarketingCTABanner } from '@/components/marketing/cta-banner';
@@ -15,17 +16,17 @@ import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    absolute: 'Resend — Get WhatsApp API in 5 Minutes | WhatsApp CRM & Multi-Agent Inbox',
   },
   description:
-    'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform with official Meta Cloud API.',
+    'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication from one unified platform.',
   alternates: {
     canonical: '/',
   },
   openGraph: {
-    title: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    title: 'Resend — Get WhatsApp API in 5 Minutes | WhatsApp CRM & Business API',
     description:
-      'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform.',
+      'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication.',
     url: siteConfig.url,
     siteName: siteConfig.name,
     images: [
@@ -33,16 +34,16 @@ export const metadata: Metadata = {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
+        alt: 'Resend — Get WhatsApp API in 5 Minutes',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Resend — WhatsApp CRM, Automation & Multi-Agent Inbox',
+    title: 'Resend — Get WhatsApp API in 5 Minutes',
     description:
-      'Consolidate WhatsApp customer communication, marketing broadcasts, and team support into an all-in-one CRM platform.',
+      'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication.',
     images: ['/og.png'],
   },
 };
@@ -67,9 +68,9 @@ export default function HomePage() {
         offers: {
           '@type': 'AggregateOffer',
           priceCurrency: 'USD',
-          lowPrice: '6',
+          lowPrice: '0',
           highPrice: '10',
-          offerCount: '2',
+          offerCount: '3',
         },
       },
       {
@@ -90,10 +91,10 @@ export default function HomePage() {
         mainEntity: [
           {
             '@type': 'Question',
-            name: 'How does the WhatsApp Cloud API integration work?',
+            name: 'How do I get started with Resend?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'WaCRM integrates with Meta’s official Cloud API for enterprise messaging, and also supports QR-based connections for instant quick starts. You can connect your existing number without downtime.',
+              text: 'Getting started takes under 5 minutes. Sign up for a free 14-day trial, create your workspace, and connect your WhatsApp number via Meta Cloud API or QR engine.',
             },
           },
           {
@@ -106,10 +107,10 @@ export default function HomePage() {
           },
           {
             '@type': 'Question',
-            name: 'Will our WhatsApp number risk getting banned?',
+            name: 'What is the difference between Meta Cloud API and QR-based connections?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Using the official Meta Cloud API ensures 100% compliance with WhatsApp Business policies. Our built-in rate-limiting prevents anti-spam triggers.',
+              text: 'The Meta Cloud API connects directly through Meta’s servers for verified high-throughput messaging without phone dependency. The QR engine provides instant quick connection for existing numbers.',
             },
           },
         ],
@@ -118,23 +119,47 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20 selection:text-foreground">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
+      {/* Section 1: Navigation */}
       <MarketingNavbar />
+
       <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
+        {/* Section 2: Hero */}
         <MarketingHero />
-        <MarketingTrustBar />
-        <MarketingProductShowcase />
+
+        {/* Section 3: Capability Marquee */}
+        <MarketingCapabilityMarquee />
+
+        {/* Section 4: Feature Bento Grid */}
+        <MarketingBentoFeatures />
+
+        {/* Section 5: How It Works */}
         <MarketingHowItWorks />
-        <MarketingUseCases />
+
+        {/* Section 6: Product Workflow Showcase */}
+        <MarketingProductShowcase />
+
+        {/* Section 7: Feature Comparison */}
+        <MarketingFeatureComparison />
+
+        {/* Section 8: Pricing Preview */}
         <MarketingPricing />
+
+        {/* Section 9: FAQ */}
         <MarketingFAQ />
+
+        {/* Section 10: Final CTA */}
         <MarketingCTABanner />
       </main>
+
+      {/* Mobile Sticky CTA Bar */}
       <StickyMobileCTA />
+
+      {/* Section 11: Footer */}
       <MarketingFooter />
     </div>
   );

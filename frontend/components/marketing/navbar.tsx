@@ -30,14 +30,17 @@ export function MarketingNavbar() {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-          <Link href="/features" className="hover:text-foreground transition-colors">
+          <Link href="/#features" className="hover:text-foreground transition-colors">
             Features
           </Link>
-          <Link href="/pricing" className="hover:text-foreground transition-colors">
-            Pricing
+          <Link href="/#how-it-works" className="hover:text-foreground transition-colors">
+            How It Works
           </Link>
-          <Link href="/contact" className="hover:text-foreground transition-colors">
-            Contact
+          <Link href="/#comparison" className="hover:text-foreground transition-colors">
+            Comparison
+          </Link>
+          <Link href="/#pricing" className="hover:text-foreground transition-colors">
+            Pricing
           </Link>
           <Link href="/#faq" className="hover:text-foreground transition-colors">
             FAQ
@@ -70,9 +73,9 @@ export function MarketingNavbar() {
               </Button>
               <Button
                 onClick={openRegister}
-                className="hidden xs:inline-flex rounded-full h-9 px-4 text-sm font-medium"
+                className="hidden xs:inline-flex rounded-full h-9 px-4 text-sm font-medium shadow-xs"
               >
-                Get Started
+                Get Started Free
               </Button>
             </>
           )}
@@ -93,25 +96,32 @@ export function MarketingNavbar() {
 
                 <div className="mt-8 flex flex-col gap-4 text-base font-medium">
                   <Link
-                    href="/features"
+                    href="/#features"
                     onClick={() => setSheetOpen(false)}
                     className="text-muted-foreground hover:text-foreground transition-colors py-1"
                   >
                     Features
                   </Link>
                   <Link
-                    href="/pricing"
+                    href="/#how-it-works"
+                    onClick={() => setSheetOpen(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    How It Works
+                  </Link>
+                  <Link
+                    href="/#comparison"
+                    onClick={() => setSheetOpen(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    Comparison
+                  </Link>
+                  <Link
+                    href="/#pricing"
                     onClick={() => setSheetOpen(false)}
                     className="text-muted-foreground hover:text-foreground transition-colors py-1"
                   >
                     Pricing
-                  </Link>
-                  <Link
-                    href="/contact"
-                    onClick={() => setSheetOpen(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
-                  >
-                    Contact
                   </Link>
                   <Link
                     href="/#faq"
@@ -119,6 +129,13 @@ export function MarketingNavbar() {
                     className="text-muted-foreground hover:text-foreground transition-colors py-1"
                   >
                     FAQ
+                  </Link>
+                  <Link
+                    href="/contact"
+                    onClick={() => setSheetOpen(false)}
+                    className="text-muted-foreground hover:text-foreground transition-colors py-1"
+                  >
+                    Contact
                   </Link>
                 </div>
 
@@ -149,7 +166,7 @@ export function MarketingNavbar() {
                           openRegister();
                         }}
                       >
-                        Get Started
+                        Get Started Free
                       </Button>
                     </>
                   )}
