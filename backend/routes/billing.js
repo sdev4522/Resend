@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const validateUser = require("../middlewares/user.js");
 const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
 const { updateUserPlan } = require("../functions/function");
 const {
   validateCoupon,
@@ -126,13 +127,21 @@ router.get("/detect_currency", async (req, res) => {
  */
 router.get("/plans", async (req, res) => {
   try {
-    const plans = await query(
-      `SELECT * FROM plan ORDER BY is_trial DESC, price ASC`
-    );
+    const rawPlans = await prisma.plan.findMany({
+      orderBy: [
+        { is_trial: "desc" },
+        { price: "asc" },
+      ],
+    });
 
-    const allPrices = await query(
-      `SELECT * FROM plan_prices WHERE is_active = 1`
-    );
+    const plans = rawPlans.map((p) => ({
+      ...p,
+      price: p.price != null ? Number(p.price) : 0,
+    }));
+
+    const allPrices = await prisma.plan_prices.findMany({
+      where: { is_active: true },
+    });
 
     const { baseCode, baseSymbol, supportedCurrencies, roundingMode } = await getCurrencySettings();
 
@@ -207,7 +216,9 @@ router.post("/activate_trial", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
 
-    const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [uid]);
+    const user = await prisma.user.findFirst({
+      where: { uid },
+    });
     if (!user) {
       return res.status(404).json({ success: false, msg: "User not found" });
     }
@@ -226,11 +237,11 @@ router.post("/activate_trial", validateUser, async (req, res) => {
     }
 
     // Check if user has already used their trial
-    const trialOrders = await query(
-      `SELECT id FROM orders WHERE uid = ? AND payment_mode = 'FREE_TRIAL' LIMIT 1`,
-      [uid]
-    );
-    if (user.trial === 1 || trialOrders.length > 0) {
+    const trialOrder = await prisma.orders.findFirst({
+      where: { uid, payment_mode: "FREE_TRIAL" },
+      select: { id: true },
+    });
+    if (user.trial === 1 || trialOrder) {
       return res.status(400).json({
         success: false,
         msg: "You have already used your free trial.",
@@ -238,37 +249,56 @@ router.post("/activate_trial", validateUser, async (req, res) => {
     }
 
     // Find Trial plan (is_trial = 1 or title like Trial)
-    const [trialPlan] = await query(
-      `SELECT * FROM plan WHERE is_trial = 1 OR LOWER(title) LIKE '%trial%' ORDER BY id ASC LIMIT 1`
-    );
+    const rawTrialPlan = await prisma.plan.findFirst({
+      where: {
+        OR: [
+          { is_trial: 1 },
+          { title: { contains: "trial" } },
+        ],
+      },
+      orderBy: { id: "asc" },
+    });
 
-    if (!trialPlan) {
+    if (!rawTrialPlan) {
       return res.status(500).json({
         success: false,
         msg: "No trial plan configured in system",
       });
     }
 
+    const trialPlan = {
+      ...rawTrialPlan,
+      price: rawTrialPlan.price != null ? Number(rawTrialPlan.price) : 0,
+    };
+
     const trialDays = parseInt(trialPlan.plan_duration_in_days || 14, 10);
-    const newExpiry = await updateUserPlan(trialPlan, uid, trialDays, false);
+    const sToken = `trial_${uid.slice(0, 8)}_${Date.now()}`;
 
-    await query(
-      `UPDATE user SET trial = 1, subscription_status = 'trialing' WHERE uid = ?`,
-      [uid]
-    );
+    // Execute plan update and order audit record inside an atomic Prisma transaction
+    const { newExpiry } = await prisma.$transaction(async (tx) => {
+      const expiry = await updateUserPlan(trialPlan, uid, trialDays, false, tx);
 
-    // Record order audit trail
-    await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data, s_token, status) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        uid,
-        "FREE_TRIAL",
-        "0.00",
-        JSON.stringify({ plan: trialPlan, isTrial: true, durationDays: trialDays }),
-        `trial_${uid.slice(0, 8)}_${Date.now()}`,
-        "paid",
-      ]
-    );
+      await tx.user.updateMany({
+        where: { uid },
+        data: {
+          trial: 1,
+          subscription_status: "trialing",
+        },
+      });
+
+      await tx.orders.create({
+        data: {
+          uid,
+          payment_mode: "FREE_TRIAL",
+          amount: "0.00",
+          data: JSON.stringify({ plan: trialPlan, isTrial: true, durationDays: trialDays }),
+          s_token: sToken,
+          status: "paid",
+        },
+      });
+
+      return { newExpiry: expiry };
+    });
 
     res.json({
       success: true,
@@ -416,17 +446,16 @@ router.post("/create_order", validateUser, async (req, res) => {
         isMock: Boolean(rzSub.isMock),
       };
 
-      const insertRes = await query(
-        `INSERT INTO orders (uid, payment_mode, amount, data, s_token, status) VALUES (?, ?, ?, ?, ?, ?)`,
-        [
+      const newOrder = await prisma.orders.create({
+        data: {
           uid,
-          "RAZORPAY_AUTOPAY",
-          priceSummary.finalAmount.toFixed(2),
-          JSON.stringify(orderPayload),
-          rzSub.id,
-          "created",
-        ]
-      );
+          payment_mode: "RAZORPAY_AUTOPAY",
+          amount: priceSummary.finalAmount.toFixed(2),
+          data: JSON.stringify(orderPayload),
+          s_token: rzSub.id,
+          status: "created",
+        },
+      });
 
       return res.json({
         success: true,
@@ -434,7 +463,7 @@ router.post("/create_order", validateUser, async (req, res) => {
         subscriptionId: rzSub.id,
         orderId: rzSub.id,
         order_id: rzSub.id,
-        internalOrderId: insertRes.insertId,
+        internalOrderId: newOrder.id,
         amount: priceSummary.amountMinor,
         currency: priceSummary.currency,
         keyId: config.keyId,
@@ -470,24 +499,23 @@ router.post("/create_order", validateUser, async (req, res) => {
       isMock: Boolean(rzOrder.isMock),
     };
 
-    const insertRes = await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data, s_token, status) VALUES (?, ?, ?, ?, ?, ?)`,
-      [
+    const newOrder = await prisma.orders.create({
+      data: {
         uid,
-        "RAZORPAY",
-        priceSummary.finalAmount.toFixed(2),
-        JSON.stringify(orderPayload),
-        rzOrder.id,
-        "created",
-      ]
-    );
+        payment_mode: "RAZORPAY",
+        amount: priceSummary.finalAmount.toFixed(2),
+        data: JSON.stringify(orderPayload),
+        s_token: rzOrder.id,
+        status: "created",
+      },
+    });
 
     res.json({
       success: true,
       isAutopay: false,
       orderId: rzOrder.id,
       order_id: rzOrder.id,
-      internalOrderId: insertRes.insertId,
+      internalOrderId: newOrder.id,
       amount: rzOrder.amount,
       currency: rzOrder.currency,
       keyId: config.keyId,
@@ -523,10 +551,12 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     // 1. Tenant isolation check
-    const [order] = await query(
-      `SELECT * FROM orders WHERE s_token = ? AND uid = ? LIMIT 1`,
-      [referenceToken, uid]
-    );
+    const order = await prisma.orders.findFirst({
+      where: {
+        s_token: referenceToken,
+        uid,
+      },
+    });
 
     if (!order) {
       return res.status(403).json({
@@ -561,7 +591,10 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     if (!isValidSignature) {
-      await query(`UPDATE orders SET status = 'failed' WHERE id = ?`, [order.id]);
+      await prisma.orders.update({
+        where: { id: order.id },
+        data: { status: "failed" },
+      });
       return res.status(400).json({
         success: false,
         msg: "Invalid payment signature verification failed",
@@ -577,7 +610,12 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     const planId = orderData.plan?.id;
-    const [latestPlan] = await query(`SELECT * FROM plan WHERE id = ? LIMIT 1`, [planId]);
+    const rawLatestPlan = planId
+      ? await prisma.plan.findFirst({ where: { id: parseInt(planId, 10) } })
+      : null;
+    const latestPlan = rawLatestPlan
+      ? { ...rawLatestPlan, price: rawLatestPlan.price != null ? Number(rawLatestPlan.price) : 0 }
+      : null;
     const planToActivate = latestPlan || orderData.plan;
 
     if (!planToActivate) {
@@ -587,33 +625,46 @@ router.post("/verify_payment", validateUser, async (req, res) => {
       });
     }
 
-    // 5. Activate plan
+    // 5. Activate plan & update state within atomic Prisma transaction
     const totalDays = orderData.totalDays || parseInt(planToActivate.plan_duration_in_days || 30, 10);
-    const newExpiry = await updateUserPlan(planToActivate, uid, totalDays, true);
+    const subIdToAttach = req.body.razorpay_subscription_id || req.body.subscriptionId || null;
 
-    // If Autopay subscription, attach subscription to user
-    await query(
-      `UPDATE user SET subscription_id = COALESCE(?, subscription_id), subscription_status = 'active', trial = 0 WHERE uid = ?`,
-      [req.body.razorpay_subscription_id || req.body.subscriptionId || null, uid]
-    );
+    const { newExpiry } = await prisma.$transaction(async (tx) => {
+      const expiry = await updateUserPlan(planToActivate, uid, totalDays, true, tx);
 
-    // 6. Coupon usage increment
-    if (orderData.couponCode) {
-      await query(
-        `UPDATE coupon SET used_count = used_count + 1 WHERE UPPER(code) = ?`,
-        [orderData.couponCode.toUpperCase()]
-      );
-    }
+      // If Autopay subscription, attach subscription to user (preserve existing if not provided)
+      await tx.user.updateMany({
+        where: { uid },
+        data: {
+          subscription_id: subIdToAttach || undefined,
+          subscription_status: "active",
+          trial: 0,
+        },
+      });
 
-    // 7. Update internal order to 'paid'
-    orderData.razorpayPaymentId = paymentId;
-    orderData.razorpaySignature = signature;
-    orderData.paidAt = new Date().toISOString();
+      // 6. Coupon usage increment
+      if (orderData.couponCode) {
+        await tx.coupon.updateMany({
+          where: { code: orderData.couponCode.toUpperCase() },
+          data: { used_count: { increment: 1 } },
+        });
+      }
 
-    await query(
-      `UPDATE orders SET status = 'paid', data = ? WHERE id = ?`,
-      [JSON.stringify(orderData), order.id]
-    );
+      // 7. Update internal order to 'paid'
+      orderData.razorpayPaymentId = paymentId;
+      orderData.razorpaySignature = signature;
+      orderData.paidAt = new Date().toISOString();
+
+      await tx.orders.update({
+        where: { id: order.id },
+        data: {
+          status: "paid",
+          data: JSON.stringify(orderData),
+        },
+      });
+
+      return { newExpiry: expiry };
+    });
 
     res.json({
       success: true,
@@ -635,10 +686,10 @@ router.post("/verify_payment", validateUser, async (req, res) => {
 router.post("/cancel_autopay", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    const [user] = await query(
-      `SELECT subscription_id, subscription_status FROM user WHERE uid = ? LIMIT 1`,
-      [uid]
-    );
+    const user = await prisma.user.findFirst({
+      where: { uid },
+      select: { subscription_id: true, subscription_status: true },
+    });
 
     if (!user || !user.subscription_id) {
       return res.status(400).json({
@@ -648,7 +699,10 @@ router.post("/cancel_autopay", validateUser, async (req, res) => {
     }
 
     await cancelRazorpaySubscription(user.subscription_id);
-    await query(`UPDATE user SET subscription_status = 'cancelled' WHERE uid = ?`, [uid]);
+    await prisma.user.updateMany({
+      where: { uid },
+      data: { subscription_status: "cancelled" },
+    });
 
     res.json({
       success: true,
@@ -667,10 +721,21 @@ router.post("/cancel_autopay", validateUser, async (req, res) => {
 router.get("/orders", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    const orders = await query(
-      `SELECT id, uid, payment_mode, amount, data, s_token, createdAt, status FROM orders WHERE uid = ? ORDER BY createdAt DESC LIMIT 50`,
-      [uid]
-    );
+    const orders = await prisma.orders.findMany({
+      where: { uid },
+      select: {
+        id: true,
+        uid: true,
+        payment_mode: true,
+        amount: true,
+        data: true,
+        s_token: true,
+        createdAt: true,
+        status: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
 
     const formattedOrders = orders.map((o) => {
       let parsedData = null;
@@ -696,7 +761,10 @@ router.get("/orders", validateUser, async (req, res) => {
       };
     });
 
-    const [user] = await query(`SELECT subscription_id, subscription_status FROM user WHERE uid = ? LIMIT 1`, [uid]);
+    const user = await prisma.user.findFirst({
+      where: { uid },
+      select: { subscription_id: true, subscription_status: true },
+    });
 
     res.json({
       success: true,
@@ -720,10 +788,17 @@ router.get("/orders", validateUser, async (req, res) => {
 router.get("/subscription", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    const [user] = await query(
-      `SELECT uid, plan, plan_expire, trial, subscription_id, subscription_status FROM user WHERE uid = ? LIMIT 1`,
-      [uid]
-    );
+    const user = await prisma.user.findFirst({
+      where: { uid },
+      select: {
+        uid: true,
+        plan: true,
+        plan_expire: true,
+        trial: true,
+        subscription_id: true,
+        subscription_status: true,
+      },
+    });
 
     if (!user) {
       return res.status(404).json({ success: false, msg: "User not found" });
@@ -788,10 +863,9 @@ router.post("/webhook", async (req, res) => {
       (payload?.payment?.entity?.id ? `${event}_${payload.payment.entity.id}` : null);
 
     if (eventId) {
-      const [alreadyProcessed] = await query(
-        `SELECT event_id FROM processed_webhook_events WHERE event_id = ? LIMIT 1`,
-        [eventId],
-      );
+      const alreadyProcessed = await prisma.processed_webhook_events.findUnique({
+        where: { event_id: eventId },
+      });
       if (alreadyProcessed) {
         logger.log(`[Billing Webhook] Duplicate event ${eventId} safely ignored (idempotent)`);
         return res.json({ status: "ok", success: true, duplicate: true });
@@ -804,26 +878,48 @@ router.post("/webhook", async (req, res) => {
       const orderId = entity?.order_id || entity?.id;
 
       if (orderId) {
-        const [order] = await query(`SELECT * FROM orders WHERE s_token = ? LIMIT 1`, [orderId]);
+        const order = await prisma.orders.findFirst({
+          where: { s_token: orderId },
+        });
         if (order && order.status !== "paid") {
           let orderData = {};
           try {
             orderData = JSON.parse(order.data);
           } catch (e) {}
 
-          const [plan] = await query(`SELECT * FROM plan WHERE id = ? LIMIT 1`, [orderData.plan?.id]);
+          const rawPlan = orderData.plan?.id
+            ? await prisma.plan.findFirst({ where: { id: parseInt(orderData.plan.id, 10) } })
+            : null;
+          const plan = rawPlan
+            ? { ...rawPlan, price: rawPlan.price != null ? Number(rawPlan.price) : 0 }
+            : orderData.plan;
+
           if (plan) {
             const totalDays = orderData.totalDays || parseInt(plan.plan_duration_in_days || 30, 10);
-            await updateUserPlan(plan, order.uid, totalDays, true);
 
-            orderData.paidAt = new Date().toISOString();
-            orderData.webhookReconciled = true;
+            await prisma.$transaction(async (tx) => {
+              await updateUserPlan(plan, order.uid, totalDays, true, tx);
 
-            await query(`UPDATE orders SET status = 'paid', data = ? WHERE id = ?`, [
-              JSON.stringify(orderData),
-              order.id,
-            ]);
-            await query(`UPDATE user SET subscription_status = 'active', trial = 0 WHERE uid = ?`, [order.uid]);
+              orderData.paidAt = new Date().toISOString();
+              orderData.webhookReconciled = true;
+
+              await tx.orders.update({
+                where: { id: order.id },
+                data: {
+                  status: "paid",
+                  data: JSON.stringify(orderData),
+                },
+              });
+
+              await tx.user.updateMany({
+                where: { uid: order.uid },
+                data: {
+                  subscription_status: "active",
+                  trial: 0,
+                },
+              });
+            });
+
             logger.log(`[Billing Webhook] Order ${order.id} marked as paid via webhook reconciliation`);
           }
         }
@@ -837,7 +933,10 @@ router.post("/webhook", async (req, res) => {
       const subId = entity?.subscription_id || subEntity?.id;
 
       if (subId) {
-        const [user] = await query(`SELECT uid, plan FROM user WHERE subscription_id = ? LIMIT 1`, [subId]);
+        const user = await prisma.user.findFirst({
+          where: { subscription_id: subId },
+          select: { uid: true, plan: true },
+        });
         if (user) {
           let userPlan = null;
           try {
@@ -845,26 +944,29 @@ router.post("/webhook", async (req, res) => {
           } catch (e) {}
           if (userPlan) {
             const planDays = parseInt(userPlan.plan_duration_in_days || 30, 10);
-            await updateUserPlan(userPlan, user.uid, planDays, true);
 
-            // Insert new renewal order record
-            await query(
-              `INSERT INTO orders (uid, payment_mode, amount, data, s_token, status) VALUES (?, ?, ?, ?, ?, ?)`,
-              [
-                user.uid,
-                "RAZORPAY_AUTOPAY",
-                ((entity?.amount || 0) / 100).toFixed(2),
-                JSON.stringify({
-                  plan: userPlan,
-                  subscriptionId: subId,
-                  paymentId: entity?.id,
-                  autoRenewed: true,
-                  isAutopay: true,
-                }),
-                subId,
-                "paid",
-              ]
-            );
+            await prisma.$transaction(async (tx) => {
+              await updateUserPlan(userPlan, user.uid, planDays, true, tx);
+
+              // Insert new renewal order record
+              await tx.orders.create({
+                data: {
+                  uid: user.uid,
+                  payment_mode: "RAZORPAY_AUTOPAY",
+                  amount: ((entity?.amount || 0) / 100).toFixed(2),
+                  data: JSON.stringify({
+                    plan: userPlan,
+                    subscriptionId: subId,
+                    paymentId: entity?.id,
+                    autoRenewed: true,
+                    isAutopay: true,
+                  }),
+                  s_token: subId,
+                  status: "paid",
+                },
+              });
+            });
+
             logger.log(`[Billing Webhook] Autopay renewed for user ${user.uid} on subscription ${subId}`);
           }
         }
@@ -875,15 +977,24 @@ router.post("/webhook", async (req, res) => {
     if (event === "subscription.cancelled") {
       const subId = payload?.subscription?.entity?.id;
       if (subId) {
-        await query(`UPDATE user SET subscription_status = 'cancelled' WHERE subscription_id = ?`, [subId]);
+        await prisma.user.updateMany({
+          where: { subscription_id: subId },
+          data: { subscription_status: "cancelled" },
+        });
       }
     }
 
     if (eventId) {
-      await query(
-        `INSERT IGNORE INTO processed_webhook_events (event_id, provider) VALUES (?, ?)`,
-        [eventId, "razorpay"],
-      );
+      await prisma.processed_webhook_events.upsert({
+        where: { event_id: eventId },
+        create: {
+          event_id: eventId,
+          provider: "razorpay",
+        },
+        update: {},
+      }).catch((err) => {
+        logger.warn("[Billing Webhook] Duplicate event insert suppressed:", err.message);
+      });
     }
 
     res.json({ status: "ok", success: true });
