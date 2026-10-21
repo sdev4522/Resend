@@ -56,7 +56,7 @@ async function runSuite() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: 'WACRM Test User',
+        name: 'Resend Test User',
         email: testEmail,
         password: testPassword,
         mobile_with_country_code: testPhone,

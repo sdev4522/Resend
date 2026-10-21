@@ -7,7 +7,7 @@ import { ThemeToggle } from '@/components/shared/theme-toggle';
 export const metadata: Metadata = {
   robots: {
     index: false,
-    follow: true,
+    follow: false,
   },
 };
 

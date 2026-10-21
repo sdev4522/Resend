@@ -311,7 +311,7 @@ app.get("*", function (request, response) {
 const BACKEND_PORT = process.env.BACKEND_PORT || process.env.PORT || 3010;
 const server = app.listen(BACKEND_PORT, () => {
   isLogging &&
-    console.log(`WaCrm server is running on port ${BACKEND_PORT}`);
+    console.log(`Resend server is running on port ${BACKEND_PORT}`);
 
   updateLangJsonFromEnglish();
   init();

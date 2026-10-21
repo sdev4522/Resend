@@ -6,6 +6,7 @@ import { MarketingFAQ } from '@/components/marketing/faq';
 import { MarketingCTABanner } from '@/components/marketing/cta-banner';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
+import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
@@ -13,7 +14,7 @@ export const metadata: Metadata = {
   description:
     'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
   alternates: {
-    canonical: '/pricing',
+    canonical: 'https://resend.in/pricing',
   },
   openGraph: {
     title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
@@ -86,6 +87,7 @@ export default function PricingPage() {
       />
       <MarketingNavbar />
       <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
+        <PageBreadcrumb items={[{ name: 'Pricing' }]} />
         <MarketingPricing isPageHeading />
         <MarketingFAQ />
         <MarketingCTABanner />

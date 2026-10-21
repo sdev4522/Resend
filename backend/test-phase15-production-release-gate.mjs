@@ -1,5 +1,5 @@
 /**
- * WACRM PHASE 15 — COMPLETE PRODUCTION RELEASE GATE & REGRESSION SUITE
+ * RESEND PHASE 15 — COMPLETE PRODUCTION RELEASE GATE & REGRESSION SUITE
  * Comprehensive, evidence-based verification covering Parts 1 through 50.
  */
 

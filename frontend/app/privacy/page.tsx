@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { MarketingNavbar } from '@/components/marketing/navbar';
 import { MarketingFooter } from '@/components/marketing/footer';
+import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   description:
     'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
   alternates: {
-    canonical: '/privacy',
+    canonical: 'https://resend.in/privacy',
   },
   openGraph: {
     title: 'Privacy Policy — Resend',
@@ -30,11 +31,37 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: siteConfig.url,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Privacy Policy',
+        item: `${siteConfig.url}/privacy`,
+      },
+    ],
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <MarketingNavbar />
 
-      <main className="flex-1 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 pt-20 sm:pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl mb-4">
+          <PageBreadcrumb items={[{ name: 'Privacy Policy' }]} />
+        </div>
         <article className="mx-auto max-w-3xl prose prose-neutral dark:prose-invert">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Privacy Policy

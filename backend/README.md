@@ -1,6 +1,6 @@
-# WhatsApp CRM Backend - API Documentation
+# Resend Backend — API Documentation
 
-This document provides a comprehensive guide to the backend API for the WhatsApp CRM application. All endpoints are versioned under `/api/v1`.
+This document provides a comprehensive guide to the backend API for the Resend WhatsApp CRM application. All endpoints are versioned under `/api/v1`.
 
 ## 📂 Project Structure
 The project follows a modular architecture:

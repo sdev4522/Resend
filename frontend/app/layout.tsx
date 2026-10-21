@@ -36,7 +36,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: `${siteConfig.name} — WhatsApp CRM, Automation & Multi-Agent Inbox`,
+    default: `${siteConfig.name} — WhatsApp Business API, CRM & Automation`,
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
@@ -63,20 +63,20 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: siteConfig.url,
     siteName: siteConfig.name,
-    title: `${siteConfig.name} — WhatsApp CRM, Automation & Multi-Agent Inbox`,
+    title: `${siteConfig.name} — WhatsApp Business API, CRM & Automation`,
     description: siteConfig.description,
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: `${siteConfig.name} — WhatsApp CRM & Automation Platform`,
+        alt: `${siteConfig.name} — WhatsApp Business API, CRM & Automation Platform`,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: `${siteConfig.name} — WhatsApp CRM, Automation & Multi-Agent Inbox`,
+    title: `${siteConfig.name} — WhatsApp Business API, CRM & Automation`,
     description: siteConfig.description,
     images: ['/og.png'],
   },

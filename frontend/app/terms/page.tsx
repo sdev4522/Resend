@@ -2,6 +2,7 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { MarketingNavbar } from '@/components/marketing/navbar';
 import { MarketingFooter } from '@/components/marketing/footer';
+import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
   description:
     'Review terms of service, acceptable messaging policies, WhatsApp Meta API compliance, and subscription guidelines for Resend.',
   alternates: {
-    canonical: '/terms',
+    canonical: 'https://resend.in/terms',
   },
   openGraph: {
     title: 'Terms and Conditions — Resend',
@@ -30,11 +31,37 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
+  const breadcrumbJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: siteConfig.url,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Terms and Conditions',
+        item: `${siteConfig.url}/terms`,
+      },
+    ],
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+      />
       <MarketingNavbar />
 
-      <main className="flex-1 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 pt-20 sm:pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl mb-4">
+          <PageBreadcrumb items={[{ name: 'Terms and Conditions' }]} />
+        </div>
         <article className="mx-auto max-w-3xl prose prose-neutral dark:prose-invert">
           <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Terms &amp; Conditions

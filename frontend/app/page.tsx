@@ -14,34 +14,34 @@ import { Hero5 } from '@/components/ui/hero-5';
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'Resend — Get WhatsApp API in 5 Minutes | WhatsApp CRM & Multi-Agent Inbox',
+    absolute: 'Resend — WhatsApp Business API, CRM & Automation',
   },
   description:
-    'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication from one unified platform.',
+    'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
   alternates: {
-    canonical: '/',
+    canonical: 'https://resend.in',
   },
   openGraph: {
-    title: 'Resend — Get WhatsApp API in 5 Minutes | WhatsApp CRM & Business API',
+    title: 'Resend — WhatsApp Business API, CRM & Automation',
     description:
-      'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication.',
-    url: siteConfig.url,
+      'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
+    url: 'https://resend.in',
     siteName: siteConfig.name,
     images: [
       {
         url: '/og.png',
         width: 1200,
         height: 630,
-        alt: 'Resend — Get WhatsApp API in 5 Minutes',
+        alt: 'Resend — WhatsApp Business API, CRM & Automation Platform',
       },
     ],
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Resend — Get WhatsApp API in 5 Minutes',
+    title: 'Resend — WhatsApp Business API, CRM & Automation',
     description:
-      'Connect WhatsApp in 5 minutes, manage conversations with your team, launch verified template campaigns, and automate customer communication.',
+      'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
     images: ['/og.png'],
   },
 };

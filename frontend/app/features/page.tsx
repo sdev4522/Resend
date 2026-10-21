@@ -7,6 +7,7 @@ import { MarketingTrustBar } from '@/components/marketing/trust-bar';
 import { MarketingCTABanner } from '@/components/marketing/cta-banner';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
+import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { siteConfig } from '@/config/site';
 
 export const metadata: Metadata = {
@@ -14,7 +15,7 @@ export const metadata: Metadata = {
   description:
     'Explore official WhatsApp Cloud API broadcasting, visual no-code flow builder, multi-agent shared inbox, and developer APIs.',
   alternates: {
-    canonical: '/features',
+    canonical: 'https://resend.in/features',
   },
   openGraph: {
     title: 'Features — WhatsApp Cloud API, Inbox & Automation | Resend',
@@ -69,6 +70,7 @@ export default function FeaturesPage() {
       />
       <MarketingNavbar />
       <main className="flex-1 pt-16 xs:pt-20 sm:pt-24 pb-16 sm:pb-0">
+        <PageBreadcrumb items={[{ name: 'Features' }]} />
         <MarketingFeatures />
         <MarketingProductShowcase />
         <MarketingTrustBar />

@@ -21,7 +21,7 @@ function assert(condition, message) {
 
 async function runTests() {
   console.log('====================================================');
-  console.log('  STARTING WACRM PUBLIC REST API (v1) TEST SUITE');
+  console.log('  STARTING RESEND PUBLIC REST API (v1) TEST SUITE');
   console.log('====================================================\n');
 
   // 1. Health check

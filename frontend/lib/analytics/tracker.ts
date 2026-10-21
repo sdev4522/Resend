@@ -1,5 +1,5 @@
 /**
- * WaCRM Privacy-Compliant Public Analytics & Telemetry Tracker
+ * Resend Privacy-Compliant Public Analytics & Telemetry Tracker
  * Strictly adheres to cookie consent choices and never tracks sensitive user data.
  */
 

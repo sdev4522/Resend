@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWTKEY;
 
 async function runTestSuite() {
   console.log("========================================================================");
-  console.log("🔒 WACRM EMAIL VERIFICATION & ADMIN MANAGEMENT REGRESSION TEST SUITE");
+  console.log("🔒 RESEND EMAIL VERIFICATION & ADMIN MANAGEMENT REGRESSION TEST SUITE");
   console.log("========================================================================\n");
 
   const { query } = await import("./database/dbpromise.js");

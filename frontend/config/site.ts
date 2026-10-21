@@ -17,7 +17,7 @@ function getCanonicalUrl() {
 
 export const siteConfig = {
   name: "Resend",
-  description: "Official WhatsApp CRM, Automation & Multi-Agent Inbox",
+  description: "Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.",
   url: getCanonicalUrl(),
   contactEmail: "support@resend.in",
   mainNav: [

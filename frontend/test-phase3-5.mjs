@@ -25,7 +25,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/`, { redirect: 'manual' });
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
     const html = await res.text();
-    assert(html.includes('WaCRM'), 'Should contain WaCRM branding');
+    assert(html.includes('Resend'), 'Should contain Resend branding');
     assert(html.includes('Sign In'), 'Should contain Sign In button/action');
     assert(html.includes('Get Started'), 'Should contain Get Started button/action');
   });
@@ -52,7 +52,7 @@ async function runTests() {
     const res = await fetch(`${BASE_URL}/login`, { redirect: 'manual' });
     assert.strictEqual(res.status, 200, `Expected 200, got ${res.status}`);
     const html = await res.text();
-    assert(html.includes('Sign in to WaCRM'), 'Should contain login title');
+    assert(html.includes('Sign in to Resend'), 'Should contain login title');
     assert(html.includes('Password'), 'Should contain password field');
   });
 

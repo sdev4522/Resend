@@ -123,7 +123,7 @@ async function run() {
       mobile: '+14155552671',
       subject: 'Inquiry regarding 50 Agent Seats and WhatsApp Cloud API SLA',
       reason: 'Sales',
-      content: 'We are evaluating WACRM for our patient communication team. Need custom SLA.',
+      content: 'We are evaluating Resend for our patient communication team. Need custom SLA.',
       captchaQuestion: '5 + 8',
       captchaAnswer: '13',
     };

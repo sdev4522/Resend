@@ -1,5 +1,5 @@
 /**
- * Google Sign-In & Sign-Up Comprehensive Acceptance Test Suite — WACRM SaaS
+ * Google Sign-In & Sign-Up Comprehensive Acceptance Test Suite — Resend SaaS
  * Validates backend verification, identity resolution, account linking, admin protection,
  * settings isolation, and frontend contracts end-to-end.
  */

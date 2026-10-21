@@ -23,7 +23,7 @@ function assert(condition, message) {
 
 async function runTests() {
   console.log('====================================================');
-  console.log('  STARTING WACRM AUTOMATION & FLOW BUILDER TEST SUITE');
+  console.log('  STARTING RESEND AUTOMATION & FLOW BUILDER TEST SUITE');
   console.log('====================================================\n');
 
   // Find two users for multi-tenancy verification

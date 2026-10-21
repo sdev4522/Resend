@@ -27,7 +27,7 @@ async function verifyAll() {
     const res = await fetch(`${BASE_URL}/`, { redirect: 'manual' });
     assert.strictEqual(res.status, 200);
     const html = await res.text();
-    assert(html.includes('WaCRM'), 'Should have WaCRM brand');
+    assert(html.includes('Resend'), 'Should have Resend brand');
   });
 
   // 2. Marketing navbar contains Sign In & Get Started
@@ -69,7 +69,7 @@ async function verifyAll() {
     const res = await fetch(`${BASE_URL}/login`, { redirect: 'manual' });
     assert.strictEqual(res.status, 200);
     const html = await res.text();
-    assert(html.includes('Sign in to WaCRM'), 'Must contain login title');
+    assert(html.includes('Sign in to Resend'), 'Must contain login title');
     assert(html.includes('Password'), 'Must contain password field');
   });
 

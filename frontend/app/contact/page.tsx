@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { MarketingNavbar } from '@/components/marketing/navbar';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { ContactForm } from '@/components/contact/contact-form';
+import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { Mail, MessageSquare, Clock, ShieldCheck } from 'lucide-react';
 import { siteConfig } from '@/config/site';
 
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   description:
     'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
   alternates: {
-    canonical: '/contact',
+    canonical: 'https://resend.in/contact',
   },
   openGraph: {
     title: 'Contact Resend — Sales & Customer Support',
@@ -67,8 +68,9 @@ export default function ContactPage() {
       />
       <MarketingNavbar />
 
-      <main className="flex-1 pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 pt-20 sm:pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
+          <PageBreadcrumb items={[{ name: 'Contact' }]} />
           {/* Header */}
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl md:text-5xl">

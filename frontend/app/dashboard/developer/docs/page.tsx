@@ -13,7 +13,7 @@ export default function DeveloperDocsPage() {
       <div className="flex items-center justify-between">
         <DashboardPageHeader
           title="API Documentation"
-          description="Complete developer reference, guides, and SDK examples for WACRM REST API."
+          description="Complete developer reference, guides, and SDK examples for Resend REST API."
         />
         <Button variant="outline" size="sm" render={<Link href="/dashboard/developer" />} className="gap-1.5 shrink-0">
           <Key className="h-3.5 w-3.5" />

@@ -16,7 +16,7 @@ function assert(condition, message) {
 
 async function runTests() {
   console.log('====================================================');
-  console.log('  WACRM PHASE 16 — PUBLIC LAUNCH READINESS AUDIT  ');
+  console.log('  RESEND PHASE 16 — PUBLIC LAUNCH READINESS AUDIT  ');
   console.log(`  Target: ${BASE_URL}`);
   console.log('====================================================\n');
 

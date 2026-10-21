@@ -23,7 +23,7 @@ function assert(condition, message) {
 
 async function runTests() {
   console.log('================================================================');
-  console.log('  STARTING WACRM ANALYTICS, ADMIN GOD MODE & NOTIFICATIONS SUITE');
+  console.log('  STARTING RESEND ANALYTICS, ADMIN GOD MODE & NOTIFICATIONS SUITE');
   console.log('================================================================\n');
 
   // Find admin and regular user

@@ -3,8 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ShieldCheck, Cookie, X } from 'lucide-react';
-import { setAnalyticsConsent, hasAnalyticsConsent } from '@/lib/analytics/tracker';
+import { Cookie, X } from 'lucide-react';
+import { setAnalyticsConsent } from '@/lib/analytics/tracker';
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);

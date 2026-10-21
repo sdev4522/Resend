@@ -279,11 +279,15 @@ export function RegisterForm({
       />
 
       {/* Divider */}
-      <div
-        role="separator"
-        className="flex items-center gap-3 text-xs text-muted-foreground before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border"
-      >
-        or
+      <div className="relative my-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-[11px] uppercase">
+          <span className="bg-background px-2 text-muted-foreground font-medium">
+            Or register with email
+          </span>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
