@@ -4,3 +4,4 @@ node_modules
 *.log
 client/public/meta-media/*.jpeg
 .env
+/generated/prisma

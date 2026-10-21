@@ -1,0 +1,1198 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model admin {
+  id           Int      @id @default(autoincrement())
+  email        String?  @db.VarChar(999)
+  password     String?  @db.VarChar(999)
+  uid          String?  @db.VarChar(999)
+  role         String   @default("admin") @db.VarChar(999)
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+  tokenVersion Int?     @default(0)
+}
+
+model admin_audit_logs {
+  id          Int      @id @default(autoincrement())
+  admin_uid   String   @db.VarChar(255)
+  action      String   @db.VarChar(100)
+  target_type String   @db.VarChar(50)
+  target_id   String?  @db.VarChar(255)
+  details     String?  @db.LongText
+  ip_address  String?  @db.VarChar(100)
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([admin_uid(length: 64), created_at], map: "idx_admin_audit_admin")
+  @@index([action, created_at], map: "idx_audit_action_time")
+}
+
+model agent_chats {
+  id        Int       @id @default(autoincrement())
+  owner_uid String?   @db.VarChar(999)
+  uid       String?   @db.VarChar(999)
+  chat_id   String?   @db.VarChar(999)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model agent_task {
+  id             Int       @id @default(autoincrement())
+  owner_uid      String?   @db.VarChar(999)
+  uid            String?   @db.VarChar(999)
+  title          String?   @db.VarChar(999)
+  description    String?   @db.LongText
+  agent_comments String?   @db.LongText
+  status         String?   @db.VarChar(999)
+  createdAt      DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model agents {
+  id                 Int       @id @default(autoincrement())
+  owner_uid          String?   @db.VarChar(999)
+  uid                String?   @db.VarChar(999)
+  role               String?   @default("agent") @db.VarChar(999)
+  email              String?   @db.VarChar(999)
+  password           String?   @db.VarChar(999)
+  name               String?   @db.VarChar(999)
+  mobile             String?   @db.VarChar(999)
+  comments           String?   @db.LongText
+  is_active          Int?      @default(1)
+  createdAt          DateTime? @default(now()) @db.Timestamp(0)
+  logs               String?   @db.LongText
+  mask_number        Int?      @default(1)
+  allow_send_new_qr  Int?      @default(0)
+  allow_save_contact Int?      @default(0)
+  fcm_data           String?   @db.LongText
+  tokenVersion       Int?      @default(0)
+
+  @@index([id], map: "idx_id")
+  @@index([owner_uid(length: 150), is_active], map: "idx_owner_active")
+  @@index([owner_uid(length: 150)], map: "idx_owner_uid")
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model api_connections {
+  id           Int                      @id @default(autoincrement())
+  public_id    String                   @unique(map: "idx_public_id") @db.VarChar(64)
+  uid          String                   @db.VarChar(999)
+  provider     api_connections_provider
+  provider_ref String                   @db.VarChar(255)
+  name         String                   @db.VarChar(255)
+  phone_number String                   @db.VarChar(64)
+  created_at   DateTime                 @default(now()) @db.Timestamp(0)
+  updated_at   DateTime                 @default(now()) @db.Timestamp(0)
+
+  @@unique([provider, provider_ref], map: "idx_provider_ref")
+  @@index([uid(length: 255), provider], map: "idx_uid_provider")
+}
+
+model api_idempotency_keys {
+  id              Int      @id @default(autoincrement())
+  uid             String   @db.VarChar(999)
+  api_key_id      Int
+  idempotency_key String   @db.VarChar(255)
+  request_path    String   @db.VarChar(255)
+  request_hash    String   @db.VarChar(128)
+  response_status Int
+  response_body   String   @db.LongText
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  expires_at      DateTime @db.DateTime(0)
+
+  @@unique([uid(length: 255), idempotency_key], map: "idx_uid_idem")
+  @@index([expires_at], map: "idx_expires_at")
+}
+
+model api_key_connections {
+  id                   Int      @id @default(autoincrement())
+  api_key_id           Int
+  connection_public_id String   @db.VarChar(64)
+  created_at           DateTime @default(now()) @db.Timestamp(0)
+
+  @@unique([api_key_id, connection_public_id], map: "idx_api_key_conn")
+  @@index([connection_public_id], map: "idx_conn_pub_id")
+}
+
+model api_keys {
+  id                    Int             @id @default(autoincrement())
+  uid                   String          @db.VarChar(999)
+  name                  String          @db.VarChar(255)
+  key_prefix            String          @db.VarChar(32)
+  key_hash              String          @unique(map: "idx_key_hash") @db.VarChar(128)
+  status                api_keys_status @default(active)
+  scopes                String          @db.LongText
+  rate_limit_policy     String?         @db.LongText
+  default_connection_id String?         @db.VarChar(64)
+  expires_at            DateTime?       @db.DateTime(0)
+  last_used_at          DateTime?       @db.DateTime(0)
+  created_at            DateTime        @default(now()) @db.Timestamp(0)
+  updated_at            DateTime        @default(now()) @db.Timestamp(0)
+  revoked_at            DateTime?       @db.DateTime(0)
+
+  @@index([status], map: "idx_status")
+  @@index([uid(length: 255)], map: "idx_uid")
+}
+
+model api_rate_limits {
+  id            Int      @id @default(autoincrement())
+  bucket_key    String   @unique(map: "idx_bucket_key") @db.VarChar(255)
+  window_start  BigInt
+  request_count Int      @default(1)
+  updated_at    DateTime @default(now()) @db.Timestamp(0)
+}
+
+model api_usage_events {
+  id                   BigInt   @id @default(autoincrement())
+  uid                  String   @db.VarChar(999)
+  api_key_id           Int?
+  connection_public_id String?  @db.VarChar(64)
+  endpoint             String   @db.VarChar(128)
+  method               String   @db.VarChar(16)
+  status_code          Int
+  message_id           String?  @db.VarChar(128)
+  message_status       String?  @db.VarChar(32)
+  duration_ms          Int?     @default(0)
+  created_at           DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([api_key_id, created_at], map: "idx_key_created")
+  @@index([message_id], map: "idx_message_id")
+  @@index([uid(length: 255), created_at], map: "idx_uid_created")
+}
+
+model auth {
+  session String  @db.VarChar(50)
+  id      String  @db.VarChar(80)
+  value   String? @db.LongText
+
+  @@unique([session, id], map: "idxunique")
+  @@index([id], map: "idxid")
+  @@index([session], map: "idxsession")
+}
+
+model beta_api_logs {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  msg_id    String?   @db.VarChar(999)
+  request   String?   @db.LongText
+  err       String?   @db.LongText
+  response  String?   @db.LongText
+  status    String?   @db.VarChar(999)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model beta_campaign {
+  id                Int       @id @default(autoincrement())
+  campaign_id       String    @db.VarChar(999)
+  uid               String    @db.VarChar(999)
+  title             String    @db.VarChar(999)
+  template_name     String    @db.VarChar(999)
+  template_language String    @db.VarChar(999)
+  phonebook_id      String    @db.VarChar(999)
+  phonebook_name    String    @db.VarChar(999)
+  status            String    @default("PENDING") @db.VarChar(999)
+  total_contacts    Int       @default(0)
+  sent_count        Int       @default(0)
+  delivered_count   Int       @default(0)
+  read_count        Int       @default(0)
+  failed_count      Int       @default(0)
+  body_variables    String?   @db.LongText
+  header_variable   String?   @db.LongText
+  button_variables  String?   @db.LongText
+  schedule          DateTime? @db.DateTime(0)
+  timezone          String?   @db.VarChar(999)
+  createdAt         DateTime  @default(now()) @db.Timestamp(0)
+  template_type     String?   @default("STANDARD") @db.VarChar(20)
+
+  @@index([status(length: 768)], map: "idx_beta_campaign_status")
+  @@index([uid(length: 64), id], map: "idx_beta_campaign_uid")
+}
+
+model beta_campaign_logs {
+  id              Int      @id @default(autoincrement())
+  uid             String   @db.VarChar(999)
+  campaign_id     String   @db.VarChar(999)
+  contact_name    String   @db.VarChar(999)
+  contact_mobile  String   @db.VarChar(999)
+  meta_msg_id     String?  @db.VarChar(999)
+  status          String   @default("PENDING") @db.VarChar(999)
+  delivery_status String?  @db.VarChar(999)
+  delivery_time   String?  @db.VarChar(999)
+  error_message   String?  @db.LongText
+  createdAt       DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([campaign_id(length: 64), status(length: 32)], map: "idx_beta_campaign_logs_cid")
+  @@index([uid(length: 64), id], map: "idx_beta_campaign_logs_uid")
+}
+
+model beta_chatbot {
+  id        Int      @id @default(autoincrement())
+  uid       String?  @db.VarChar(999)
+  source    String?  @default("wa_chatbot") @db.VarChar(999)
+  title     String?  @db.VarChar(999)
+  flow_id   String?  @db.VarChar(999)
+  active    Int?     @default(1)
+  origin    String?  @db.LongText
+  origin_id String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150), active], map: "idx_uid_active")
+  @@index([uid(length: 120), flow_id(length: 120)], map: "idx_uid_flow")
+  @@index([uid(length: 100), origin_id(length: 100)], map: "idx_uid_origin")
+  @@index([uid(length: 100), source(length: 50), active], map: "idx_uid_source_active")
+}
+
+model beta_chats {
+  id                 Int       @id @default(autoincrement())
+  uid                String?   @db.VarChar(999)
+  old_chat_id        String?   @db.VarChar(999)
+  profile            String?   @db.LongText
+  origin_instance_id String?   @db.VarChar(999)
+  chat_id            String?   @db.VarChar(999)
+  last_message       String?   @db.LongText
+  chat_label         String?   @db.LongText
+  chat_note          String?   @db.LongText
+  sender_name        String?   @db.VarChar(999)
+  sender_mobile      String?   @db.VarChar(999)
+  unread_count       BigInt?   @default(0)
+  origin             String?   @db.VarChar(999)
+  assigned_agent     String?   @db.LongText
+  createdAt          DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt          DateTime? @default(now()) @db.Timestamp(0)
+  kanban_order       Int?      @default(0)
+
+  @@index([uid(length: 100), updatedAt], map: "idx_beta_chats_uid_updatedAt")
+  @@index([sender_mobile(length: 150)], map: "idx_sender_mobile")
+  @@index([uid(length: 100), chat_id(length: 100)], map: "idx_uid_chatid")
+  @@index([uid(length: 120), origin(length: 50)], map: "idx_uid_origin")
+  @@index([uid(length: 80), origin(length: 50)], map: "idx_uid_origin_updated")
+  @@index([uid(length: 150), unread_count], map: "idx_uid_unread")
+  @@index([uid(length: 150)], map: "idx_uid_updated")
+}
+
+model beta_conversation {
+  id           Int       @id @default(autoincrement())
+  type         String?   @db.VarChar(999)
+  chat_id      String?   @db.VarChar(999)
+  uid          String?   @db.VarChar(999)
+  status       String?   @db.VarChar(999)
+  metaChatId   String?   @db.VarChar(999)
+  msgContext   String?   @db.LongText
+  reaction     String?   @db.VarChar(999)
+  timestamp    String?   @db.VarChar(999)
+  senderName   String?   @db.VarChar(999)
+  senderMobile String?   @db.VarChar(999)
+  star         String?   @db.VarChar(999)
+  route        String?   @db.VarChar(999)
+  context      String?   @db.LongText
+  origin       String?   @db.VarChar(999)
+  createdAt    DateTime? @default(now()) @db.Timestamp(0)
+  sentBy       String?   @db.VarChar(999)
+  err          String?   @db.LongText
+
+  @@index([chat_id(length: 100)], map: "idx_chat_timestamp")
+  @@index([chat_id(length: 80), type(length: 50), route(length: 50)], map: "idx_chat_type_route")
+  @@index([uid(length: 50), chat_id(length: 50), route(length: 50)], map: "idx_uid_chat_route")
+  @@index([uid(length: 50), chat_id(length: 50)], map: "idx_uid_chat_timestamp")
+  @@index([uid(length: 100), metaChatId(length: 100)], map: "idx_uid_metachatid")
+}
+
+model beta_flows {
+  id        Int      @id @default(autoincrement())
+  is_active Int?     @default(1)
+  uid       String?  @db.VarChar(999)
+  flow_id   String?  @db.VarChar(999)
+  source    String?  @db.VarChar(999)
+  name      String?  @db.VarChar(999)
+  data      String?  @db.LongText
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 120), is_active, source(length: 50)], map: "idx_uid_active_source")
+  @@index([uid(length: 120), flow_id(length: 120)], map: "idx_uid_flow")
+}
+
+model broadcast {
+  id           Int       @id @default(autoincrement())
+  broadcast_id String?   @db.VarChar(999)
+  uid          String?   @db.VarChar(999)
+  title        String?   @db.VarChar(999)
+  templet      String?   @db.LongText
+  phonebook    String?   @db.LongText
+  status       String?   @db.VarChar(999)
+  schedule     DateTime? @db.DateTime(0)
+  timezone     String?   @default("Asia/Kolkata") @db.VarChar(999)
+  createdAt    DateTime  @default(now()) @db.Timestamp(0)
+
+  @@index([status(length: 768)], map: "idx_broadcast_status")
+  @@index([uid(length: 64), id], map: "idx_broadcast_uid")
+}
+
+model broadcast_log {
+  id              Int      @id @default(autoincrement())
+  uid             String?  @db.VarChar(999)
+  broadcast_id    String?  @db.VarChar(999)
+  templet_name    String?  @db.VarChar(999)
+  is_read         Int?     @default(0)
+  meta_msg_id     String?  @db.VarChar(999)
+  sender_mobile   String?  @db.VarChar(999)
+  send_to         String?  @db.VarChar(999)
+  delivery_status String?  @default("PENDING") @db.VarChar(999)
+  delivery_time   String?  @db.VarChar(999)
+  err             String?  @db.LongText
+  example         String?  @db.LongText
+  contact         String?  @db.LongText
+  createdAt       DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([broadcast_id(length: 64), uid(length: 64)], map: "idx_broadcast_log_bid_uid")
+}
+
+model chat_tags {
+  id             Int       @id @default(autoincrement())
+  uid            String?   @db.VarChar(999)
+  hex            String?   @db.VarChar(999)
+  title          String?   @db.LongText
+  createdAt      DateTime? @default(now()) @db.Timestamp(0)
+  show_on_kanban Boolean?  @default(true)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model chat_widget {
+  id              Int       @id @default(autoincrement())
+  unique_id       String?   @db.VarChar(999)
+  uid             String?   @db.VarChar(999)
+  title           String?   @db.VarChar(999)
+  whatsapp_number String?   @db.VarChar(999)
+  logo            String?   @db.VarChar(999)
+  place           String?   @db.VarChar(999)
+  size            String?   @db.VarChar(999)
+  createdAt       DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model chatbot {
+  id        Int      @id @default(autoincrement())
+  uid       String?  @db.VarChar(999)
+  title     String?  @db.VarChar(999)
+  for_all   Int?     @default(0)
+  chats     String?  @db.LongText
+  flow      String?  @db.LongText
+  flow_id   String?  @db.VarChar(999)
+  active    Int?     @default(0)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+  origin    String?  @db.LongText
+}
+
+model chats {
+  id                Int      @id @default(autoincrement())
+  chat_id           String?  @db.VarChar(999)
+  uid               String?  @db.VarChar(999)
+  last_message_came String?  @db.VarChar(999)
+  chat_note         String?  @db.LongText
+  chat_tags         String?  @db.LongText
+  sender_name       String?  @db.VarChar(999)
+  sender_mobile     String?  @db.VarChar(999)
+  chat_status       String?  @default("open") @db.VarChar(999)
+  is_opened         Int?     @default(0)
+  last_message      String?  @db.LongText
+  createdAt         DateTime @default(now()) @db.Timestamp(0)
+  origin            String?  @default("meta") @db.VarChar(999)
+  profile           String?  @db.LongText
+  other             String?  @db.LongText
+}
+
+model contact {
+  id             Int      @id @default(autoincrement())
+  uid            String?  @db.VarChar(999)
+  phonebook_id   String?  @db.VarChar(999)
+  phonebook_name String?  @db.VarChar(999)
+  name           String?  @db.VarChar(999)
+  mobile         String?  @db.VarChar(999)
+  var1           String?  @db.VarChar(999)
+  var2           String?  @db.VarChar(999)
+  var3           String?  @db.VarChar(999)
+  var4           String?  @db.VarChar(999)
+  var5           String?  @db.VarChar(999)
+  createdAt      DateTime @default(now()) @db.Timestamp(0)
+  var6           String?  @db.VarChar(999)
+
+  @@index([uid(length: 64), phonebook_id(length: 64)], map: "idx_contact_uid_phonebook")
+  @@index([uid(length: 150)], map: "idx_uid")
+  @@index([uid(length: 120), mobile(length: 80)], map: "idx_uid_mobile")
+}
+
+model contact_form {
+  id        Int      @id @default(autoincrement())
+  email     String?  @db.VarChar(999)
+  name      String?  @db.VarChar(999)
+  company   String?  @db.VarChar(255)
+  mobile    String?  @db.VarChar(999)
+  subject   String?  @db.VarChar(255)
+  reason    String?  @default("General") @db.VarChar(100)
+  content   String?  @db.LongText
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+}
+
+model coupon {
+  id           Int         @id @default(autoincrement())
+  code         String      @unique(map: "code") @db.VarChar(50)
+  type         coupon_type @default(percentage)
+  value        Decimal     @db.Decimal(10, 2)
+  min_amount   Decimal?    @default(0.00) @db.Decimal(10, 2)
+  max_discount Decimal?    @db.Decimal(10, 2)
+  is_active    Boolean?    @default(true)
+  expires_at   DateTime?   @db.Timestamp(0)
+  usage_limit  Int?
+  used_count   Int?        @default(0)
+  created_at   DateTime?   @default(now()) @db.Timestamp(0)
+}
+
+model email_verification {
+  id         Int       @id @default(autoincrement())
+  uid        String    @db.VarChar(255)
+  email      String    @db.VarChar(255)
+  token_hash String    @db.VarChar(255)
+  expires_at DateTime  @db.Timestamp(0)
+  used_at    DateTime? @db.Timestamp(0)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([email], map: "idx_email_verification_email")
+  @@index([token_hash], map: "idx_email_verification_token")
+  @@index([uid], map: "idx_email_verification_uid")
+}
+
+model faq {
+  id        Int      @id @default(autoincrement())
+  question  String?  @db.LongText
+  answer    String?  @db.LongText
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+}
+
+model fcm_tokens {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  token     String?   @db.Text
+  other     String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model flow {
+  id           Int      @id @default(autoincrement())
+  uid          String?  @db.VarChar(999)
+  flow_id      String?  @db.VarChar(999)
+  title        String?  @db.VarChar(999)
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+  prevent_list String?  @db.LongText
+  ai_list      String?  @db.LongText
+}
+
+model flow_data {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  uniqueId  String?   @db.VarChar(999)
+  inputs    String?   @db.LongText
+  other     String?   @db.LongText
+  meta_data String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model flow_session {
+  id            Int      @id @default(autoincrement())
+  uid           String?  @db.VarChar(999)
+  origin        String?  @db.VarChar(999)
+  origin_id     String?  @db.VarChar(999)
+  flow_id       String?  @db.VarChar(999)
+  sender_mobile String?  @db.VarChar(999)
+  data          String?  @db.LongText
+  createdAt     DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 120), flow_id(length: 120)], map: "idx_uid_flow")
+  @@index([uid(length: 50), flow_id(length: 50), sender_mobile(length: 80)], map: "idx_uid_flow_sender")
+  @@index([uid(length: 80), origin(length: 50), flow_id(length: 80)], map: "idx_uid_origin_flow")
+}
+
+model flow_templates {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar(255)
+  source      String    @db.VarChar(255)
+  description String    @db.Text
+  data        String    @db.LongText
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model g_auth {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  label     String?   @db.VarChar(999)
+  url       String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model gen_links {
+  id        Int       @id @default(autoincrement())
+  wa_mobile String?   @db.VarChar(999)
+  email     String?   @db.VarChar(999)
+  msg       String?   @db.VarChar(999)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model in_app_notifications {
+  id         Int      @id @default(autoincrement())
+  uid        String   @db.VarChar(255)
+  title      String   @db.VarChar(255)
+  message    String   @db.Text
+  type       String   @default("INFO") @db.VarChar(50)
+  action_url String?  @db.VarChar(500)
+  is_read    Boolean  @default(false)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid, is_read, created_at], map: "idx_in_app_notif_user")
+}
+
+model instagram_accounts {
+  id           Int       @id @default(autoincrement())
+  uid          String?   @db.Text
+  webhook_id   String?   @db.Text
+  ig_graph_id  String?   @db.Text
+  user_id      String?   @db.Text
+  page_id      String?   @db.Text
+  username     String?   @db.Text
+  name         String?   @db.Text
+  profile_pic  String?   @db.LongText
+  access_token String?   @db.LongText
+  token_type   String?   @db.Text
+  expires_in   BigInt?
+  connected_at DateTime? @db.DateTime(0)
+  other        String?   @db.LongText
+  createdAt    DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt    DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model instance {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  title     String?   @db.VarChar(999)
+  number    String?   @db.VarChar(999)
+  uniqueId  String?   @db.VarChar(999)
+  qr        String?   @db.LongText
+  data      String?   @db.LongText
+  other     String?   @db.LongText
+  status    String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+  @@index([uid(length: 120), status(length: 50)], map: "idx_uid_status")
+  @@index([uniqueId(length: 150)], map: "idx_uniqueid")
+}
+
+model mail_templates {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique(map: "name") @db.VarChar(100)
+  subject    String   @db.VarChar(255)
+  body       String   @db.Text
+  variables  String   @default("{{name}}, {{email}}") @db.VarChar(500)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+}
+
+model messenger_accounts {
+  id                Int       @id @default(autoincrement())
+  uid               String?   @db.VarChar(999)
+  page_id           String?   @db.VarChar(999)
+  page_name         String?   @db.VarChar(999)
+  page_access_token String?   @db.LongText
+  user_access_token String?   @db.LongText
+  profile_pic       String?   @db.VarChar(999)
+  webhook_id        String?   @db.VarChar(999)
+  connected_at      DateTime? @default(now()) @db.Timestamp(0)
+  createdAt         DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt         DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model meta_api {
+  id                       Int      @id @default(autoincrement())
+  uid                      String?  @db.VarChar(999)
+  waba_id                  String?  @db.VarChar(999)
+  business_account_id      String?  @db.VarChar(999)
+  access_token             String?  @db.VarChar(999)
+  business_phone_number_id String?  @db.VarChar(999)
+  app_id                   String?  @db.VarChar(999)
+  createdAt                DateTime @default(now()) @db.Timestamp(0)
+  embed_data               String?  @db.LongText
+  login_type               String?  @default("manual") @db.VarChar(999)
+  is_coexistence           Boolean? @default(false)
+  platform_type            String?  @db.VarChar(50)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model meta_templet_media {
+  id           Int      @id @default(autoincrement())
+  uid          String?  @db.VarChar(999)
+  templet_name String?  @db.VarChar(999)
+  meta_hash    String?  @db.VarChar(999)
+  file_name    String?  @db.VarChar(999)
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+}
+
+model mobile_app {
+  id        Int       @id @default(autoincrement())
+  fcmJson   String?   @db.LongText
+  appTheme  String?   @db.LongText
+  other     String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model notification_broadcast_history {
+  id              Int      @id @default(autoincrement())
+  admin_uid       String   @db.VarChar(255)
+  title           String   @db.VarChar(255)
+  message         String   @db.Text
+  channels        String   @db.VarChar(100)
+  audience_type   String   @db.VarChar(50)
+  recipient_count Int      @default(0)
+  sent_count      Int      @default(0)
+  failed_count    Int      @default(0)
+  status          String   @default("SENT") @db.VarChar(50)
+  details         String?  @db.LongText
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([created_at], map: "idx_broadcast_created")
+}
+
+model orders {
+  id           Int      @id @default(autoincrement())
+  uid          String?  @db.VarChar(999)
+  payment_mode String?  @db.VarChar(999)
+  amount       String?  @db.VarChar(999)
+  data         String?  @db.LongText
+  s_token      String?  @db.VarChar(999)
+  createdAt    DateTime @default(now()) @db.Timestamp(0)
+  status       String?  @default("PENDING") @db.VarChar(50)
+
+  @@index([uid(length: 64), id], map: "idx_orders_uid")
+}
+
+model page {
+  id        Int      @id @default(autoincrement())
+  slug      String?  @db.VarChar(999)
+  title     String?  @db.VarChar(999)
+  image     String?  @db.VarChar(999)
+  content   String?  @db.LongText
+  permanent Int?     @default(0)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+}
+
+model partners {
+  id        Int      @id @default(autoincrement())
+  filename  String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+}
+
+model phonebook {
+  id        Int      @id @default(autoincrement())
+  name      String?  @db.VarChar(999)
+  uid       String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model plan {
+  id                    Int           @id @default(autoincrement())
+  title                 String?       @db.VarChar(999)
+  short_description     String?       @db.LongText
+  allow_tag             Int?          @default(0)
+  allow_note            Int?          @default(0)
+  allow_chatbot         Int?          @default(0)
+  contact_limit         String?       @db.VarChar(999)
+  allow_api             Int?          @default(0)
+  is_trial              Int?          @default(0)
+  price                 BigInt?
+  price_strike          String?       @db.VarChar(999)
+  plan_duration_in_days String?       @db.VarChar(999)
+  createdAt             DateTime      @default(now()) @db.Timestamp(0)
+  qr_account            Int?          @default(0)
+  wa_warmer             Int?          @default(0)
+  rest_api_qr           Int?          @default(0)
+  instagram_inbox       Int?          @default(0)
+  telegram_inbox        Int?          @default(0)
+  allow_wa_forms        Int?          @default(0)
+  messenger_inbox       Int?          @default(0)
+  custom                String?       @db.LongText
+  plan_prices           plan_prices[]
+}
+
+model plan_prices {
+  id                  Int      @id @default(autoincrement())
+  plan_id             Int
+  currency_code       String   @db.VarChar(10)
+  amount              Decimal  @db.Decimal(12, 2)
+  strike_amount       Decimal? @db.Decimal(12, 2)
+  billing_period_days Int      @default(30)
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now()) @db.Timestamp(0)
+  updated_at          DateTime @default(now()) @db.Timestamp(0)
+  plan                plan     @relation(fields: [plan_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_plan_prices_plan")
+
+  @@unique([plan_id, currency_code, billing_period_days], map: "idx_plan_curr_period")
+  @@index([currency_code], map: "idx_currency")
+}
+
+model processed_webhook_events {
+  event_id   String    @id @db.VarChar(255)
+  provider   String?   @db.VarChar(50)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model qr_campaign_logs {
+  id              Int       @id @default(autoincrement())
+  campaign_id     Int?
+  uid             String?   @db.VarChar(999)
+  contact_name    String?   @db.VarChar(999)
+  contact_mobile  String?   @db.VarChar(999)
+  status          String?   @db.VarChar(999)
+  error_msg       String?   @db.LongText
+  sent_at         DateTime? @default(now()) @db.Timestamp(0)
+  createdAt       DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt       DateTime? @default(now()) @db.Timestamp(0)
+  read_at         DateTime? @db.Timestamp(0)
+  delivered_at    DateTime? @db.Timestamp(0)
+  delivery_status String?   @db.VarChar(999)
+  message_id      String?   @db.VarChar(999)
+}
+
+model qr_campaigns {
+  id             Int       @id @default(autoincrement())
+  uid            String?   @db.VarChar(999)
+  title          String?   @db.VarChar(999)
+  instance_id    String?   @db.VarChar(999)
+  phonebook_id   String?   @db.VarChar(999)
+  message_type   String?   @db.VarChar(999)
+  message_text   String?   @db.LongText
+  media_url      String?   @db.LongText
+  media_caption  String?   @db.LongText
+  delay_min      Int?      @default(5)
+  delay_max      Int?      @default(15)
+  random_suffix  Int?      @default(1) @db.TinyInt
+  status         String?   @default("pending") @db.VarChar(999)
+  total_contacts Int?      @default(0)
+  sent_count     Int?      @default(0)
+  failed_count   Int?      @default(0)
+  scheduled_at   DateTime? @db.DateTime(0)
+  started_at     DateTime? @db.DateTime(0)
+  completed_at   DateTime? @db.DateTime(0)
+  other          String?   @db.LongText
+  createdAt      DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt      DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model quick_reply {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  msg       String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model rooms {
+  id        Int      @id @default(autoincrement())
+  uid       String?  @db.VarChar(999)
+  socket_id String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+}
+
+model smtp {
+  id        Int      @id @default(autoincrement())
+  email     String?  @db.VarChar(999)
+  host      String?  @db.VarChar(999)
+  port      String?  @db.VarChar(999)
+  password  String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+  username  String?  @db.LongText
+}
+
+model support_messages {
+  id              Int             @id @default(autoincrement())
+  ticket_id       Int
+  sender_type     String          @db.VarChar(20)
+  sender_id       String          @db.VarChar(255)
+  sender_name     String          @db.VarChar(100)
+  message         String          @db.Text
+  attachments     String?         @db.LongText
+  created_at      DateTime?       @default(now()) @db.Timestamp(0)
+  support_tickets support_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_support_ticket")
+
+  @@index([ticket_id], map: "idx_msg_ticket")
+}
+
+model support_tickets {
+  id               Int                @id @default(autoincrement())
+  ticket_number    String             @unique(map: "ticket_number") @db.VarChar(32)
+  uid              String             @db.VarChar(255)
+  workspace_id     String?            @db.VarChar(255)
+  subject          String             @db.VarChar(255)
+  category         String             @default("technical") @db.VarChar(50)
+  priority         String             @default("normal") @db.VarChar(20)
+  status           String             @default("open") @db.VarChar(20)
+  created_at       DateTime?          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?          @default(now()) @db.Timestamp(0)
+  support_messages support_messages[]
+
+  @@index([created_at], map: "idx_support_created")
+  @@index([status], map: "idx_support_status")
+  @@index([uid], map: "idx_support_uid")
+}
+
+model telegram_session {
+  id         Int       @id @default(autoincrement())
+  uid        String?   @db.VarChar(255)
+  status     String?   @db.VarChar(255)
+  session_id String?   @unique(map: "session_id") @db.VarChar(255)
+  title      String?   @db.VarChar(255)
+  api_id     String?   @db.VarChar(255)
+  api_hash   String?   @db.VarChar(255)
+  data       String?   @db.LongText
+  session    String?   @db.LongText
+  createdAt  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model templets {
+  id        Int      @id @default(autoincrement())
+  uid       String?  @db.VarChar(999)
+  content   String?  @db.LongText
+  type      String?  @db.VarChar(999)
+  title     String?  @db.VarChar(999)
+  createdAt DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 768)], map: "idx_templets_uid")
+}
+
+model testimonial {
+  id                Int      @id @default(autoincrement())
+  title             String?  @db.VarChar(999)
+  description       String?  @db.LongText
+  reviewer_name     String?  @db.VarChar(999)
+  reviewer_position String?  @db.VarChar(999)
+  createdAt         DateTime @default(now()) @db.Timestamp(0)
+}
+
+model undefined {
+  session String  @db.VarChar(50)
+  id      String  @db.VarChar(80)
+  value   String? @db.LongText
+
+  @@unique([session, id], map: "idxunique")
+  @@index([id], map: "idxid")
+  @@index([session], map: "idxsession")
+}
+
+model user {
+  id                       Int       @id @default(autoincrement())
+  role                     String?   @default("user") @db.VarChar(999)
+  uid                      String?   @db.VarChar(999)
+  name                     String?   @db.VarChar(999)
+  email                    String?   @db.VarChar(999)
+  password                 String?   @db.VarChar(999)
+  mobile_with_country_code String?   @db.VarChar(999)
+  timezone                 String?   @default("Asia/Kolkata") @db.VarChar(999)
+  plan                     String?   @db.LongText
+  plan_expire              String?   @db.VarChar(999)
+  trial                    Int?      @default(0)
+  api_key                  String?   @db.VarChar(999)
+  createdAt                DateTime  @default(now()) @db.Timestamp(0)
+  fcm_data                 String?   @db.LongText
+  fcm_inbox                String?   @db.LongText
+  tokenVersion             Int?      @default(0)
+  is_blocked               Boolean   @default(false)
+  subscription_id          String?   @db.VarChar(255)
+  subscription_status      String?   @db.VarChar(50)
+  email_verified_at        DateTime? @db.Timestamp(0)
+  terms_accepted_at        DateTime? @db.Timestamp(0)
+  google_id                String?   @db.VarChar(255)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+  @@index([google_id], map: "idx_user_google_id")
+  @@index([is_blocked], map: "idx_user_is_blocked")
+}
+
+model wa_call_bot {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  title     String?   @db.VarChar(999)
+  flow_id   String?   @db.VarChar(999)
+  data      String?   @db.LongText
+  active    Int?      @default(1)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model wa_call_broadcasts {
+  id                   Int                        @id @default(autoincrement())
+  uid                  String                     @db.VarChar(255)
+  campaign_id          String                     @unique(map: "campaign_id") @db.VarChar(255)
+  title                String                     @db.VarChar(255)
+  flow_id              String                     @db.VarChar(255)
+  status               wa_call_broadcasts_status? @default(draft)
+  contacts             String                     @db.LongText
+  call_delay           Int?                       @default(5000)
+  max_concurrent_calls Int?                       @default(1)
+  retry_failed         Boolean?                   @default(false)
+  retry_count          Int?                       @default(0)
+  total_contacts       Int?                       @default(0)
+  permission_requested Int?                       @default(0)
+  permission_granted   Int?                       @default(0)
+  permission_denied    Int?                       @default(0)
+  calls_initiated      Int?                       @default(0)
+  calls_completed      Int?                       @default(0)
+  calls_failed         Int?                       @default(0)
+  logs                 String?                    @db.LongText
+  meta_data            String?                    @db.LongText
+  created_at           DateTime?                  @default(now()) @db.Timestamp(0)
+  started_at           DateTime?                  @db.Timestamp(0)
+  completed_at         DateTime?                  @db.Timestamp(0)
+  updated_at           DateTime?                  @default(now()) @db.Timestamp(0)
+
+  @@index([campaign_id], map: "idx_campaign_id")
+  @@index([status], map: "idx_status")
+  @@index([uid], map: "idx_uid")
+}
+
+model wa_call_flows {
+  id        Int       @id @default(autoincrement())
+  is_active Int?      @default(1)
+  uid       String?   @db.VarChar(999)
+  flow_id   String?   @db.VarChar(999)
+  source    String?   @db.VarChar(999)
+  name      String?   @db.VarChar(999)
+  data      String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model wa_call_logs {
+  id                  Int                  @id @default(autoincrement())
+  uid                 String               @db.VarChar(255)
+  call_id             String               @db.VarChar(255)
+  flow_id             String?              @db.VarChar(255)
+  status              wa_call_logs_status? @default(connected)
+  transcription_json  String?              @db.LongText
+  recording_user      String?              @db.VarChar(255)
+  recording_assistant String?              @db.VarChar(255)
+  recording_stereo    String?              @db.VarChar(255)
+  error_message       String?              @db.Text
+  created_at          DateTime?            @default(now()) @db.Timestamp(0)
+  meta_data           String?              @db.Text
+  ended_at            DateTime?            @db.Timestamp(0)
+
+  @@index([call_id], map: "idx_call_id")
+  @@index([created_at], map: "idx_created_at")
+  @@index([flow_id], map: "idx_flow_id")
+  @@index([status], map: "idx_status")
+  @@index([uid], map: "idx_uid")
+}
+
+model wa_contacts {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(255)
+  uniqueId  String?   @db.VarChar(255)
+  jid       String?   @db.VarChar(255)
+  name      String?   @db.VarChar(999)
+  mobile    String?   @db.VarChar(50)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt DateTime? @default(now()) @db.Timestamp(0)
+
+  @@unique([jid(length: 100), uniqueId(length: 100)], map: "uniq_jid_instance")
+  @@index([uid(length: 100), uniqueId(length: 100)], map: "idx_wa_contacts_uid_uniqueId")
+}
+
+model wa_form_submissions {
+  id          Int       @id @default(autoincrement())
+  uid         String?   @db.Text
+  flow_id     String?   @db.Text
+  form_name   String?   @db.Text
+  from_phone  String?   @db.Text
+  raw_payload String?   @db.LongText
+  createdAt   DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model wa_forms {
+  id          Int       @id @default(autoincrement())
+  uid         String?   @db.Text
+  name        String?   @db.Text
+  description String?   @db.LongText
+  flow_id     String?   @db.Text
+  flow_status String?   @db.Text
+  fields_json String?   @db.LongText
+  createdAt   DateTime? @default(now()) @db.Timestamp(0)
+  updatedAt   DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model warmer_script {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  message   String?   @db.LongText
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150)], map: "idx_uid")
+}
+
+model warmers {
+  id        Int       @id @default(autoincrement())
+  uid       String?   @db.VarChar(999)
+  instances String?   @db.LongText
+  is_active Int?      @default(1)
+  createdAt DateTime? @default(now()) @db.Timestamp(0)
+
+  @@index([uid(length: 150), is_active], map: "idx_uid_active")
+}
+
+model web_private {
+  id                           Int      @id @default(autoincrement())
+  pay_offline_id               String?  @db.VarChar(999)
+  pay_offline_key              String?  @db.LongText
+  offline_active               Int?     @default(0)
+  pay_stripe_id                String?  @db.VarChar(999)
+  pay_stripe_key               String?  @db.VarChar(999)
+  stripe_active                Int?     @default(0)
+  createdAt                    DateTime @default(now()) @db.Timestamp(0)
+  pay_paypal_id                String?  @db.VarChar(999)
+  pay_paypal_key               String?  @db.VarChar(999)
+  paypal_active                String?  @db.VarChar(999)
+  rz_id                        String?  @db.VarChar(999)
+  rz_key                       String?  @db.VarChar(999)
+  rz_active                    String?  @db.VarChar(999)
+  pay_paystack_id              String?  @db.VarChar(999)
+  pay_paystack_key             String?  @db.VarChar(999)
+  paystack_active              String?  @db.VarChar(999)
+  qr_storage                   String?  @default("local") @db.VarChar(999)
+  mongodb_string               String?  @db.LongText
+  embed_app_sec                String?  @db.VarChar(999)
+  embed_app_id                 String?  @db.VarChar(999)
+  embed_app_config             String?  @db.VarChar(999)
+  teleAppId                    String?  @db.Text
+  teleHash                     String?  @db.Text
+  pay_mercadopago_public_key   String?  @db.Text
+  pay_mercadopago_access_token String?  @db.Text
+  mercadopago_active           Int?     @default(0)
+  fcm_apiKey                   String?  @db.LongText
+  fcm_authDomain               String?  @db.LongText
+  fcm_projectId                String?  @db.LongText
+  fcm_storageBucket            String?  @db.LongText
+  fcm_messagingSenderId        String?  @db.LongText
+  fcm_appId                    String?  @db.LongText
+  fcm_measurementId            String?  @db.LongText
+  fcm_vapidKey                 String?  @db.LongText
+  fcm_clientEmail              String?  @db.LongText
+  fcm_privateKey               String?  @db.LongText
+  insta_app_id                 String?  @db.Text
+  insta_app_secret             String?  @db.Text
+  insta_callback_url           String?  @db.Text
+  messenger_app_secret         String?  @db.LongText
+  messenger_app_id             String?  @db.LongText
+  rz_webhook_secret            String?  @db.Text
+  google_client_secret         String?  @db.Text
+}
+
+model web_public {
+  id                        Int     @id @default(autoincrement())
+  currency_code             String? @db.VarChar(999)
+  logo                      String? @db.VarChar(999)
+  app_name                  String? @db.VarChar(999)
+  custom_home               String? @db.VarChar(999)
+  is_custom_home            Int?    @default(0)
+  meta_description          String? @db.LongText
+  currency_symbol           String? @db.VarChar(999)
+  chatbot_screen_tutorial   String? @db.VarChar(999)
+  broadcast_screen_tutorial String? @db.VarChar(999)
+  home_page_tutorial        String? @db.VarChar(999)
+  login_header_footer       Int?    @default(1)
+  exchange_rate             String? @db.VarChar(999)
+  google_client_id          String? @db.VarChar(999)
+  google_login_active       Int?    @default(1)
+  rtl                       Int?    @default(0)
+  other                     String? @db.LongText
+  fb_login_app_id           String? @db.VarChar(999)
+  fb_login_active           String? @db.VarChar(999)
+  fb_login_app_sec          String? @db.VarChar(999)
+}
+
+model webhook_logs {
+  id         Int                 @id @default(autoincrement())
+  uid        String              @db.VarChar(255)
+  webhook_id String              @db.VarChar(36)
+  method     webhook_logs_method @default(POST)
+  event_type String?             @default("unknown") @db.VarChar(255)
+  payload    String?             @db.Text
+  status     webhook_logs_status @default(RECEIVED)
+  error      String?             @db.Text
+  created_at DateTime            @default(now()) @db.Timestamp(0)
+
+  @@index([uid, id], map: "idx_webhook_logs_uid")
+}
+
+model webhooks {
+  id          Int             @id @default(autoincrement())
+  uid         String          @db.VarChar(255)
+  name        String          @db.VarChar(255)
+  description String?         @db.Text
+  method      webhooks_method @default(POST)
+  secret      String?         @db.VarChar(255)
+  webhook_id  String          @db.VarChar(36)
+  is_active   Boolean         @default(true)
+  created_at  DateTime        @default(now()) @db.Timestamp(0)
+  updated_at  DateTime        @default(now()) @db.Timestamp(0)
+}
+
+enum coupon_type {
+  percentage
+  fixed
+}
+
+enum api_connections_provider {
+  qr
+  meta
+}
+
+enum webhook_logs_method {
+  GET
+  POST
+  PUT
+  DELETE
+}
+
+enum webhooks_method {
+  GET
+  POST
+  PUT
+  DELETE
+}
+
+enum wa_call_logs_status {
+  connected
+  ended
+  failed
+}
+
+enum api_keys_status {
+  active
+  revoked
+  expired
+}
+
+enum wa_call_broadcasts_status {
+  draft
+  requesting_permissions
+  ready
+  running
+  paused
+  completed
+  failed
+}
+
+enum webhook_logs_status {
+  RECEIVED
+  FAILED
+}
