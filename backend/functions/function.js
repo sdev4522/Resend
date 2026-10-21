@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const moment = require("moment-timezone");
 const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
 const { default: axios } = require("axios");
 const randomstring = require("randomstring");
 const { getIOInstance } = () => {};
@@ -1202,13 +1203,18 @@ function addDaysToCurrentTimestamp(days) {
 
 // update user plan
 // update user plan
-async function updateUserPlan(plan, uid, customDays = null, extendIfActive = false) {
+async function updateUserPlan(plan, uid, customDays = null, extendIfActive = false, tx = null) {
   logger.log({ plan, uid, customDays, extendIfActive });
   const planDays = customDays ? parseInt(customDays) : parseInt(plan?.plan_duration_in_days || 0);
 
+  const db = tx || prisma;
+
   let baseTimestamp = Date.now();
   if (extendIfActive) {
-    const [existing] = await query(`SELECT plan, plan_expire, trial FROM user WHERE uid = ?`, [uid]);
+    const existing = await db.user.findFirst({
+      where: { uid },
+      select: { plan: true, plan_expire: true, trial: true },
+    });
     if (existing && existing.plan_expire && Number(existing.plan_expire) > Date.now() && !existing.trial) {
       let existingPlan = null;
       try {
@@ -1226,13 +1232,20 @@ async function updateUserPlan(plan, uid, customDays = null, extendIfActive = fal
   const isTrial = plan?.is_trial === 1 || String(plan?.title || "").toLowerCase().includes("trial") ? 1 : 0;
   const subStatus = isTrial ? "trialing" : "active";
 
-  await query(`UPDATE user SET plan = ?, plan_expire = ?, trial = ?, subscription_status = ? WHERE uid = ?`, [
-    JSON.stringify(plan),
-    String(timeStamp),
-    isTrial,
-    subStatus,
-    uid,
-  ]);
+  const sanitizedPlan = {
+    ...plan,
+    price: plan?.price != null ? Number(plan.price) : 0,
+  };
+
+  await db.user.updateMany({
+    where: { uid },
+    data: {
+      plan: JSON.stringify(sanitizedPlan),
+      plan_expire: String(timeStamp),
+      trial: isTrial,
+      subscription_status: subStatus,
+    },
+  });
   return timeStamp;
 }
 

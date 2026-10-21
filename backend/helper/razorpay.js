@@ -1,6 +1,6 @@
 const crypto = require("crypto");
 const axios = require("axios");
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
 const logger = require("../utils/logger");
 
 /**
@@ -8,9 +8,14 @@ const logger = require("../utils/logger");
  * Never exposes the key_secret to clients.
  */
 async function getRazorpayConfig() {
-  const [webPrivate] = await query(
-    `SELECT rz_id, rz_key, rz_active, rz_webhook_secret FROM web_private LIMIT 1`
-  );
+  const webPrivate = await prisma.web_private.findFirst({
+    select: {
+      rz_id: true,
+      rz_key: true,
+      rz_active: true,
+      rz_webhook_secret: true,
+    },
+  });
 
   const envKeyId = process.env.RAZORPAY_KEY_ID;
   const envKeySecret = process.env.RAZORPAY_KEY_SECRET;

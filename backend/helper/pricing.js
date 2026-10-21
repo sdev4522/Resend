@@ -1,4 +1,4 @@
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
 const logger = require("../utils/logger");
 
 // Standard multi-month duration discounts: 1mo (0%), 3mo (5%), 6mo (10%), 12mo (15%)
@@ -21,10 +21,9 @@ async function validateCoupon(code, subtotal = 0) {
   }
 
   const normalizedCode = code.trim().toUpperCase();
-  const [coupon] = await query(
-    `SELECT * FROM coupon WHERE UPPER(code) = ? LIMIT 1`,
-    [normalizedCode]
-  );
+  const coupon = await prisma.coupon.findFirst({
+    where: { code: normalizedCode },
+  });
 
   if (!coupon) {
     return { valid: false, discountAmount: 0, message: "Invalid coupon code" };
@@ -147,9 +146,14 @@ function applySmartRounding(amount, currency = "USD", roundingMode = "smart_saas
  * Retrieves currency settings and supported currencies from database.
  */
 async function getCurrencySettings() {
-  const [webPublic] = await query(
-    `SELECT currency_code, currency_symbol, exchange_rate, other FROM web_public LIMIT 1`
-  );
+  const webPublic = await prisma.web_public.findFirst({
+    select: {
+      currency_code: true,
+      currency_symbol: true,
+      exchange_rate: true,
+      other: true,
+    },
+  });
 
   const baseCode = (webPublic?.currency_code || "USD").toUpperCase();
   const baseSymbol = webPublic?.currency_symbol || "$";
@@ -314,10 +318,13 @@ async function getPlanPrice(planId, targetCurrency = "USD", durationDays = null)
   const normCurrency = (targetCurrency || "USD").trim().toUpperCase();
 
   // Tier 1: Query plan_prices table
-  const priceRows = await query(
-    `SELECT * FROM plan_prices WHERE plan_id = ? AND UPPER(currency_code) = ? AND is_active = 1`,
-    [planId, normCurrency]
-  );
+  const priceRows = await prisma.plan_prices.findMany({
+    where: {
+      plan_id: parseInt(planId, 10),
+      currency_code: normCurrency,
+      is_active: true,
+    },
+  });
 
   let selectedRow = null;
   if (priceRows && priceRows.length > 0) {
@@ -343,16 +350,23 @@ async function getPlanPrice(planId, targetCurrency = "USD", durationDays = null)
   }
 
   // Tier 2 (Fallback): Query USD baseline from plan_prices or plan table
-  const [usdRow] = await query(
-    `SELECT * FROM plan_prices WHERE plan_id = ? AND UPPER(currency_code) = 'USD' AND is_active = 1 LIMIT 1`,
-    [planId]
-  );
-  const [plan] = await query(`SELECT * FROM plan WHERE id = ? LIMIT 1`, [planId]);
+  const usdRow = await prisma.plan_prices.findFirst({
+    where: {
+      plan_id: parseInt(planId, 10),
+      currency_code: "USD",
+      is_active: true,
+    },
+  });
+  const plan = await prisma.plan.findFirst({
+    where: { id: parseInt(planId, 10) },
+  });
   if (!plan && !usdRow) {
     throw new Error(`Plan ${planId} not found`);
   }
 
-  const baselineUsd = usdRow ? parseFloat(usdRow.amount) : parseFloat(plan?.price || 0);
+  const baselineUsd = usdRow
+    ? parseFloat(usdRow.amount)
+    : parseFloat(plan?.price != null ? Number(plan.price) : 0);
   const baselineStrikeUsd = usdRow?.strike_amount
     ? parseFloat(usdRow.strike_amount)
     : plan?.price_strike
@@ -395,10 +409,17 @@ async function calculateCheckoutPrice({ planId, durationMonths = 1, couponCode =
   }
 
   // Load authoritative plan from DB
-  const [plan] = await query(`SELECT * FROM plan WHERE id = ? LIMIT 1`, [planId]);
-  if (!plan) {
+  const rawPlan = await prisma.plan.findFirst({
+    where: { id: parseInt(planId, 10) },
+  });
+  if (!rawPlan) {
     throw new Error("Plan not found");
   }
+
+  const plan = {
+    ...rawPlan,
+    price: rawPlan.price != null ? Number(rawPlan.price) : 0,
+  };
 
   if (plan.is_trial) {
     throw new Error("Trial plans cannot be purchased through checkout");
