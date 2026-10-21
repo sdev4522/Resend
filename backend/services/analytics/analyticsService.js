@@ -1,4 +1,4 @@
-const { query } = require("../../database/dbpromise");
+const { prisma, sanitizeBigInt } = require("../../database/prisma");
 
 /**
  * Builds SQL condition and parameters for date range filtering.
@@ -51,11 +51,28 @@ async function resolveInstanceScope(uid, instanceId) {
   const isNumeric = !isNaN(instanceId) && /^\d+$/.test(String(instanceId));
   const numericId = isNumeric ? parseInt(instanceId, 10) : -1;
 
-  // 1. Check QR instance ownership
-  const [qrInst] = await query(
-    `SELECT id, uniqueId, number, title, status FROM instance WHERE uid = ? AND (uniqueId = ? OR id = ? OR number = ?) LIMIT 1`,
-    [uid, instanceId, numericId, instanceId]
-  );
+  // 1. Check QR instance ownership via typed Prisma
+  const qrOrConditions = [
+    { uniqueId: String(instanceId) },
+    { number: String(instanceId) },
+  ];
+  if (numericId !== -1) {
+    qrOrConditions.push({ id: numericId });
+  }
+
+  const qrInst = await prisma.instance.findFirst({
+    where: {
+      uid,
+      OR: qrOrConditions,
+    },
+    select: {
+      id: true,
+      uniqueId: true,
+      number: true,
+      title: true,
+      status: true,
+    },
+  });
 
   if (qrInst) {
     return {
@@ -68,11 +85,26 @@ async function resolveInstanceScope(uid, instanceId) {
     };
   }
 
-  // 2. Check Meta API ownership
-  const [metaInst] = await query(
-    `SELECT id, business_phone_number_id, waba_id FROM meta_api WHERE uid = ? AND (business_phone_number_id = ? OR id = ? OR waba_id = ?) LIMIT 1`,
-    [uid, instanceId, numericId, instanceId]
-  );
+  // 2. Check Meta API ownership via typed Prisma
+  const metaOrConditions = [
+    { business_phone_number_id: String(instanceId) },
+    { waba_id: String(instanceId) },
+  ];
+  if (numericId !== -1) {
+    metaOrConditions.push({ id: numericId });
+  }
+
+  const metaInst = await prisma.meta_api.findFirst({
+    where: {
+      uid,
+      OR: metaOrConditions,
+    },
+    select: {
+      id: true,
+      business_phone_number_id: true,
+      waba_id: true,
+    },
+  });
 
   if (metaInst) {
     return {
@@ -123,22 +155,23 @@ async function getUserWorkspaceAnalytics(uid, filters = {}) {
   const msgWhere = msgConditions.join(" AND ");
 
   // Message aggregate counts
-  const [msgSummary] = await query(
-    `SELECT 
+  const msgSummaryRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as total,
       COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
       COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
       COUNT(CASE WHEN status IN ('delivered', 'read') THEN 1 END) as delivered,
       COUNT(CASE WHEN status = 'read' THEN 1 END) as readCount,
       COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failed
-    FROM beta_conversation 
+    FROM beta_conversation
     WHERE ${msgWhere}`,
-    msgParams
+    ...msgParams
   );
+  const [msgSummary] = sanitizeBigInt(msgSummaryRaw);
 
   // Message daily time series
-  const msgTimeSeries = await query(
-    `SELECT 
+  const msgTimeSeriesRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
       COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
       COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
@@ -148,8 +181,9 @@ async function getUserWorkspaceAnalytics(uid, filters = {}) {
     WHERE ${msgWhere}
     GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
     ORDER BY date ASC`,
-    msgParams
+    ...msgParams
   );
+  const msgTimeSeries = sanitizeBigInt(msgTimeSeriesRaw);
 
   // 2. Conversations Summary
   const chatConditions = ["uid = ?"];
@@ -173,106 +207,134 @@ async function getUserWorkspaceAnalytics(uid, filters = {}) {
 
   const chatWhere = chatConditions.join(" AND ");
 
-  const [chatSummary] = await query(
-    `SELECT 
+  const chatSummaryRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as total,
       COUNT(CASE WHEN ${dateSql.replace(/createdAt/g, "updatedAt")} THEN 1 END) as activeInPeriod,
       COALESCE(SUM(unread_count), 0) as totalUnread
     FROM beta_chats
     WHERE ${chatWhere}`,
-    [...chatParams, ...dateParams]
+    ...chatParams,
+    ...dateParams
   );
+  const [chatSummary] = sanitizeBigInt(chatSummaryRaw);
 
-  const chatsByOrigin = await query(
-    `SELECT 
+  const chatsByOriginRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COALESCE(NULLIF(origin, ''), 'other') as origin,
       COUNT(*) as count
     FROM beta_chats
     WHERE ${chatWhere}
     GROUP BY COALESCE(NULLIF(origin, ''), 'other')
     ORDER BY count DESC`,
-    chatParams
+    ...chatParams
   );
+  const chatsByOrigin = sanitizeBigInt(chatsByOriginRaw);
 
   // 3. Contacts Metrics
-  const [contactSummary] = await query(
-    `SELECT 
+  const contactSummaryRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as total,
       COUNT(CASE WHEN ${dateSql} THEN 1 END) as newInPeriod
-    FROM contact 
+    FROM contact
     WHERE uid = ?`,
-    [uid, ...dateParams]
+    uid,
+    ...dateParams
   );
+  const [contactSummary] = sanitizeBigInt(contactSummaryRaw);
 
-  const contactsByPhonebook = await query(
-    `SELECT 
+  const contactsByPhonebookRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COALESCE(NULLIF(phonebook_name, ''), 'Default') as phonebook,
       COUNT(*) as count
-    FROM contact 
+    FROM contact
     WHERE uid = ?
     GROUP BY COALESCE(NULLIF(phonebook_name, ''), 'Default')
     ORDER BY count DESC
     LIMIT 8`,
-    [uid]
+    uid
   );
+  const contactsByPhonebook = sanitizeBigInt(contactsByPhonebookRaw);
 
-  // 4. WhatsApp Connections (Available instances for user)
-  const instancesList = await query(
-    `SELECT id, uniqueId, title, number, status, createdAt FROM instance WHERE uid = ? ORDER BY id DESC`,
-    [uid]
-  );
+  // 4. WhatsApp Connections (Available instances for user) via typed Prisma
+  const instancesList = await prisma.instance.findMany({
+    where: { uid },
+    select: {
+      id: true,
+      uniqueId: true,
+      title: true,
+      number: true,
+      status: true,
+      createdAt: true,
+    },
+    orderBy: { id: "desc" },
+  });
 
-  const [metaRow] = await query(
-    `SELECT id, business_phone_number_id, waba_id, createdAt FROM meta_api WHERE uid = ? LIMIT 1`,
-    [uid]
-  );
+  const metaRow = await prisma.meta_api.findFirst({
+    where: { uid },
+    select: {
+      id: true,
+      business_phone_number_id: true,
+      waba_id: true,
+      createdAt: true,
+    },
+  });
 
   const activeQr = instancesList.filter((i) => i.status === "ACTIVE").length;
   const disconnectedQr = instancesList.filter((i) => i.status !== "ACTIVE").length;
   const metaCount = metaRow ? 1 : 0;
 
   // 5. Campaign Metrics
-  const [campaignSummary] = await query(
-    `SELECT 
+  const campaignSummaryRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalCampaigns,
       COALESCE(SUM(sent_count), 0) as sent,
       COALESCE(SUM(delivered_count), 0) as delivered,
       COALESCE(SUM(read_count), 0) as readCount,
       COALESCE(SUM(failed_count), 0) as failed
-    FROM beta_campaign 
+    FROM beta_campaign
     WHERE uid = ? AND ${dateSql}`,
-    [uid, ...dateParams]
+    uid,
+    ...dateParams
   );
+  const [campaignSummary] = sanitizeBigInt(campaignSummaryRaw);
 
-  const recentCampaigns = await query(
-    `SELECT id, campaign_id, title, status, total_contacts, sent_count, delivered_count, read_count, failed_count, createdAt
-    FROM beta_campaign 
-    WHERE uid = ? 
-    ORDER BY id DESC 
-    LIMIT 5`,
-    [uid]
-  );
+  const recentCampaigns = await prisma.beta_campaign.findMany({
+    where: { uid },
+    select: {
+      id: true,
+      campaign_id: true,
+      title: true,
+      status: true,
+      total_contacts: true,
+      sent_count: true,
+      delivered_count: true,
+      read_count: true,
+      failed_count: true,
+      createdAt: true,
+    },
+    orderBy: { id: "desc" },
+    take: 5,
+  });
 
-  // 6. Automations & Chatbots
-  const [flowSummary] = await query(
-    `SELECT COUNT(*) as totalFlows FROM beta_flows WHERE uid = ?`,
-    [uid]
-  );
+  // 6. Automations & Chatbots via typed Prisma and safe queryRawUnsafe
+  const totalFlows = await prisma.beta_flows.count({ where: { uid } });
 
-  const [chatbotSummary] = await query(
-    `SELECT 
+  const chatbotSummaryRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalBots,
       COUNT(CASE WHEN active = 1 THEN 1 END) as activeBots,
       COUNT(CASE WHEN active = 0 THEN 1 END) as inactiveBots
     FROM beta_chatbot WHERE uid = ?`,
-    [uid]
+    uid
   );
+  const [chatbotSummary] = sanitizeBigInt(chatbotSummaryRaw);
 
-  // 7. Live Subscription & Usage Limits
-  const [userRow] = await query(
-    `SELECT plan, plan_expire FROM user WHERE uid = ?`,
-    [uid]
-  );
+  // 7. Live Subscription & Usage Limits via typed Prisma
+  const userRow = await prisma.user.findFirst({
+    where: { uid },
+    select: { plan: true, plan_expire: true },
+  });
 
   let planData = {};
   try {
@@ -352,7 +414,7 @@ async function getUserWorkspaceAnalytics(uid, filters = {}) {
       recent: recentCampaigns || [],
     },
     automations: {
-      totalFlows: Number(flowSummary?.totalFlows || 0),
+      totalFlows: Number(totalFlows || 0),
       totalChatbots: Number(chatbotSummary?.totalBots || 0),
       activeChatbots: Number(chatbotSummary?.activeBots || 0),
       inactiveChatbots: Number(chatbotSummary?.inactiveBots || 0),
@@ -388,39 +450,42 @@ async function getAdminPlatformAnalytics(filters = {}) {
   const { conditionSql: dateSql, params: dateParams, range, startDate, endDate } = buildDateRangeFilter(filters, "createdAt");
 
   // 1. Platform User Metrics
-  const [userStats] = await query(
-    `SELECT 
+  const userStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalUsers,
       COUNT(CASE WHEN is_blocked = 0 OR is_blocked IS NULL THEN 1 END) as activeUsers,
       COUNT(CASE WHEN is_blocked = 1 THEN 1 END) as blockedUsers,
       COUNT(CASE WHEN ${dateSql} THEN 1 END) as newUsersInPeriod
     FROM user`,
-    dateParams
+    ...dateParams
   );
+  const [userStats] = sanitizeBigInt(userStatsRaw);
 
-  const userGrowthTimeSeries = await query(
-    `SELECT 
+  const userGrowthTimeSeriesRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
       COUNT(*) as count
     FROM user
     WHERE ${dateSql}
     GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
     ORDER BY date ASC`,
-    dateParams
+    ...dateParams
   );
+  const userGrowthTimeSeries = sanitizeBigInt(userGrowthTimeSeriesRaw);
 
-  const planDistribution = await query(
-    `SELECT 
+  const planDistributionRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(plan, '$.title'))), ''), 'Free / Trial') as planTitle,
       COUNT(*) as count
     FROM user
     GROUP BY planTitle
     ORDER BY count DESC`
   );
+  const planDistribution = sanitizeBigInt(planDistributionRaw);
 
   // 2. Platform Revenue & Orders (orders table)
-  const [revenueStats] = await query(
-    `SELECT 
+  const revenueStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) as totalRevenue,
       COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') AND ${dateSql} THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) as periodRevenue,
       COUNT(*) as totalOrders,
@@ -428,11 +493,12 @@ async function getAdminPlatformAnalytics(filters = {}) {
       COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pendingOrders,
       COUNT(CASE WHEN status = 'FAILED' THEN 1 END) as failedOrders
     FROM orders`,
-    dateParams
+    ...dateParams
   );
+  const [revenueStats] = sanitizeBigInt(revenueStatsRaw);
 
-  const revenueTimeSeries = await query(
-    `SELECT 
+  const revenueTimeSeriesRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
       COALESCE(SUM(CAST(amount AS DECIMAL(10,2))), 0) as revenue,
       COUNT(*) as orderCount
@@ -440,25 +506,25 @@ async function getAdminPlatformAnalytics(filters = {}) {
     WHERE status IN ('SUCCESS', 'PAID') AND ${dateSql}
     GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
     ORDER BY date ASC`,
-    dateParams
+    ...dateParams
   );
+  const revenueTimeSeries = sanitizeBigInt(revenueTimeSeriesRaw);
 
   // 3. Platform WhatsApp Accounts
-  const [instanceStats] = await query(
-    `SELECT 
+  const instanceStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalInstances,
       COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as activeInstances,
       COUNT(CASE WHEN status != 'ACTIVE' THEN 1 END) as disconnectedInstances
     FROM instance`
   );
+  const [instanceStats] = sanitizeBigInt(instanceStatsRaw);
 
-  const [metaStats] = await query(
-    `SELECT COUNT(*) as metaCount FROM meta_api`
-  );
+  const metaCount = await prisma.meta_api.count();
 
   // 4. Platform Throughput & Activity
-  const [throughputStats] = await query(
-    `SELECT 
+  const throughputStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalMessagesInPeriod,
       COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incomingInPeriod,
       COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoingInPeriod,
@@ -467,11 +533,12 @@ async function getAdminPlatformAnalytics(filters = {}) {
       COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failedInPeriod
     FROM beta_conversation
     WHERE ${dateSql}`,
-    dateParams
+    ...dateParams
   );
+  const [throughputStats] = sanitizeBigInt(throughputStatsRaw);
 
-  const throughputTimeSeries = await query(
-    `SELECT 
+  const throughputTimeSeriesRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
       COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
       COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
@@ -481,11 +548,12 @@ async function getAdminPlatformAnalytics(filters = {}) {
     WHERE ${dateSql}
     GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
     ORDER BY date ASC`,
-    dateParams
+    ...dateParams
   );
+  const throughputTimeSeries = sanitizeBigInt(throughputTimeSeriesRaw);
 
-  const [campaignStats] = await query(
-    `SELECT 
+  const campaignStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalCampaigns,
       COALESCE(SUM(sent_count), 0) as totalSent,
       COALESCE(SUM(delivered_count), 0) as totalDelivered,
@@ -493,34 +561,42 @@ async function getAdminPlatformAnalytics(filters = {}) {
       COALESCE(SUM(failed_count), 0) as totalFailed
     FROM beta_campaign
     WHERE ${dateSql}`,
-    dateParams
+    ...dateParams
   );
+  const [campaignStats] = sanitizeBigInt(campaignStatsRaw);
 
-  const [flowStats] = await query(
-    `SELECT COUNT(*) as totalFlows FROM beta_flows`
-  );
+  const totalFlows = await prisma.beta_flows.count();
 
-  const [chatbotStats] = await query(
-    `SELECT 
+  const chatbotStatsRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       COUNT(*) as totalBots,
       COUNT(CASE WHEN active = 1 THEN 1 END) as activeBots
     FROM beta_chatbot`
   );
+  const [chatbotStats] = sanitizeBigInt(chatbotStatsRaw);
 
-  // 5. Recent Admin Audit Logs
+  // 5. Recent Admin Audit Logs via typed Prisma
   let auditLogs = [];
   try {
-    auditLogs = await query(
-      `SELECT id, admin_uid, action, target_type, target_id, details, ip_address, created_at
-      FROM admin_audit_logs
-      ORDER BY id DESC
-      LIMIT 10`
-    );
+    auditLogs = await prisma.admin_audit_logs.findMany({
+      select: {
+        id: true,
+        admin_uid: true,
+        action: true,
+        target_type: true,
+        target_id: true,
+        details: true,
+        ip_address: true,
+        created_at: true,
+      },
+      orderBy: { id: "desc" },
+      take: 10,
+    });
   } catch (_) {}
 
   // 6. Top Workspaces approaching limits or highest usage
-  const topWorkspaces = await query(
-    `SELECT 
+  const topWorkspacesRaw = await prisma.$queryRawUnsafe(
+    `SELECT
       u.uid, u.name, u.email,
       COUNT(c.id) as contactCount
     FROM user u
@@ -529,6 +605,7 @@ async function getAdminPlatformAnalytics(filters = {}) {
     ORDER BY contactCount DESC
     LIMIT 5`
   );
+  const topWorkspaces = sanitizeBigInt(topWorkspacesRaw);
 
   return {
     range,
@@ -552,10 +629,10 @@ async function getAdminPlatformAnalytics(filters = {}) {
       timeSeries: revenueTimeSeries || [],
     },
     whatsapp: {
-      total: Number(instanceStats?.totalInstances || 0) + Number(metaStats?.metaCount || 0),
+      total: Number(instanceStats?.totalInstances || 0) + Number(metaCount || 0),
       qr: Number(instanceStats?.totalInstances || 0),
-      meta: Number(metaStats?.metaCount || 0),
-      active: Number(instanceStats?.activeInstances || 0) + Number(metaStats?.metaCount || 0),
+      meta: Number(metaCount || 0),
+      active: Number(instanceStats?.activeInstances || 0) + Number(metaCount || 0),
       disconnected: Number(instanceStats?.disconnectedInstances || 0),
     },
     throughput: {
@@ -570,7 +647,7 @@ async function getAdminPlatformAnalytics(filters = {}) {
       campaignDelivered: Number(campaignStats?.totalDelivered || 0),
       campaignRead: Number(campaignStats?.totalRead || 0),
       campaignFailed: Number(campaignStats?.totalFailed || 0),
-      totalFlows: Number(flowStats?.totalFlows || 0),
+      totalFlows: Number(totalFlows || 0),
       activeChatbots: Number(chatbotStats?.activeBots || 0),
       timeSeries: throughputTimeSeries || [],
     },

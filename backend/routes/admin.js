@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const con = require("../database/config.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
@@ -116,9 +117,9 @@ router.post("/add_plan", adminValidator, async (req, res) => {
     const customVal = custom ? (typeof custom === "object" ? JSON.stringify(custom) : String(custom)) : null;
 
     const insertRes = await query(
-      `INSERT INTO plan (title, short_description, allow_tag, allow_note, allow_chatbot, 
-        contact_limit, allow_api, is_trial, price, price_strike, plan_duration_in_days, 
-        qr_account, wa_warmer, rest_api_qr, instagram_inbox, telegram_inbox, allow_wa_forms, custom) 
+      `INSERT INTO plan (title, short_description, allow_tag, allow_note, allow_chatbot,
+        contact_limit, allow_api, is_trial, price, price_strike, plan_duration_in_days,
+        qr_account, wa_warmer, rest_api_qr, instagram_inbox, telegram_inbox, allow_wa_forms, custom)
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         title,
@@ -146,9 +147,9 @@ router.post("/add_plan", adminValidator, async (req, res) => {
       await query(
         `INSERT INTO plan_prices (plan_id, currency_code, amount, strike_amount, billing_period_days, is_active, updated_at)
          VALUES (?, 'USD', ?, ?, ?, 1, NOW())
-         ON DUPLICATE KEY UPDATE 
-           amount = VALUES(amount), 
-           strike_amount = VALUES(strike_amount), 
+         ON DUPLICATE KEY UPDATE
+           amount = VALUES(amount),
+           strike_amount = VALUES(strike_amount),
            billing_period_days = VALUES(billing_period_days),
            updated_at = NOW()`,
         [
@@ -199,7 +200,7 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
     const customVal = custom ? (typeof custom === "object" ? JSON.stringify(custom) : String(custom)) : null;
 
     await query(
-      `UPDATE plan SET 
+      `UPDATE plan SET
         title = ?, short_description = ?, allow_tag = ?, allow_note = ?,
         allow_chatbot = ?, contact_limit = ?, allow_api = ?, is_trial = ?,
         price = ?, price_strike = ?, plan_duration_in_days = ?,
@@ -234,9 +235,9 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
     await query(
       `INSERT INTO plan_prices (plan_id, currency_code, amount, strike_amount, billing_period_days, is_active, updated_at)
        VALUES (?, 'USD', ?, ?, ?, 1, NOW())
-       ON DUPLICATE KEY UPDATE 
-         amount = VALUES(amount), 
-         strike_amount = VALUES(strike_amount), 
+       ON DUPLICATE KEY UPDATE
+         amount = VALUES(amount),
+         strike_amount = VALUES(strike_amount),
          billing_period_days = VALUES(billing_period_days),
          updated_at = NOW()`,
       [
@@ -315,10 +316,10 @@ router.get("/get_users", adminValidator, async (req, res) => {
     const emailStatusFilter = req.query.email_status ? String(req.query.email_status).trim().toLowerCase() : null;
 
     let sql = `
-      SELECT 
-        u.id, u.role, u.uid, u.name, u.email, u.mobile_with_country_code, 
-        u.timezone, u.plan, u.plan_expire, u.trial, u.createdAt, 
-        u.tokenVersion, u.subscription_id, u.subscription_status, u.is_blocked, 
+      SELECT
+        u.id, u.role, u.uid, u.name, u.email, u.mobile_with_country_code,
+        u.timezone, u.plan, u.plan_expire, u.trial, u.createdAt,
+        u.tokenVersion, u.subscription_id, u.subscription_status, u.is_blocked,
         u.email_verified_at,
         (SELECT COUNT(*) FROM email_verification ev WHERE ev.email = u.email AND ev.used_at IS NULL AND ev.expires_at > NOW()) as pending_verification_count
       FROM user u
@@ -387,7 +388,7 @@ router.get("/get_user_details", adminValidator, async (req, res) => {
 
     const rawUsers = await query(
       `SELECT u.id, u.role, u.uid, u.name, u.email, u.mobile_with_country_code, u.timezone, u.plan, u.plan_expire, u.trial, u.createdAt, u.subscription_id, u.subscription_status, u.is_blocked, u.email_verified_at,
-        (SELECT COUNT(*) FROM email_verification ev WHERE ev.email = u.email AND ev.used_at IS NULL AND ev.expires_at > NOW()) as pending_verification_count 
+        (SELECT COUNT(*) FROM email_verification ev WHERE ev.email = u.email AND ev.used_at IS NULL AND ev.expires_at > NOW()) as pending_verification_count
        FROM user u WHERE u.uid = ?`,
       [uid]
     );
@@ -471,8 +472,8 @@ router.post("/toggle_user_status", adminValidator, async (req, res) => {
 
     // Invalidate existing sessions immediately via tokenVersion bump
     await query(
-      `UPDATE user 
-       SET is_blocked = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
+      `UPDATE user
+       SET is_blocked = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1
        WHERE uid = ?`,
       [blockedVal, uid]
     );
@@ -539,15 +540,15 @@ router.post("/update_user", adminValidator, async (req, res) => {
       const hashpass = await bcrypt.hash(newPassword, 10);
 
       await query(
-        `UPDATE user 
-         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
+        `UPDATE user
+         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1
          WHERE uid = ?`,
         [name, email, hashpass, mobile_with_country_code, uid],
       );
     } else {
       await query(
-        `UPDATE user 
-         SET name = ?, email = ?, mobile_with_country_code = ? 
+        `UPDATE user
+         SET name = ?, email = ?, mobile_with_country_code = ?
          WHERE uid = ?`,
         [name, email, mobile_with_country_code, uid],
       );
@@ -627,12 +628,12 @@ router.post("/update_pay_gateway", adminValidator, async (req, res) => {
     } = req.body;
 
     await query(
-      `UPDATE web_private SET  
-            pay_offline_id = ?, 
-            pay_offline_key = ?, 
+      `UPDATE web_private SET
+            pay_offline_id = ?,
+            pay_offline_key = ?,
             offline_active = ?,
-            pay_stripe_id = ?, 
-            pay_stripe_key = ?, 
+            pay_stripe_id = ?,
+            pay_stripe_key = ?,
             stripe_active = ?,
             pay_paypal_id = ?,
             pay_paypal_key = ?,
@@ -898,9 +899,9 @@ router.post("/suggest_ppp_prices", adminValidator, async (req, res) => {
 router.get("/get_payment_orders", adminValidator, async (req, res) => {
   try {
     const orders = await query(
-      `SELECT o.id, o.uid, o.payment_mode, o.amount, o.data, o.s_token, o.status, o.createdAt, u.email as user_email, u.name as user_name 
-       FROM orders o 
-       LEFT JOIN user u ON o.uid = u.uid 
+      `SELECT o.id, o.uid, o.payment_mode, o.amount, o.data, o.s_token, o.status, o.createdAt, u.email as user_email, u.name as user_name
+       FROM orders o
+       LEFT JOIN user u ON o.uid = u.uid
        ORDER BY o.createdAt DESC LIMIT 100`
     );
 
@@ -1000,10 +1001,12 @@ router.post("/add_faq", adminValidator, async (req, res) => {
       });
     }
 
-    await query(`INSERT INTO faq (question, answer) VALUES (?,?)`, [
-      question,
-      answer,
-    ]);
+    await prisma.faq.create({
+      data: {
+        question,
+        answer,
+      },
+    });
 
     res.json({ success: true, msg: "Faq was added" });
   } catch (err) {
@@ -1015,7 +1018,7 @@ router.post("/add_faq", adminValidator, async (req, res) => {
 // get all faq
 router.get("/get_faq", async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM faq`, []);
+    const data = await prisma.faq.findMany();
     res.json({ data, success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -1027,7 +1030,12 @@ router.get("/get_faq", async (req, res) => {
 router.post("/del_faq", adminValidator, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM faq WHERE id = ?`, [id]);
+    const parsedId = parseInt(id, 10);
+    if (!isNaN(parsedId) && parsedId > 0) {
+      await prisma.faq.deleteMany({
+        where: { id: parsedId },
+      });
+    }
     res.json({ success: true, msg: "Faq was deleted" });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -1159,10 +1167,14 @@ router.post("/add_testimonial", adminValidator, async (req, res) => {
       return res.json({ success: false, msg: "Please fill all fields" });
     }
 
-    await query(
-      `INSERT INTO testimonial (title, description, reviewer_name, reviewer_position) VALUES (?,?,?,?)`,
-      [title, description, reviewer_name, reviewer_position],
-    );
+    await prisma.testimonial.create({
+      data: {
+        title,
+        description,
+        reviewer_name,
+        reviewer_position,
+      },
+    });
 
     res.json({ success: true, msg: "Testimonial was added" });
   } catch (err) {
@@ -1174,7 +1186,7 @@ router.post("/add_testimonial", adminValidator, async (req, res) => {
 // get all testi
 router.get("/get_testi", async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM testimonial`, []);
+    const data = await prisma.testimonial.findMany();
     res.json({ success: true, data });
   } catch (err) {
     logger.log(err);
@@ -1186,8 +1198,12 @@ router.get("/get_testi", async (req, res) => {
 router.post("/del_testi", adminValidator, async (req, res) => {
   try {
     const { id } = req.body;
-
-    await query(`DELETE FROM testimonial WHERE id = ?`, [id]);
+    const parsedId = parseInt(id, 10);
+    if (!isNaN(parsedId) && parsedId > 0) {
+      await prisma.testimonial.deleteMany({
+        where: { id: parsedId },
+      });
+    }
     res.json({ success: true, msg: "Testimonial was deleted" });
   } catch (err) {
     logger.log(err);
@@ -1200,7 +1216,7 @@ router.get("/get_orders", adminValidator, async (req, res) => {
   try {
     const data = await query(
       `
-            SELECT 
+            SELECT
                 orders.id,
                 orders.uid,
                 orders.payment_mode,
@@ -1348,22 +1364,22 @@ router.get("/get_smtp", adminValidator, async (req, res) => {
   try {
     const data = await query(`SELECT id, email, host, port, username, password, createdAt FROM smtp`, []);
     if (data.length < 1) {
-      return res.json({ 
-        data: { 
-          id: "", 
-          email: "", 
-          host: "", 
-          port: "587", 
-          username: "", 
-          has_password: false, 
-          password: "" 
-        }, 
-        success: true 
+      return res.json({
+        data: {
+          id: "",
+          email: "",
+          host: "",
+          port: "587",
+          username: "",
+          has_password: false,
+          password: ""
+        },
+        success: true
       });
     } else {
       const config = data[0];
       const hasPassword = Boolean(config.password && String(config.password).trim().length > 0);
-      return res.json({ 
+      return res.json({
         data: {
           id: config.id,
           email: config.email,
@@ -1374,8 +1390,8 @@ router.get("/get_smtp", adminValidator, async (req, res) => {
           has_password: hasPassword,
           password: hasPassword ? "••••••••••••" : "",
           createdAt: config.createdAt,
-        }, 
-        success: true 
+        },
+        success: true
       });
     }
   } catch (err) {
@@ -1493,44 +1509,57 @@ router.post("/send_test_email", adminValidator, async (req, res) => {
 // get dashboard for user
 router.get("/get_dashboard_for_user", adminValidator, async (req, res) => {
   try {
-    // Get users data (selective projection)
-    const getUsers = await query(`SELECT id, uid, name, email, plan, createdAt FROM user`, []);
+    // Get users data (selective projection) via typed Prisma
+    const rawUsers = await prisma.user.findMany({
+      select: { id: true, uid: true, name: true, email: true, plan: true, createdAt: true },
+    });
+    const getUsers = sanitizeBigInt(rawUsers);
     const { paidSignupsByMonth, unpaidSignupsByMonth } =
       getUserSignupsByMonth(getUsers);
 
-    // Get orders data (selective projection)
-    const getOrders = await query(`SELECT id, uid, amount, createdAt FROM orders`, []);
+    // Get orders data (selective projection) via typed Prisma
+    const rawOrders = await prisma.orders.findMany({
+      select: { id: true, uid: true, amount: true, createdAt: true },
+    });
+    const getOrders = sanitizeBigInt(rawOrders);
     const orders = getUserOrderssByMonth(getOrders);
 
-    // Get contact form count
-    const [contactFormCount] = await query(`SELECT COUNT(*) AS count FROM contact_form`, []);
+    // Get contact form count via typed Prisma
+    const contactFormCount = { count: await prisma.contact_form.count() };
 
-    // Get chats data (selective projection)
-    const getChats = await query(`SELECT createdAt FROM beta_chats`, []);
+    // Get chats data (selective projection) via typed Prisma
+    const getChats = await prisma.beta_chats.findMany({
+      select: { createdAt: true },
+    });
     const chatsByMonth = getChatsByMonth(getChats);
 
-    // Get conversations data (selective projection)
-    const getConversations = await query(`SELECT type, createdAt FROM beta_conversation`, []);
+    // Get conversations data (selective projection) via typed Prisma
+    const getConversations = await prisma.beta_conversation.findMany({
+      select: { type: true, createdAt: true },
+    });
     const messagesByMonth = getMessagesByMonth(getConversations);
 
     // Get message types distribution
     const messageTypes = getMessageTypeDistribution(getConversations);
 
-    // Get agents data
-    const getAgents = await query(`SELECT id, name FROM agents`, []);
+    // Get agents data via typed Prisma
+    const getAgents = await prisma.agents.findMany({
+      select: { id: true, name: true },
+    });
 
-    // Get agent tasks data
-    const getAgentTasks = await query(`SELECT id, agent_id, status FROM agent_task`, []);
+    // Get agent tasks data via typed Prisma
+    const getAgentTasks = await prisma.agent_task.findMany({
+      select: { id: true, agent_id: true, status: true },
+    });
     const agentPerformance = getAgentPerformance(getAgents, getAgentTasks);
 
-    // Get instances data (WhatsApp connections)
-    const getInstances = await query(`SELECT status FROM instance`, []);
-    const activeInstances = getInstances.filter(
-      (instance) => instance.status === "ACTIVE",
-    ).length;
+    // Get instances count (WhatsApp connections) via typed Prisma
+    const activeInstances = await prisma.instance.count({
+      where: { status: "ACTIVE" },
+    });
 
-    // Get flows count
-    const [flowsCount] = await query(`SELECT COUNT(*) AS count FROM beta_flows`, []);
+    // Get flows count via typed Prisma
+    const flowsCount = { count: await prisma.beta_flows.count() };
 
     // Get system metrics (this would typically come from a monitoring service)
     const systemMetrics = {
@@ -2606,15 +2635,15 @@ router.post("/delete_flow_template", adminValidator, async (req, res) => {
 router.get("/get_fcm_data", adminValidator, async (req, res) => {
   try {
     const [data] = await query(
-      `SELECT fcm_apiKey, 
-      fcm_authDomain, 
-      fcm_projectId, 
-      fcm_storageBucket, 
-      fcm_messagingSenderId, 
-      fcm_appId, 
-      fcm_measurementId, 
-      fcm_vapidKey, 
-      fcm_clientEmail, 
+      `SELECT fcm_apiKey,
+      fcm_authDomain,
+      fcm_projectId,
+      fcm_storageBucket,
+      fcm_messagingSenderId,
+      fcm_appId,
+      fcm_measurementId,
+      fcm_vapidKey,
+      fcm_clientEmail,
       fcm_privateKey FROM web_private`,
       [],
     );
@@ -2678,7 +2707,7 @@ router.get("/get_fcm_subs", adminValidator, async (req, res) => {
   try {
     const data = await query(
       `
-       SELECT 
+       SELECT
         f.id,
         f.uid,
         f.token,
@@ -3014,7 +3043,7 @@ router.post("/update_web_public", adminValidator, async (req, res) => {
     const [existing] = await query(`SELECT * FROM web_public LIMIT 1`);
     if (existing) {
       await query(
-        `UPDATE web_public 
+        `UPDATE web_public
          SET app_name = COALESCE(?, app_name),
              meta_description = COALESCE(?, meta_description),
              logo = COALESCE(?, logo),
@@ -3024,7 +3053,7 @@ router.post("/update_web_public", adminValidator, async (req, res) => {
       );
     } else {
       await query(
-        `INSERT INTO web_public (app_name, meta_description, logo, login_header_footer) 
+        `INSERT INTO web_public (app_name, meta_description, logo, login_header_footer)
          VALUES (?,?,?,?)`,
         [app_name, meta_description, logo, login_header_footer ? 1 : 0]
       );
@@ -3190,7 +3219,7 @@ router.post("/send_notification", adminValidator, async (req, res) => {
 
     // 5. Record Broadcast History & Admin Audit Log
     await query(
-      `INSERT INTO notification_broadcast_history 
+      `INSERT INTO notification_broadcast_history
        (admin_uid, title, message, channels, audience_type, recipient_count, sent_count, failed_count, status, details)
        VALUES (?,?,?,?,?,?,?,?,?,?)`,
       [
@@ -3267,15 +3296,15 @@ router.post("/save_mail_template", adminValidator, async (req, res) => {
 
     if (id) {
       await query(
-        `UPDATE mail_templates 
-         SET name = ?, subject = ?, body = ?, variables = ?, is_active = ? 
+        `UPDATE mail_templates
+         SET name = ?, subject = ?, body = ?, variables = ?, is_active = ?
          WHERE id = ?`,
         [name, subject, body, variables || "{{name}}, {{email}}", is_active ? 1 : 0, id]
       );
       res.json({ success: true, msg: "Template updated successfully" });
     } else {
       await query(
-        `INSERT INTO mail_templates (name, subject, body, variables, is_active) 
+        `INSERT INTO mail_templates (name, subject, body, variables, is_active)
          VALUES (?,?,?,?,?)`,
         [name, subject, body, variables || "{{name}}, {{email}}", is_active ? 1 : 0]
       );
@@ -3373,7 +3402,7 @@ router.get("/get_workspaces", adminValidator, async (req, res) => {
     const totalCount = countRows[0]?.total || 0;
 
     const workspaces = await query(
-      `SELECT 
+      `SELECT
         u.id, u.uid, u.name, u.email, u.mobile_with_country_code, u.timezone,
         u.plan, u.plan_expire, u.trial, u.is_blocked, u.createdAt,
         (SELECT COUNT(*) FROM agents a WHERE a.owner_uid = u.uid) as memberCount,
@@ -3608,7 +3637,7 @@ router.post("/del_instance", adminValidator, async (req, res) => {
 router.get("/get_subscriptions", adminValidator, async (req, res) => {
   try {
     const usersWithPlan = await query(
-      `SELECT u.id, u.uid, u.name, u.email, u.plan, u.plan_expire, u.subscription_id, 
+      `SELECT u.id, u.uid, u.name, u.email, u.plan, u.plan_expire, u.subscription_id,
               u.subscription_status, u.is_blocked, u.createdAt,
               (SELECT MAX(o.createdAt) FROM orders o WHERE o.uid = u.uid AND o.status IN ('PAID', 'SUCCESS', 'paid')) as lastPaidAt,
               (SELECT o.amount FROM orders o WHERE o.uid = u.uid AND o.status IN ('PAID', 'SUCCESS', 'paid') ORDER BY o.id DESC LIMIT 1) as lastAmount,
@@ -3678,8 +3707,8 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
 // ─── GOD-MODE USAGE & ENTITLEMENTS SUMMARY ──────────────────────────────────
 router.get("/get_usage_summary", adminValidator, async (req, res) => {
   try {
-    const tenants = await query(
-      `SELECT 
+    const rawTenants = await prisma.$queryRaw`
+      SELECT
         u.id, u.uid, u.name, u.email, u.plan, u.plan_expire,
         (SELECT COUNT(*) FROM contact c WHERE c.uid = u.uid) as contactCount,
         (SELECT COUNT(*) FROM instance i WHERE i.uid = u.uid) as instanceCount,
@@ -3688,8 +3717,9 @@ router.get("/get_usage_summary", adminValidator, async (req, res) => {
       FROM user u
       WHERE u.is_blocked = 0 OR u.is_blocked IS NULL
       ORDER BY contactCount DESC
-      LIMIT 100`
-    );
+      LIMIT 100
+    `;
+    const tenants = sanitizeBigInt(rawTenants);
 
     const formatted = tenants.map((t) => {
       let parsedPlan = null;

@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -1246,23 +1247,29 @@ router.post("/convert_audio", validateUser, async (req, res) => {
 router.get("/get_me", validateUser, async (req, res) => {
   try {
     const { userOnly } = req.query;
-    const data = await query(`SELECT * FROM user WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const userRecord = await prisma.user.findFirst({
+      where: {
+        uid: req.decode.uid,
+      },
+    });
 
     const finalAddon = returnAddons();
 
-    let contact = [];
+    let contactCount = 0;
 
     if (!userOnly) {
       // getting phonebook
-      contact = await query(`SELECT * FROM contact WHERE uid = ?`, [
-        req.decode.uid,
-      ]);
+      contactCount = await prisma.contact.count({
+        where: {
+          uid: req.decode.uid,
+        },
+      });
     }
 
+    const userData = userRecord || {};
+
     res.json({
-      data: { ...data[0], contact: contact.length },
+      data: { ...userData, contact: contactCount },
       success: true,
       addon: finalAddon,
     });
@@ -1501,11 +1508,11 @@ router.post("/update_meta", validateUser, async (req, res) => {
 
     if (findOne.length > 0) {
       await query(
-        `UPDATE meta_api 
-         SET waba_id = ?, 
-             access_token = ?, 
-             business_phone_number_id = ?, 
-             app_id = ?, 
+        `UPDATE meta_api
+         SET waba_id = ?,
+             access_token = ?,
+             business_phone_number_id = ?,
+             app_id = ?,
              login_type = ?,
              embed_data = NULL,
              is_coexistence = 0,
@@ -2141,8 +2148,8 @@ router.get("/stripe_payment", async (req, res) => {
     }
 
     await query(
-      `UPDATE orders 
-       SET data = ?, status = ? 
+      `UPDATE orders
+       SET data = ?, status = ?
        WHERE id = ? AND payment_mode = ?`,
       [
         JSON.stringify(checkPayment?.data),
@@ -2254,18 +2261,21 @@ router.post("/update_profile", validateUser, async (req, res) => {
       const hash = await bcrypt.hash(newPassword, 10);
 
       await query(
-        `UPDATE user 
-         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, timezone = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
+        `UPDATE user
+         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, timezone = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1
          WHERE uid = ?`,
         [name, email, hash, mobile_with_country_code, timezone, req.decode.uid],
       );
     } else {
-      await query(
-        `UPDATE user 
-         SET name = ?, email = ?, mobile_with_country_code = ?, timezone = ? 
-         WHERE uid = ?`,
-        [name, email, mobile_with_country_code, timezone, req.decode.uid],
-      );
+      await prisma.user.updateMany({
+        where: { uid: req.decode.uid },
+        data: {
+          name,
+          email,
+          mobile_with_country_code,
+          timezone,
+        },
+      });
     }
 
     res.json({ success: true, msg: "Profile was updated" });
@@ -2278,54 +2288,54 @@ router.post("/update_profile", validateUser, async (req, res) => {
 // get dashboard
 router.get("/get_dashboard_old", validateUser, async (req, res) => {
   try {
-    const getOpenChat = await query(
-      `SELECT * FROM chats WHERE uid = ? AND chat_status = ?`,
-      [req.decode.uid, "open"],
-    );
-    const getOpenPending = await query(
-      `SELECT * FROM chats WHERE uid = ? AND chat_status = ?`,
-      [req.decode.uid, "pending"],
-    );
-    const getOpenResolved = await query(
-      `SELECT * FROM chats WHERE uid = ? AND chat_status = ?`,
-      [req.decode.uid, "solved"],
-    );
+    const uid = req.decode.uid;
 
-    const getActiveChatbots = await query(
-      `SELECT * FROM chatbot WHERE active = ? AND uid = ?`,
-      [1, req.decode.uid],
-    );
-    const getDActiveChatbots = await query(
-      `SELECT * FROM chatbot WHERE active = ? AND uid = ?`,
-      [0, req.decode.uid],
-    );
+    const [
+      getOpenChat,
+      getOpenPending,
+      getOpenResolved,
+      getActiveChatbots,
+      getDActiveChatbots,
+      totalChats,
+      totalChatbots,
+      totalContacts,
+      totalFlows,
+      totalBroadcast,
+      totalTemplets,
+    ] = await Promise.all([
+      prisma.chats.findMany({
+        where: { uid, chat_status: "open" },
+        select: { createdAt: true },
+      }),
+      prisma.chats.findMany({
+        where: { uid, chat_status: "pending" },
+        select: { createdAt: true },
+      }),
+      prisma.chats.findMany({
+        where: { uid, chat_status: "solved" },
+        select: { createdAt: true },
+      }),
+      prisma.chatbot.findMany({
+        where: { uid, active: 1 },
+        select: { createdAt: true },
+      }),
+      prisma.chatbot.findMany({
+        where: { uid, active: 0 },
+        select: { createdAt: true },
+      }),
+      prisma.chats.count({ where: { uid } }),
+      prisma.chatbot.count({ where: { uid } }),
+      prisma.contact.count({ where: { uid } }),
+      prisma.flow.count({ where: { uid } }),
+      prisma.broadcast.count({ where: { uid } }),
+      prisma.templets.count({ where: { uid } }),
+    ]);
 
     const opened = getUserOrderssByMonth(getOpenChat);
     const pending = getUserOrderssByMonth(getOpenPending);
     const resolved = getUserOrderssByMonth(getOpenResolved);
     const activeBot = getUserOrderssByMonth(getActiveChatbots);
     const dActiveBot = getUserOrderssByMonth(getDActiveChatbots);
-
-    // get total chats
-    const totalChats = await query(`SELECT * FROM chats WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    const totalChatbots = await query(`SELECT * FROM chatbot WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    const totalContacts = await query(`SELECT * FROM contact WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    const totalFlows = await query(`SELECT * FROM flow WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    const totalBroadcast = await query(
-      `SELECT * FROM broadcast WHERE uid = ?`,
-      [req.decode.uid],
-    );
-    const totalTemplets = await query(`SELECT * FROM templets WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
 
     res.json({
       success: true,
@@ -2334,12 +2344,12 @@ router.get("/get_dashboard_old", validateUser, async (req, res) => {
       resolved,
       activeBot,
       dActiveBot,
-      totalChats: totalChats.length,
-      totalChatbots: totalChatbots?.length,
-      totalContacts: totalContacts?.length,
-      totalFlows: totalFlows?.length,
-      totalBroadcast: totalBroadcast?.length,
-      totalTemplets: totalTemplets?.length,
+      totalChats,
+      totalChatbots,
+      totalContacts,
+      totalFlows,
+      totalBroadcast,
+      totalTemplets,
     });
   } catch (err) {
     logger.log(err);
@@ -2351,27 +2361,26 @@ router.get("/get_dashboard", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
 
-    // 1. User Profile Data
-    const user = await query("SELECT * FROM user WHERE uid = ?", [uid]);
+    // 1. User Profile Data via typed Prisma
+    const user = await prisma.user.findFirst({
+      where: { uid },
+    });
 
-    // 2. Statistics
-    const [agents, activeChats, completedTasks, activeInstances] =
+    // 2. Statistics via typed Prisma operations
+    const [agentsCount, activeChatsCount, completedTasksCount, activeInstancesCount] =
       await Promise.all([
-        query("SELECT COUNT(*) as count FROM agents WHERE owner_uid = ?", [
-          uid,
-        ]),
-        query(
-          "SELECT COUNT(*) as count FROM beta_chats WHERE uid = ? AND unread_count > 0",
-          [uid],
-        ),
-        query(
-          "SELECT COUNT(*) as count FROM agent_task WHERE owner_uid = ? AND status = 'COMPLETED'",
-          [uid],
-        ),
-        query(
-          "SELECT COUNT(*) as count FROM instance WHERE uid = ? AND status = 'ACTIVE'",
-          [uid],
-        ),
+        prisma.agents.count({
+          where: { owner_uid: uid },
+        }),
+        prisma.beta_chats.count({
+          where: { uid, unread_count: { gt: 0 } },
+        }),
+        prisma.agent_task.count({
+          where: { owner_uid: uid, status: "COMPLETED" },
+        }),
+        prisma.instance.count({
+          where: { uid, status: "ACTIVE" },
+        }),
       ]);
 
     // 3. Recent Conversations (from beta_conversation)
@@ -2380,39 +2389,33 @@ router.get("/get_dashboard", validateUser, async (req, res) => {
     // 4. Unread Messages Summary
     const unreadSummary = [];
 
-    // 5. Active Chatbots
-    const activeChatbots = await query(
-      `
-      SELECT title, flow_id 
-      FROM beta_chatbot 
-      WHERE uid = ? AND active = 1
-      LIMIT 3
-    `,
-      [uid],
-    );
+    // 5. Active Chatbots via typed Prisma
+    const activeChatbots = await prisma.beta_chatbot.findMany({
+      where: { uid, active: 1 },
+      select: { title: true, flow_id: true },
+      take: 3,
+    });
 
-    // 6. Performance Metrics (last 7 days)
-    const performanceData = await query(
-      `
-      SELECT 
+    // 6. Performance Metrics (last 7 days) via safe parameterized queryRaw
+    const rawPerformanceData = await prisma.$queryRaw`
+      SELECT
         DATE(createdAt) as date,
         COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
         COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing
       FROM beta_conversation
-      WHERE uid = ? AND createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+      WHERE uid = ${uid} AND createdAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)
       GROUP BY DATE(createdAt)
       ORDER BY date ASC
-    `,
-      [uid],
-    );
+    `;
+    const performanceData = sanitizeBigInt(rawPerformanceData);
 
     const data = {
-      user: user[0],
+      user: user || null,
       stats: {
-        agents: agents[0].count,
-        activeChats: activeChats[0].count,
-        completedTasks: completedTasks[0].count,
-        activeInstances: activeInstances[0].count,
+        agents: agentsCount,
+        activeChats: activeChatsCount,
+        completedTasks: completedTasksCount,
+        activeInstances: activeInstancesCount,
       },
       recentConversations,
       unreadSummary,
@@ -2602,8 +2605,8 @@ const handleModifyPassword = async (req, res) => {
     const hashpassword = await bcrypt.hash(pass, 10);
 
     await query(
-      `UPDATE user 
-       SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
+      `UPDATE user
+       SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1
        WHERE uid = ?`,
       [hashpassword, user.uid],
     );
@@ -2895,15 +2898,15 @@ router.post("/update_agent_profile", validateUser, async (req, res) => {
       const hasPas = await bcrypt.hash(newPas, 10);
 
       await query(
-        `UPDATE agents 
-         SET email = ?, name = ?, mobile = ?, password = ? 
+        `UPDATE agents
+         SET email = ?, name = ?, mobile = ?, password = ?
          WHERE uid = ? AND owner_uid = ?`,
         [email, name, mobile, hasPas, uid, req.decode.uid],
       );
     } else {
       await query(
-        `UPDATE agents 
-         SET email = ?, name = ?, mobile = ? 
+        `UPDATE agents
+         SET email = ?, name = ?, mobile = ?
          WHERE uid = ? AND owner_uid = ?`,
         [email, name, mobile, uid, req.decode.uid],
       );
@@ -3785,10 +3788,12 @@ router.post("/add_quick_reply", validateUser, async (req, res) => {
     const { msg } = req.body;
     if (!msg) return res.json({ msg: "Please enter message to add" });
 
-    await query(`INSERT INTO quick_reply (uid, msg) VALUES (?,?)`, [
-      req.decode.uid,
-      msg,
-    ]);
+    await prisma.quick_reply.create({
+      data: {
+        uid: req.decode.uid,
+        msg,
+      },
+    });
 
     res.json({ success: true, msg: "Quick reply added" });
   } catch (err) {
@@ -3804,9 +3809,11 @@ router.post("/add_quick_reply", validateUser, async (req, res) => {
 // get all quick reply
 router.get("/get_all_quick_reply", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM quick_reply WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = await prisma.quick_reply.findMany({
+      where: {
+        uid: req.decode.uid,
+      },
+    });
     res.json({ data, success: true });
   } catch (err) {
     logger.log(err);
@@ -3822,10 +3829,15 @@ router.get("/get_all_quick_reply", validateUser, async (req, res) => {
 router.post("/del_quick_r", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM quick_reply WHERE uid = ? AND id = ?`, [
-      req.decode.uid,
-      id,
-    ]);
+    const parsedId = parseInt(id, 10);
+    if (!isNaN(parsedId) && parsedId > 0) {
+      await prisma.quick_reply.deleteMany({
+        where: {
+          uid: req.decode.uid,
+          id: parsedId,
+        },
+      });
+    }
     res.json({
       success: true,
       msg: "Quick reply deleted",
@@ -3963,14 +3975,14 @@ router.post("/exchange_embed_token", validateUser, async (req, res) => {
       if (findOne.length > 0) {
         // ✅ Explicit full update — nothing left stale
         const updateResult = await query(
-          `UPDATE meta_api SET 
-        embed_data = ?, 
-        login_type = ?, 
-        waba_id = ?, 
-        access_token = ?, 
-        business_phone_number_id = ?, 
-        app_id = ?, 
-        is_coexistence = ?, 
+          `UPDATE meta_api SET
+        embed_data = ?,
+        login_type = ?,
+        waba_id = ?,
+        access_token = ?,
+        business_phone_number_id = ?,
+        app_id = ?,
+        is_coexistence = ?,
         platform_type = ?
       WHERE uid = ?`,
           [
@@ -3989,8 +4001,8 @@ router.post("/exchange_embed_token", validateUser, async (req, res) => {
         logger.log("✅ embed UPDATE result:", updateResult);
       } else {
         await query(
-          `INSERT INTO meta_api 
-        (uid, embed_data, login_type, waba_id, access_token, business_phone_number_id, app_id, is_coexistence, platform_type) 
+          `INSERT INTO meta_api
+        (uid, embed_data, login_type, waba_id, access_token, business_phone_number_id, app_id, is_coexistence, platform_type)
       VALUES (?,?,?,?,?,?,?,?,?)`,
           [
             req.decode.uid,
@@ -4303,13 +4315,13 @@ router.post("/mercadopago_webhook", async (req, res) => {
 router.get("/get_fcm_data", validateUser, async (req, res) => {
   try {
     const [data] = await query(
-      `SELECT fcm_apiKey, 
-      fcm_authDomain, 
-      fcm_projectId, 
-      fcm_storageBucket, 
-      fcm_messagingSenderId, 
-      fcm_appId, 
-      fcm_measurementId, 
+      `SELECT fcm_apiKey,
+      fcm_authDomain,
+      fcm_projectId,
+      fcm_storageBucket,
+      fcm_messagingSenderId,
+      fcm_appId,
+      fcm_measurementId,
       fcm_vapidKey FROM web_private`,
       [],
     );
@@ -4376,9 +4388,11 @@ router.post("/update_fcm_choice", validateUser, async (req, res) => {
 // GET all tags (already exists)
 router.get("/get_chat_tags", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM chat_tags WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = await prisma.chat_tags.findMany({
+      where: {
+        uid: req.decode.uid,
+      },
+    });
     res.json({ success: true, data });
   } catch (err) {
     logger.error(err);
@@ -4393,11 +4407,13 @@ router.post("/add_chat_tag", validateUser, async (req, res) => {
     if (!title || title.length > 12)
       return res.json({ success: false, msg: "Invalid title" });
 
-    await query(`INSERT INTO chat_tags (uid, title, hex) VALUES (?, ?, ?)`, [
-      req.decode.uid,
-      title,
-      hex || "#6366F1",
-    ]);
+    await prisma.chat_tags.create({
+      data: {
+        uid: req.decode.uid,
+        title,
+        hex: hex || "#6366F1",
+      },
+    });
     res.json({ success: true });
   } catch (err) {
     logger.error(err);
@@ -4409,10 +4425,15 @@ router.post("/add_chat_tag", validateUser, async (req, res) => {
 router.post("/delete_chat_tag", validateUser, async (req, res) => {
   try {
     const { labelId } = req.body;
-    await query(`DELETE FROM chat_tags WHERE id = ? AND uid = ?`, [
-      labelId,
-      req.decode.uid,
-    ]);
+    const parsedId = parseInt(labelId, 10);
+    if (!isNaN(parsedId) && parsedId > 0) {
+      await prisma.chat_tags.deleteMany({
+        where: {
+          id: parsedId,
+          uid: req.decode.uid,
+        },
+      });
+    }
     res.json({ success: true });
   } catch (err) {
     logger.error(err);
@@ -4429,14 +4450,14 @@ router.get("/get_phonebook_for_inbox", validateUser, async (req, res) => {
     const searchTerm = `%${search}%`;
 
     const [countResult] = await query(
-      `SELECT COUNT(*) as total FROM contact 
+      `SELECT COUNT(*) as total FROM contact
        WHERE uid = ? AND (name LIKE ? OR mobile LIKE ?)`,
       [req.decode.uid, searchTerm, searchTerm],
     );
 
     const data = await query(
-      `SELECT id, name, mobile, phonebook_name, var1, var2 
-       FROM contact 
+      `SELECT id, name, mobile, phonebook_name, var1, var2
+       FROM contact
        WHERE uid = ? AND (name LIKE ? OR mobile LIKE ?)
        ORDER BY name ASC
        LIMIT ? OFFSET ?`,
@@ -4549,24 +4570,27 @@ router.get("/analytics", validateUser, async (req, res) => {
 router.get("/notifications", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    const notifications = await query(
-      `SELECT * FROM in_app_notifications 
-       WHERE uid = ? OR uid = 'ALL' 
-       ORDER BY created_at DESC 
-       LIMIT 30`,
-      [uid]
-    );
+    const notifications = await prisma.in_app_notifications.findMany({
+      where: {
+        OR: [{ uid }, { uid: "ALL" }],
+      },
+      orderBy: {
+        created_at: "desc",
+      },
+      take: 30,
+    });
 
-    const [unread] = await query(
-      `SELECT COUNT(*) as count FROM in_app_notifications 
-       WHERE (uid = ? OR uid = 'ALL') AND is_read = 0`,
-      [uid]
-    );
+    const unreadCount = await prisma.in_app_notifications.count({
+      where: {
+        OR: [{ uid }, { uid: "ALL" }],
+        is_read: false,
+      },
+    });
 
     res.json({
       success: true,
       data: notifications || [],
-      unreadCount: unread?.count || 0,
+      unreadCount,
     });
   } catch (err) {
     logger.error("Fetch notifications error:", err);
@@ -4580,10 +4604,14 @@ router.post("/mark_notification_read", validateUser, async (req, res) => {
     const { id, all } = req.body;
 
     if (all) {
-      await query(
-        `UPDATE in_app_notifications SET is_read = 1 WHERE uid = ? OR uid = 'ALL'`,
-        [uid]
-      );
+      await prisma.in_app_notifications.updateMany({
+        where: {
+          OR: [{ uid }, { uid: "ALL" }],
+        },
+        data: {
+          is_read: true,
+        },
+      });
       return res.json({ success: true, msg: "All notifications marked as read" });
     }
 
@@ -4591,10 +4619,18 @@ router.post("/mark_notification_read", validateUser, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Notification ID required" });
     }
 
-    await query(
-      `UPDATE in_app_notifications SET is_read = 1 WHERE id = ? AND (uid = ? OR uid = 'ALL')`,
-      [id, uid]
-    );
+    const parsedId = parseInt(id, 10);
+    if (!isNaN(parsedId) && parsedId > 0) {
+      await prisma.in_app_notifications.updateMany({
+        where: {
+          id: parsedId,
+          OR: [{ uid }, { uid: "ALL" }],
+        },
+        data: {
+          is_read: true,
+        },
+      });
+    }
 
     res.json({ success: true, msg: "Notification marked as read" });
   } catch (err) {

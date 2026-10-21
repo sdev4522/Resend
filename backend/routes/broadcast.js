@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -264,7 +265,7 @@ router.post(
 
       // ── Get contacts ──────────────────────────────────────
       const contacts = await query(
-        `SELECT 
+        `SELECT
           mobile,
           MAX(name)  as name,
           MAX(var1)  as var1,
@@ -495,7 +496,7 @@ router.get("/campaigns", validateUser, async (req, res) => {
 
     // Get campaigns with updated counts
     const campaignsQuery = `
-      SELECT 
+      SELECT
         c.campaign_id,
         c.title,
         c.template_name,
@@ -566,7 +567,7 @@ router.post("/download_csv", validateUser, async (req, res) => {
 
     // Get all logs for the campaign
     const logs = await query(
-      `SELECT 
+      `SELECT
         contact_name as 'Contact Name',
         contact_mobile as 'Phone Number',
         status as 'Send Status',
@@ -604,7 +605,7 @@ router.get("/campaign/:campaignId", validateUser, async (req, res) => {
 
     // Get campaign with updated counts
     const campaignQuery = `
-      SELECT 
+      SELECT
         c.*,
         p.name as phonebook_name
       FROM beta_campaign c
@@ -623,7 +624,7 @@ router.get("/campaign/:campaignId", validateUser, async (req, res) => {
 
     // Get hourly stats for charts
     const stats = await query(
-      `SELECT 
+      `SELECT
         DATE_FORMAT(createdAt, '%Y-%m-%d %H:00:00') as hour,
         status,
         delivery_status,
@@ -637,7 +638,7 @@ router.get("/campaign/:campaignId", validateUser, async (req, res) => {
 
     // Get recent logs (last 100)
     let logs = await query(
-      `SELECT 
+      `SELECT
         id,
         contact_name,
         contact_mobile,
@@ -666,7 +667,7 @@ router.get("/campaign/:campaignId", validateUser, async (req, res) => {
 
     // Get real-time accurate counts - FIXED: Added backticks around 'read'
     const realTimeCounts = await query(
-      `SELECT 
+      `SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'SENT' THEN 1 ELSE 0 END) as sent,
         SUM(CASE WHEN delivery_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
@@ -709,15 +710,14 @@ router.get("/dashboard", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
 
-    // Get total campaigns
-    const totalCampaigns = await query(
-      `SELECT COUNT(*) as count FROM beta_campaign WHERE uid = ?`,
-      [uid],
-    );
+    // Get total campaigns via typed Prisma
+    const totalCampaigns = await prisma.beta_campaign.count({
+      where: { uid },
+    });
 
-    // Get accurate message stats from logs with proper counting - FIXED: Added backticks around 'read'
-    const messageStats = await query(
-      `SELECT 
+    // Get accurate message stats from logs with proper counting via safe parameterized queryRaw
+    const rawMessageStats = await prisma.$queryRaw`
+      SELECT
         COUNT(*) as total,
         SUM(CASE WHEN status = 'SENT' THEN 1 ELSE 0 END) as sent,
         SUM(CASE WHEN delivery_status = 'delivered' THEN 1 ELSE 0 END) as delivered,
@@ -725,33 +725,33 @@ router.get("/dashboard", validateUser, async (req, res) => {
         SUM(CASE WHEN status = 'FAILED' THEN 1 ELSE 0 END) as failed,
         SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending
       FROM beta_campaign_logs
-      WHERE uid = ?`,
-      [uid],
-    );
+      WHERE uid = ${uid}
+    `;
+    const messageStats = sanitizeBigInt(rawMessageStats);
 
     // Format the final message stats - ensure they're all numbers
     const finalMessageStats = {
-      total: parseInt(messageStats[0]?.total || 0),
-      sent: parseInt(messageStats[0]?.sent || 0),
-      delivered: parseInt(messageStats[0]?.delivered || 0),
-      read: parseInt(messageStats[0]?.read || 0),
-      failed: parseInt(messageStats[0]?.failed || 0),
-      pending: parseInt(messageStats[0]?.pending || 0),
+      total: parseInt(messageStats[0]?.total || 0, 10),
+      sent: parseInt(messageStats[0]?.sent || 0, 10),
+      delivered: parseInt(messageStats[0]?.delivered || 0, 10),
+      read: parseInt(messageStats[0]?.read || 0, 10),
+      failed: parseInt(messageStats[0]?.failed || 0, 10),
+      pending: parseInt(messageStats[0]?.pending || 0, 10),
     };
 
-    // Get campaigns by status
-    const campaignsByStatus = await query(
-      `SELECT status, COUNT(*) as count
+    // Get campaigns by status via safe parameterized queryRaw
+    const rawCampaignsByStatus = await prisma.$queryRaw`
+      SELECT status, COUNT(*) as count
       FROM beta_campaign
-      WHERE uid = ?
+      WHERE uid = ${uid}
       GROUP BY status
-      ORDER BY status`,
-      [uid],
-    );
+      ORDER BY status
+    `;
+    const campaignsByStatus = sanitizeBigInt(rawCampaignsByStatus);
 
-    // Get daily stats for the last 7 days - FIXED: Added backticks around 'read'
-    const dailyStats = await query(
-      `SELECT 
+    // Get daily stats for the last 7 days via safe parameterized queryRaw
+    const rawDailyStats = await prisma.$queryRaw`
+      SELECT
         DATE(l.createdAt) as date,
         COUNT(*) as total_messages,
         SUM(CASE WHEN l.status = 'SENT' THEN 1 ELSE 0 END) as sent,
@@ -759,16 +759,16 @@ router.get("/dashboard", validateUser, async (req, res) => {
         SUM(CASE WHEN l.delivery_status = 'read' THEN 1 ELSE 0 END) as \`read\`,
         SUM(CASE WHEN l.status = 'FAILED' THEN 1 ELSE 0 END) as failed
       FROM beta_campaign_logs l
-      WHERE l.uid = ? 
+      WHERE l.uid = ${uid}
       AND l.createdAt >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
       GROUP BY DATE(l.createdAt)
-      ORDER BY date DESC`,
-      [uid],
-    );
+      ORDER BY date DESC
+    `;
+    const dailyStats = sanitizeBigInt(rawDailyStats);
 
-    // Get recent campaigns with updated counts from campaign table
-    const recentCampaigns = await query(
-      `SELECT 
+    // Get recent campaigns with updated counts from campaign table via safe parameterized queryRaw
+    const rawRecentCampaigns = await prisma.$queryRaw`
+      SELECT
         c.campaign_id,
         c.title,
         c.template_name,
@@ -783,15 +783,15 @@ router.get("/dashboard", validateUser, async (req, res) => {
         p.name as phonebook_name
       FROM beta_campaign c
       LEFT JOIN phonebook p ON c.phonebook_id = p.id
-      WHERE c.uid = ?
+      WHERE c.uid = ${uid}
       ORDER BY c.createdAt DESC
-      LIMIT 10`,
-      [uid],
-    );
+      LIMIT 10
+    `;
+    const recentCampaigns = sanitizeBigInt(rawRecentCampaigns);
 
     res.json({
       success: true,
-      totalCampaigns: totalCampaigns[0].count,
+      totalCampaigns,
       messageStats: finalMessageStats,
       campaignsByStatus,
       dailyStats,
@@ -830,7 +830,7 @@ router.get("/export/:campaignId", validateUser, async (req, res) => {
     // Get all logs
     const logs = await query(
       `
-      SELECT 
+      SELECT
         contact_name,
         contact_mobile,
         status,

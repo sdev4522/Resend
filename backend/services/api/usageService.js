@@ -1,4 +1,4 @@
-const { query } = require("../../database/dbpromise");
+const { prisma, sanitizeBigInt } = require("../../database/prisma");
 const logger = require("../../utils/logger");
 
 /**
@@ -18,22 +18,19 @@ async function recordUsageEvent({
   if (!uid) return;
 
   try {
-    await query(
-      `INSERT INTO api_usage_events 
-       (uid, api_key_id, connection_public_id, endpoint, method, status_code, message_id, message_status, duration_ms) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        uid,
-        apiKeyId,
-        connectionPublicId,
-        endpoint,
-        method,
-        statusCode,
-        messageId,
-        messageStatus,
-        durationMs,
-      ]
-    );
+    await prisma.api_usage_events.create({
+      data: {
+        uid: String(uid),
+        api_key_id: apiKeyId ? parseInt(apiKeyId, 10) : null,
+        connection_public_id: connectionPublicId ? String(connectionPublicId) : null,
+        endpoint: String(endpoint || ""),
+        method: String(method || "GET"),
+        status_code: parseInt(statusCode, 10) || 200,
+        message_id: messageId ? String(messageId) : null,
+        message_status: messageStatus ? String(messageStatus) : null,
+        duration_ms: parseInt(durationMs, 10) || 0,
+      },
+    });
   } catch (err) {
     logger.error("Failed to record API usage event:", err.message);
   }
@@ -47,30 +44,30 @@ async function getAggregateUsage(uid, period = null) {
 
   try {
     // 1. Query usage events from api_usage_events
-    const eventStats = await query(
-      `SELECT 
+    const eventStatsRaw = await prisma.$queryRaw`
+      SELECT
          COUNT(*) as total_requests,
          SUM(CASE WHEN message_status = 'accepted' THEN 1 ELSE 0 END) as accepted_count,
          SUM(CASE WHEN message_status = 'sent' THEN 1 ELSE 0 END) as sent_count,
          SUM(CASE WHEN message_status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
          SUM(CASE WHEN message_status = 'failed' THEN 1 ELSE 0 END) as failed_count
        FROM api_usage_events
-       WHERE uid = ? AND DATE_FORMAT(created_at, '%Y-%m') = ?`,
-      [uid, currentMonth]
-    );
+       WHERE uid = ${uid} AND DATE_FORMAT(created_at, '%Y-%m') = ${currentMonth}
+    `;
+    const eventStats = sanitizeBigInt(eventStatsRaw);
 
     // 2. Also check beta_api_logs for broader message counts
-    const logStats = await query(
-      `SELECT 
+    const logStatsRaw = await prisma.$queryRaw`
+      SELECT
          COUNT(*) as total_logs,
          SUM(CASE WHEN status = 'processing' OR status = 'accepted' THEN 1 ELSE 0 END) as accepted_logs,
          SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent_logs,
          SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_logs,
          SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_logs
        FROM beta_api_logs
-       WHERE uid = ? AND DATE_FORMAT(createdAt, '%Y-%m') = ?`,
-      [uid, currentMonth]
-    );
+       WHERE uid = ${uid} AND DATE_FORMAT(createdAt, '%Y-%m') = ${currentMonth}
+    `;
+    const logStats = sanitizeBigInt(logStatsRaw);
 
     const events = eventStats[0] || {};
     const logs = logStats[0] || {};

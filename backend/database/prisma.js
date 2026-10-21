@@ -1,7 +1,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient, Prisma } = require("@prisma/client");
 
 const adapter = new PrismaMariaDb({
   host: process.env.DBHOST || "localhost",
@@ -22,4 +22,29 @@ process.on("beforeExit", async () => {
   await prisma.$disconnect();
 });
 
-module.exports = { prisma, PrismaClient };
+/**
+ * Recursively converts BigInt and Prisma.Decimal values to standard JavaScript numbers for JSON safety.
+ */
+function sanitizeBigInt(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") return Number(obj);
+  if (typeof obj === "object") {
+    if (typeof obj.toNumber === "function") {
+      return obj.toNumber();
+    }
+    if (obj instanceof Date) {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeBigInt);
+    }
+    const res = {};
+    for (const [k, v] of Object.entries(obj)) {
+      res[k] = sanitizeBigInt(v);
+    }
+    return res;
+  }
+  return obj;
+}
+
+module.exports = { prisma, PrismaClient, Prisma, sanitizeBigInt };
