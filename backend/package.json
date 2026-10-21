@@ -9,7 +9,8 @@
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "test:prisma": "node test-prisma-health.mjs",
-    "test:p2": "node test-prisma-dal-templets.mjs"
+    "test:p2": "node test-prisma-dal-templets.mjs",
+    "test:p5": "node test-prisma-billing.mjs"
   },
   "keywords": [],
   "author": "",
