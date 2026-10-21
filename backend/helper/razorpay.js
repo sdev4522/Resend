@@ -1,6 +1,5 @@
 const crypto = require("crypto");
 const axios = require("axios");
-const { query } = require("../database/dbpromise");
 const { prisma } = require("../database/prisma");
 const logger = require("../utils/logger");
 

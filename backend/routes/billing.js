@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 const validateUser = require("../middlewares/user.js");
-const { query } = require("../database/dbpromise");
 const { prisma } = require("../database/prisma");
 const { updateUserPlan } = require("../functions/function");
 const {
@@ -21,7 +20,6 @@ const {
   verifySubscriptionSignature,
   verifyWebhookSignature,
 } = require("../helper/razorpay");
-const { activateUserPlan } = require("../helper/entitlements");
 const logger = require("../utils/logger");
 
 const COUNTRY_TO_CURRENCY = {
