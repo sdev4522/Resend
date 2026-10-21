@@ -8,7 +8,8 @@
     "start": "node server.js",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "test:prisma": "node test-prisma-health.mjs"
+    "test:prisma": "node test-prisma-health.mjs",
+    "test:p2": "node test-prisma-dal-templets.mjs"
   },
   "keywords": [],
   "author": "",
