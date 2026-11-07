@@ -1,5 +1,6 @@
 const crypto = require("crypto");
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { idParam, plain, whereStr } = require("../database/prismaHelpers");
 const logger = require("../utils/logger");
 
 /**
@@ -45,10 +46,7 @@ function idempotencyMiddleware() {
 
     try {
       // 1. Check existing record
-      const rows = await query(
-        `SELECT * FROM api_idempotency_keys WHERE uid = ? AND idempotency_key = ? LIMIT 1`,
-        [uid, cleanKey]
-      );
+      const rows = plain(await prisma.api_idempotency_keys.findMany({ where: { uid: whereStr(uid), idempotency_key: whereStr(cleanKey) }, take: 1 }));
 
       if (rows.length > 0) {
         const record = rows[0];
@@ -88,23 +86,23 @@ function idempotencyMiddleware() {
           const apiKeyId = req.apiKey?.id || 0;
           const requestPath = req.originalUrl || req.path;
 
-          query(
-            `INSERT INTO api_idempotency_keys 
-             (uid, api_key_id, idempotency_key, request_path, request_hash, response_status, response_body, expires_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
-             ON DUPLICATE KEY UPDATE 
-               response_status = VALUES(response_status), 
-               response_body = VALUES(response_body)`,
-            [
-              uid,
-              apiKeyId,
-              cleanKey,
-              requestPath,
-              payloadHash,
-              statusCode,
-              bodyString,
-            ]
-          ).catch((err) => {
+          prisma.api_idempotency_keys
+            .upsert({
+              where: { uid_idempotency_key: { uid: String(uid), idempotency_key: String(cleanKey) } },
+              create: {
+                uid: String(uid),
+                api_key_id: idParam(apiKeyId) > 0 ? idParam(apiKeyId) : 0,
+                idempotency_key: String(cleanKey),
+                request_path: String(requestPath).slice(0, 255),
+                request_hash: String(payloadHash),
+                response_status: statusCode,
+                response_body: bodyString,
+                expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+              },
+              // former ON DUPLICATE KEY UPDATE
+              update: { response_status: statusCode, response_body: bodyString },
+            })
+            .catch((err) => {
             logger.error("Failed to persist idempotency key record:", err.message);
           });
         }

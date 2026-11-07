@@ -1,5 +1,6 @@
 const admin = require("firebase-admin");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { idParam, jsonHasString, plain, whereStr } = require("../../../database/prismaHelpers");
 const logger = require("../../../utils/logger");
 
 async function sendFcmPushNotification({
@@ -266,10 +267,7 @@ async function processWebPushMessageNotificaion({
 }) {
   try {
     // ── Fetch FCM credentials for this user ──────────────────────────────────
-    const [fcmConfig] = await query(
-      `SELECT fcm_projectId, fcm_clientEmail, fcm_privateKey FROM web_private`,
-      [],
-    );
+    const [fcmConfig] = plain(await prisma.web_private.findMany({ select: { fcm_projectId: true, fcm_clientEmail: true, fcm_privateKey: true } }));
 
     if (
       !fcmConfig?.fcm_projectId ||
@@ -285,10 +283,7 @@ async function processWebPushMessageNotificaion({
     const notification = generateNotificationFromMessage(message);
 
     // ── Send to user ─────────────────────────────────────────────────────────
-    const [userTokenRow] = await query(
-      `SELECT token FROM fcm_tokens WHERE uid = ? LIMIT 1`,
-      [uid],
-    );
+    const [userTokenRow] = plain(await prisma.fcm_tokens.findMany({ where: { uid: whereStr(uid) }, select: { token: true }, take: 1 }));
 
     if (userTokenRow?.token) {
       const userResult = await sendFcmPushNotification({
@@ -305,14 +300,11 @@ async function processWebPushMessageNotificaion({
     }
 
     // ── Send to assigned agents if chat is assigned ──────────────────────────
-    const [row] = await query(
-      `SELECT *
-        FROM beta_chats
-        WHERE chat_id = ?
-          AND uid = ?
-          AND JSON_SEARCH(assigned_agent, 'one', ?) IS NOT NULL
-        LIMIT 1`,
-      [chatId, uid, uid],
+    const [row] = plain(
+      await prisma.beta_chats.findMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid), assigned_agent: jsonHasString(uid) },
+        take: 1,
+      }),
     );
 
     if (row) {
@@ -323,16 +315,11 @@ async function processWebPushMessageNotificaion({
       const agentIds = extractAgents.map((a) => a.id);
 
       for (const agentId of agentIds) {
-        const [agentData] = await query(`SELECT * FROM agents WHERE id = ?`, [
-          agentId,
-        ]);
+        const [agentData] = plain(await prisma.agents.findMany({ where: { id: idParam(agentId) } }));
 
         if (!agentData?.uid) continue;
 
-        const [agentTokenRow] = await query(
-          `SELECT token FROM fcm_tokens WHERE uid = ? LIMIT 1`,
-          [agentData.uid],
-        );
+        const [agentTokenRow] = plain(await prisma.fcm_tokens.findMany({ where: { uid: whereStr(agentData.uid) }, select: { token: true }, take: 1 }));
 
         if (!agentTokenRow?.token) continue;
 

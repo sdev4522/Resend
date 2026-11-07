@@ -1,4 +1,5 @@
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { idParam, intOrNull, plain, whereStr } = require("../../../database/prismaHelpers");
 const { destributeTaskFlow } = require("../../../functions/chatbot");
 const { readJsonFromFile } = require("../../../functions/function");
 const {
@@ -89,10 +90,7 @@ async function runChatbot(
 
           if (answer?.length < 1) {
             const uniqueId = `${uid}-${senderNumber}-${chatId}`;
-            const [flow_data] = await query(
-              `SELECT * FROM flow_data WHERE uniqueId = ?`,
-              [uniqueId]
-            );
+            const [flow_data] = plain(await prisma.flow_data.findMany({ where: { uniqueId: whereStr(uniqueId) } }));
             if (flow_data && flow_data?.other) {
               const savedNode = JSON.parse(flow_data.other) || {};
               const findSourceFromEdge = edges?.find(
@@ -141,10 +139,7 @@ async function runChatbot(
 
         if (answer?.length < 1) {
           const uniqueId = `${uid}-${senderNumber}-${chatId}`;
-          const [flow_data] = await query(
-            `SELECT * FROM flow_data WHERE uniqueId = ?`,
-            [uniqueId]
-          );
+          const [flow_data] = plain(await prisma.flow_data.findMany({ where: { uniqueId: whereStr(uniqueId) } }));
           if (flow_data && flow_data?.other) {
             const savedNode = JSON.parse(flow_data.other) || {};
             const findSourceFromEdge = edges?.find(
@@ -202,22 +197,20 @@ async function metaChatbotInit({
       return;
     }
 
-    const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     if (getUser[0]?.plan) {
       const plan = JSON.parse(getUser[0]?.plan);
       if (plan.allow_chatbot > 0) {
         let chatbots = [];
 
         if (origin === "qr" && sessionId) {
-          chatbots = await query(
-            `SELECT * FROM chatbot WHERE uid = ? AND active = ? AND origin LIKE ?`,
-            [uid, 1, `%${sessionId}%`]
+          chatbots = plain(
+            await prisma.chatbot.findMany({
+              where: { uid: whereStr(uid), active: 1, origin: { contains: String(sessionId) } },
+            }),
           );
         } else {
-          chatbots = await query(
-            `SELECT * FROM chatbot WHERE uid = ? AND active = ?`,
-            [uid, 1]
-          );
+          chatbots = plain(await prisma.chatbot.findMany({ where: { uid: whereStr(uid), active: idParam(1) } }));
         }
 
         // console.log({ chatbots });
@@ -238,7 +231,7 @@ async function metaChatbotInit({
           );
         }
       } else {
-        await query(`UPDATE chatbot SET active = ? WHERE uid = ?`, [0, uid]);
+        await prisma.chatbot.updateMany({ where: { uid: whereStr(uid) }, data: { active: intOrNull(0) } });
       }
     }
   } catch (err) {

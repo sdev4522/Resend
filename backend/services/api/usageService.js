@@ -1,4 +1,5 @@
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { intOrNull, monthRange, str, whereStr } = require("../../database/prismaHelpers");
 const logger = require("../../utils/logger");
 
 /**
@@ -18,22 +19,19 @@ async function recordUsageEvent({
   if (!uid) return;
 
   try {
-    await query(
-      `INSERT INTO api_usage_events 
-       (uid, api_key_id, connection_public_id, endpoint, method, status_code, message_id, message_status, duration_ms) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        uid,
-        apiKeyId,
-        connectionPublicId,
-        endpoint,
-        method,
-        statusCode,
-        messageId,
-        messageStatus,
-        durationMs,
-      ]
-    );
+    await prisma.api_usage_events.create({
+      data: {
+        uid: str(uid),
+        api_key_id: intOrNull(apiKeyId),
+        connection_public_id: str(connectionPublicId),
+        endpoint: str(endpoint),
+        method: str(method),
+        status_code: intOrNull(statusCode),
+        message_id: str(messageId),
+        message_status: str(messageStatus),
+        duration_ms: intOrNull(durationMs),
+      },
+    });
   } catch (err) {
     logger.error("Failed to record API usage event:", err.message);
   }
@@ -47,30 +45,40 @@ async function getAggregateUsage(uid, period = null) {
 
   try {
     // 1. Query usage events from api_usage_events
-    const eventStats = await query(
-      `SELECT 
-         COUNT(*) as total_requests,
-         SUM(CASE WHEN message_status = 'accepted' THEN 1 ELSE 0 END) as accepted_count,
-         SUM(CASE WHEN message_status = 'sent' THEN 1 ELSE 0 END) as sent_count,
-         SUM(CASE WHEN message_status = 'delivered' THEN 1 ELSE 0 END) as delivered_count,
-         SUM(CASE WHEN message_status = 'failed' THEN 1 ELSE 0 END) as failed_count
-       FROM api_usage_events
-       WHERE uid = ? AND DATE_FORMAT(created_at, '%Y-%m') = ?`,
-      [uid, currentMonth]
-    );
+    const month = monthRange(currentMonth);
+    const countBy = (rows, key, values) =>
+      rows.filter((r) => values.includes(r[key])).reduce((n, r) => n + r._count._all, 0);
+
+    const eventGroups = await prisma.api_usage_events.groupBy({
+      by: ["message_status"],
+      where: { uid: whereStr(uid), created_at: month },
+      _count: { _all: true },
+    });
+    const eventStats = [
+      {
+        total_requests: eventGroups.reduce((n, r) => n + r._count._all, 0),
+        accepted_count: countBy(eventGroups, "message_status", ["accepted"]),
+        sent_count: countBy(eventGroups, "message_status", ["sent"]),
+        delivered_count: countBy(eventGroups, "message_status", ["delivered"]),
+        failed_count: countBy(eventGroups, "message_status", ["failed"]),
+      },
+    ];
 
     // 2. Also check beta_api_logs for broader message counts
-    const logStats = await query(
-      `SELECT 
-         COUNT(*) as total_logs,
-         SUM(CASE WHEN status = 'processing' OR status = 'accepted' THEN 1 ELSE 0 END) as accepted_logs,
-         SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) as sent_logs,
-         SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) as delivered_logs,
-         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed_logs
-       FROM beta_api_logs
-       WHERE uid = ? AND DATE_FORMAT(createdAt, '%Y-%m') = ?`,
-      [uid, currentMonth]
-    );
+    const logGroups = await prisma.beta_api_logs.groupBy({
+      by: ["status"],
+      where: { uid: whereStr(uid), createdAt: month },
+      _count: { _all: true },
+    });
+    const logStats = [
+      {
+        total_logs: logGroups.reduce((n, r) => n + r._count._all, 0),
+        accepted_logs: countBy(logGroups, "status", ["processing", "accepted"]),
+        sent_logs: countBy(logGroups, "status", ["sent"]),
+        delivered_logs: countBy(logGroups, "status", ["delivered"]),
+        failed_logs: countBy(logGroups, "status", ["failed"]),
+      },
+    ];
 
     const events = eventStats[0] || {};
     const logs = logStats[0] || {};

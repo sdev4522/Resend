@@ -165,3 +165,18 @@ function enumIn(value, allowed) {
 }
 
 module.exports.enumIn = enumIn;
+
+/** Calendar month "YYYY-MM" (local time) — replaces `DATE_FORMAT(col, '%Y-%m') = ?`. */
+function monthRange(yyyyMm) {
+  const [y, m] = String(yyyyMm).split("-").map((n) => parseInt(n, 10));
+  if (!y || !m) return { gte: new Date(0), lt: new Date(0) }; // matches nothing
+  return { gte: new Date(y, m - 1, 1), lt: new Date(y, m, 1) };
+}
+
+/** Replaces `JSON_SEARCH(col, 'one', value) IS NOT NULL` on JSON text columns. */
+function jsonHasString(value) {
+  return { contains: JSON.stringify(String(value ?? "")) };
+}
+
+module.exports.monthRange = monthRange;
+module.exports.jsonHasString = jsonHasString;

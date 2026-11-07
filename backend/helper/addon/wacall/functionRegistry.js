@@ -1,8 +1,8 @@
 const axios = require("axios");
+const { prisma } = require("../../../database/prisma");
 const { google } = require("googleapis");
 const nodemailer = require("nodemailer");
 const mysql = require("mysql2/promise");
-const { query } = require("../../../database/dbpromise");
 const { substituteVariables } = require("./utils");
 const logger = require("../../../utils/logger");
 
@@ -256,9 +256,11 @@ async function googleServicesFunc(params) {
     }
 
     // Get credentials from database
-    const credQuery = `SELECT service_account_json FROM google_credentials 
-                      WHERE credential_id = ? AND is_active = 1`;
-    const credResult = await query(credQuery, [credentialId]);
+    // `google_credentials` has no Prisma model (table is not part of schema.prisma), so this
+    // stays a parameterised raw query through the Prisma client. Add a model once the table exists.
+    const credResult = await prisma.$queryRaw`
+      SELECT service_account_json FROM google_credentials
+      WHERE credential_id = ${String(credentialId)} AND is_active = 1`;
 
     if (credResult.length === 0) {
       throw new Error("Google credentials not found or inactive");

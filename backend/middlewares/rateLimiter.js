@@ -1,4 +1,5 @@
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { monthRange, plain, whereStr } = require("../database/prismaHelpers");
 const logger = require("../utils/logger");
 
 const RATE_LIMIT_ENABLED = process.env.API_RATE_LIMIT_ENABLED !== "false";
@@ -20,19 +21,20 @@ async function checkBucket(bucketKey, limit, windowSizeMs = 60000) {
 
   try {
     // Atomic Upsert
-    await query(
-      `INSERT INTO api_rate_limits (bucket_key, window_start, request_count)
-       VALUES (?, ?, 1)
-       ON DUPLICATE KEY UPDATE
-         request_count = IF(window_start = VALUES(window_start), request_count + 1, 1),
-         window_start = VALUES(window_start)`,
-      [bucketKey, windowStart]
-    );
+    // Kept as a single atomic statement: the conditional reset-or-increment cannot be
+    // expressed race-free with Prisma ORM calls. $executeRaw is parameterised (tagged template).
+    await prisma.$executeRaw`
+      INSERT INTO api_rate_limits (bucket_key, window_start, request_count)
+      VALUES (${bucketKey}, ${windowStart}, 1)
+      ON DUPLICATE KEY UPDATE
+        request_count = IF(window_start = VALUES(window_start), request_count + 1, 1),
+        window_start = VALUES(window_start)`;
 
-    const rows = await query(
-      `SELECT request_count, window_start FROM api_rate_limits WHERE bucket_key = ? LIMIT 1`,
-      [bucketKey]
-    );
+    const rows = plain(await prisma.api_rate_limits.findMany({
+      where: { bucket_key: whereStr(bucketKey) },
+      select: { request_count: true, window_start: true },
+      take: 1,
+    }));
 
     const currentCount = rows[0]?.request_count || 1;
     const windowStartMs = Number(rows[0]?.window_start || windowStart);
@@ -200,11 +202,11 @@ async function checkPlanMonthlyQuota(uid, plan) {
   const quotaLimit = parseInt(plan.custom?.message_quota || plan.contact_limit || "100000", 10);
   const currentMonth = new Date().toISOString().slice(0, 7);
 
-  const [row] = await query(
-    `SELECT COUNT(*) as current_count FROM api_usage_events 
-     WHERE uid = ? AND message_id IS NOT NULL AND DATE_FORMAT(created_at, '%Y-%m') = ?`,
-    [uid, currentMonth]
-  );
+  const row = {
+    current_count: await prisma.api_usage_events.count({
+      where: { uid: whereStr(uid), message_id: { not: null }, created_at: monthRange(currentMonth) },
+    }),
+  };
 
   const used = row?.current_count || 0;
   return {

@@ -1,4 +1,5 @@
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { idParam, jsonHasString, plain, whereStr } = require("../../database/prismaHelpers");
 const {
   getConnectionsByUid,
   sendToUid,
@@ -209,14 +210,11 @@ async function processMobileNotificaion({
     });
 
     // Fetch chat row only if current user belongs to assigned_agent
-    const [row] = await query(
-      `SELECT *
-        FROM beta_chats
-        WHERE chat_id = ?
-          AND uid = ?
-          AND JSON_SEARCH(assigned_agent, 'one', ?) IS NOT NULL
-        LIMIT 1`,
-      [chatId, uid, uid],
+    const [row] = plain(
+      await prisma.beta_chats.findMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid), assigned_agent: jsonHasString(uid) },
+        take: 1,
+      }),
     );
 
     if (row) {
@@ -227,9 +225,7 @@ async function processMobileNotificaion({
       const agentIds = extractAgents.map((a) => a.id);
 
       for (const agentId of agentIds) {
-        const [agentData] = await query(`SELECT * FROM agents WHERE id = ?`, [
-          agentId,
-        ]);
+        const [agentData] = plain(await prisma.agents.findMany({ where: { id: idParam(agentId) } }));
 
         const agentTokens = extractTokens(agentData?.fcm_data);
 
@@ -266,7 +262,7 @@ async function processMessage({
 }) {
   try {
     // getting user data
-    const [userData] = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const [userData] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     if (!userData) return;
 
     let latestConversation = [];
@@ -407,7 +403,7 @@ async function processMessage({
       }
 
       // Get user details
-      const [user] = await query("SELECT * FROM user WHERE uid = ?", [uid]);
+      const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
       if (!user) {
         return logger.log("User not found");
       }
