@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -126,107 +127,12 @@ const validateUploadFile = (file) => {
   return true;
 };
 
-// facebook login
-router.post("/login_with_facebook", async (req, res) => {
-  try {
-    const { token, userId, email, name } = req.body;
-
-    if (!token || !userId || !email || !name) {
-      return res.json({
-        success: false,
-        msg: "Login cannot be completed, input not provided",
-      });
-    }
-
-    const [getWeb] = await query(`SELECT * FROM web_public`, []);
-
-    const appId = getWeb?.fb_login_app_id;
-    const appSec = getWeb?.fb_login_app_sec;
-
-    if (!appId || !appSec) {
-      return res.json({
-        success: false,
-        msg: "Facebook login is not configured properly",
-      });
-    }
-
-    const checkToken = await validateFacebookToken(token, appId, appSec);
-
-    if (!checkToken?.success) {
-      return res.json({
-        success: false,
-        msg: "Could not validate Facebook token",
-      });
-    }
-
-    const resp = checkToken?.response?.data;
-    const decodedUserId = resp?.user_id;
-
-    if (decodedUserId != userId || !resp?.is_valid) {
-      return res.json({
-        success: false,
-        msg: "Invalid Facebook login token",
-      });
-    }
-
-    const getUser = await query(`SELECT * FROM user WHERE email = ?`, [email]);
-
-    // NEW USER
-    if (getUser.length < 1) {
-      const uid = randomstring.generate();
-
-      const randomPassword = randomstring.generate(24);
-
-      const hasPass = await bcrypt.hash(randomPassword, 10);
-
-      await query(
-        `INSERT INTO user (name, uid, email, password, tokenVersion) VALUES (?,?,?,?,?)`,
-        [name, uid, email, hasPass, 0],
-      );
-
-      const loginToken = sign(
-        {
-          uid,
-          role: "user",
-          tokenVersion: 0,
-        },
-        process.env.JWTKEY,
-        {
-          expiresIn: "7d",
-        },
-      );
-
-      return res.json({
-        success: true,
-        token: loginToken,
-      });
-    }
-
-    // EXISTING USER
-    const loginToken = sign(
-      {
-        uid: getUser[0].uid,
-        role: "user",
-        tokenVersion: getUser[0].tokenVersion || 0,
-      },
-      process.env.JWTKEY,
-      {
-        expiresIn: "7d",
-      },
-    );
-
-    return res.json({
-      success: true,
-      token: loginToken,
-    });
-  } catch (err) {
-    logger.log(err);
-
-    return res.json({
-      success: false,
-      msg: "Something went wrong",
-    });
-  }
+// facebook login (disabled for security reasons — SEC-05)
+router.post("/login_with_facebook", (req, res) => {
+  return res.status(403).json({
+    success: false,
+    msg: "Facebook login is disabled. Please use Google login or email/password.",
+  });
 });
 
 // public google auth config
@@ -345,11 +251,28 @@ router.post("/login_with_google", authRateLimiter({ limit: 15, prefix: "google_l
       }
 
       // Link Google ID if not yet linked, and mark email as verified (Google verified it)
-      if (!existingUser.google_id || !existingUser.email_verified_at) {
-        await query(
-          "UPDATE user SET google_id = COALESCE(google_id, ?), email_verified_at = COALESCE(email_verified_at, CURRENT_TIMESTAMP) WHERE uid = ?",
-          [googleSub, existingUser.uid]
-        );
+      let currentTokenVersion = existingUser.tokenVersion || 0;
+      if (!existingUser.email_verified_at) {
+        // Pre-hijack mitigation (AUTH-01): account had unverified password registration before real Google owner logged in
+        const randomPassword = crypto.randomBytes(32).toString("hex");
+        const hashPass = await bcrypt.hash(randomPassword, 10);
+        currentTokenVersion += 1;
+        await prisma.user.update({
+          where: { uid: existingUser.uid },
+          data: {
+            google_id: existingUser.google_id || googleSub,
+            email_verified_at: new Date(),
+            password: hashPass,
+            tokenVersion: currentTokenVersion,
+          },
+        });
+      } else if (!existingUser.google_id) {
+        await prisma.user.update({
+          where: { uid: existingUser.uid },
+          data: {
+            google_id: googleSub,
+          },
+        });
       }
 
       const loginToken = sign(
@@ -357,7 +280,7 @@ router.post("/login_with_google", authRateLimiter({ limit: 15, prefix: "google_l
           uid: existingUser.uid,
           role: "user",
           email: cleanEmail,
-          tokenVersion: existingUser.tokenVersion || 0,
+          tokenVersion: currentTokenVersion,
           emailVerified: true,
         },
         process.env.JWTKEY,
@@ -533,9 +456,14 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
       });
     }
 
-    // check if user already has same email
-    const findEx = await query(`SELECT * FROM user WHERE email = ?`, [email.toLowerCase().trim()]);
-    if (findEx.length > 0) {
+    const cleanEmail = email.toLowerCase().trim();
+    // check if email already exists across all identity tables (MED-09)
+    const [userEx, adminEx, agentEx] = await Promise.all([
+      prisma.user.findFirst({ where: { email: cleanEmail } }),
+      prisma.admin.findFirst({ where: { email: cleanEmail } }),
+      prisma.agents.findFirst({ where: { email: cleanEmail } }),
+    ]);
+    if (userEx || adminEx || agentEx) {
       return res.json({ msg: "A user already exist with this email", success: false });
     }
 
@@ -543,29 +471,44 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
     const uid = randomstring.generate();
     const resolvedName = name && typeof name === "string" && name.trim() ? name.trim() : null;
 
-    await query(
-      `INSERT INTO user (name, uid, email, password, mobile_with_country_code, email_verified_at, terms_accepted_at) VALUES (?,?,?,?,?, NULL, CURRENT_TIMESTAMP)`,
-      [resolvedName, uid, email.toLowerCase().trim(), haspass, cleanPhone],
-    );
+    await prisma.user.create({
+      data: {
+        name: resolvedName,
+        uid,
+        email: cleanEmail,
+        password: haspass,
+        mobile_with_country_code: cleanPhone,
+        email_verified_at: null,
+        terms_accepted_at: new Date(),
+        tokenVersion: 0,
+      },
+    });
 
-    // Assign 14-day trial plan
-    const getPlan = await query(`SELECT * FROM plan WHERE is_trial = 1 OR title LIKE '%Trial%' ORDER BY id ASC LIMIT 1`);
-    if (getPlan.length > 0) {
-      await updateUserPlan(getPlan[0], uid, 14);
+    // Assign 14-day trial plan via is_trial = 1 only (MED-09)
+    const trialPlan = await prisma.plan.findFirst({
+      where: { is_trial: 1 },
+      orderBy: { id: "asc" },
+    });
+    if (trialPlan) {
+      await updateUserPlan(trialPlan, uid, 14);
     }
 
     // Generate 6-digit verification OTP
     const otpCode = Math.floor(100000 + crypto.randomInt(900000)).toString();
     const tokenHash = crypto
       .createHash("sha256")
-      .update(`${email.toLowerCase().trim()}_${otpCode}`)
+      .update(`${cleanEmail}_${otpCode}`)
       .digest("hex");
     const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
-    await query(
-      `INSERT INTO email_verification (uid, email, token_hash, expires_at) VALUES (?, ?, ?, ?)`,
-      [uid, email.toLowerCase().trim(), tokenHash, expiresAt]
-    );
+    await prisma.email_verification.create({
+      data: {
+        uid,
+        email: cleanEmail,
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+      },
+    });
 
     // Send verification email via SMTP
     try {
@@ -611,8 +554,8 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
   }
 });
 
-// verify email code / OTP
-router.post("/verify_email", async (req, res) => {
+// verify email code / OTP (SEC-03: rate limited, no token for already-verified, atomic Prisma tx)
+router.post("/verify_email", authRateLimiter({ limit: 10, prefix: "verify_email" }), async (req, res) => {
   try {
     const { email, otp, code, token } = req.body;
     const verificationCode = (otp || code || token || "").toString().trim();
@@ -625,8 +568,10 @@ router.post("/verify_email", async (req, res) => {
       });
     }
 
-    const userFind = await query(`SELECT * FROM user WHERE email = ?`, [userEmail]);
-    if (userFind.length === 0) {
+    const user = await prisma.user.findFirst({
+      where: { email: userEmail },
+    });
+    if (!user) {
       return res.status(404).json({
         success: false,
         code: "USER_NOT_FOUND",
@@ -634,33 +579,12 @@ router.post("/verify_email", async (req, res) => {
       });
     }
 
-    const user = userFind[0];
+    // SEC-03: NEVER issue an authentication token for an already-verified user without password!
     if (user.email_verified_at) {
-      const authToken = sign(
-        {
-          uid: user.uid,
-          role: "user",
-          tokenVersion: user.tokenVersion || 0,
-          emailVerified: true,
-        },
-        process.env.JWTKEY,
-        { expiresIn: "7d" }
-      );
-      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-      return res.json({
-        success: true,
-        already_verified: true,
-        token: authToken,
-        user: {
-          uid: user.uid,
-          name: user.name,
-          email: user.email,
-          mobile_with_country_code: user.mobile_with_country_code,
-          role: "user",
-          timezone: user.timezone,
-          email_verified_at: user.email_verified_at,
-        },
-        msg: "Email is already verified.",
+      return res.status(400).json({
+        success: false,
+        code: "ALREADY_VERIFIED",
+        msg: "Email is already verified. Please log in directly.",
       });
     }
 
@@ -669,20 +593,18 @@ router.post("/verify_email", async (req, res) => {
       .update(`${userEmail}_${verificationCode}`)
       .digest("hex");
 
-    const records = await query(
-      `SELECT * FROM email_verification WHERE email = ? AND token_hash = ? ORDER BY id DESC LIMIT 1`,
-      [userEmail, tokenHash]
-    );
+    const record = await prisma.email_verification.findFirst({
+      where: { email: userEmail, token_hash: tokenHash },
+      orderBy: { id: "desc" },
+    });
 
-    if (records.length === 0) {
+    if (!record) {
       return res.status(400).json({
         success: false,
         code: "INVALID_CODE",
         msg: "Invalid verification code. Please check and try again.",
       });
     }
-
-    const record = records[0];
 
     if (record.used_at) {
       return res.status(400).json({
@@ -700,12 +622,18 @@ router.post("/verify_email", async (req, res) => {
       });
     }
 
-    await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE id = ?`, [record.id]);
-    await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE email = ? AND used_at IS NULL`, [userEmail]);
-    await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [user.uid]);
-
-    const updatedUsers = await query(`SELECT * FROM user WHERE uid = ?`, [user.uid]);
-    const updatedUser = updatedUsers[0];
+    const now = new Date();
+    // Atomic check-then-burn inside Prisma transaction
+    const [_, updatedUser] = await prisma.$transaction([
+      prisma.email_verification.updateMany({
+        where: { email: userEmail, used_at: null },
+        data: { used_at: now },
+      }),
+      prisma.user.update({
+        where: { uid: user.uid },
+        data: { email_verified_at: now },
+      }),
+    ]);
 
     const authToken = sign(
       {
@@ -734,8 +662,8 @@ router.post("/verify_email", async (req, res) => {
       msg: "Email verified successfully.",
     });
   } catch (err) {
-    logger.log(err);
-    res.status(500).json({ success: false, msg: "Something went wrong during verification", err });
+    logger.error("verify_email error:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong during verification" });
   }
 });
 
@@ -1246,23 +1174,23 @@ router.post("/convert_audio", validateUser, async (req, res) => {
 router.get("/get_me", validateUser, async (req, res) => {
   try {
     const { userOnly } = req.query;
-    const data = await query(`SELECT * FROM user WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const user = await prisma.user.findFirst({
+      where: { uid: req.decode.uid },
+    });
 
     const finalAddon = returnAddons();
 
-    let contact = [];
+    let contactCount = 0;
 
     if (!userOnly) {
       // getting phonebook
-      contact = await query(`SELECT * FROM contact WHERE uid = ?`, [
-        req.decode.uid,
-      ]);
+      contactCount = await prisma.contact.count({
+        where: { uid: req.decode.uid },
+      });
     }
 
     res.json({
-      data: { ...data[0], contact: contact.length },
+      data: sanitizeBigInt({ ...(user || {}), contact: contactCount }),
       success: true,
       addon: finalAddon,
     });
@@ -1807,427 +1735,68 @@ router.post("/get_plan_details", validateUser, async (req, res) => {
   }
 });
 
-// get payment gateway
+// get payment gateway (SEC-02: return public keys and flags only, never secrets)
 router.get("/get_payment_details", validateUser, async (req, res) => {
   try {
-    const resp = await query(`SELECT * FROM web_private`, []);
-    let data = resp[0];
-    const [userData] = await query(`SELECT * FROM user WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-
-    data.pay_stripe_key = "";
-    res.json({ data, userData, success: true });
-  } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
-  }
-});
-
-// creating stripe pay session
-router.post("/create_stripe_session", validateUser, async (req, res) => {
-  try {
-    const getWeb = await query(`SELECT * FROM web_private`, []);
-
-    if (
-      getWeb.length < 1 ||
-      !getWeb[0]?.pay_stripe_key ||
-      !getWeb[0]?.pay_stripe_id
-    ) {
-      return res.json({
-        success: false,
-        msg: "Opss.. payment keys found not found",
-      });
-    }
-
-    const stripeKeys = getWeb[0]?.pay_stripe_key;
-
-    const stripeClient = new Stripe(stripeKeys);
-
-    const { planId } = req.body;
-
-    const plan = await query(`SELECT * FROM plan WHERE id = ?`, [planId]);
-
-    if (plan.length < 1) {
-      return res.json({ msg: "No plan found with the id" });
-    }
-
-    const randomSt = randomstring.generate();
-    const orderID = `STRIPE_${randomSt}`;
-
-    await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-      [req.decode.uid, "STRIPE", plan[0]?.price, orderID],
-    );
-
-    const web = await query(`SELECT * FROM web_public`, []);
-
-    const productStripe = [
-      {
-        price_data: {
-          currency: web[0]?.currency_code,
-          product_data: {
-            name: plan[0]?.title,
-            // images:[product.imgdata]
-          },
-          unit_amount: plan[0]?.price * 100,
-        },
-        quantity: 1,
+    const web = await prisma.web_private.findFirst({
+      select: {
+        pay_offline_id: true,
+        offline_active: true,
+        pay_stripe_id: true,
+        stripe_active: true,
+        pay_paypal_id: true,
+        paypal_active: true,
+        rz_id: true,
+        rz_active: true,
+        pay_paystack_id: true,
+        paystack_active: true,
+        pay_mercadopago_public_key: true,
+        mercadopago_active: true,
       },
-    ];
-
-    const session = await stripeClient.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: productStripe,
-      mode: "payment",
-      success_url: `${process.env.BACKURI}/api/user/stripe_payment?order=${orderID}&plan=${plan[0]?.id}`,
-      cancel_url: `${process.env.BACKURI}/api/user/stripe_payment?order=${orderID}&plan=${plan[0]?.id}`,
-      locale: process.env.STRIPE_LANG || "en",
+    });
+    const userData = await prisma.user.findFirst({
+      where: { uid: req.decode.uid },
+      select: {
+        id: true,
+        uid: true,
+        name: true,
+        email: true,
+        mobile: true,
+        mobile_with_country_code: true,
+        timezone: true,
+        role: true,
+        email_verified_at: true,
+      },
     });
 
-    await query(`UPDATE orders SET s_token = ? WHERE data = ?`, [
-      session?.id,
-      orderID,
-    ]);
-
-    res.json({ success: true, session: session });
-  } catch (err) {
-    res.json({ msg: err.toString(), err });
-    logger.log({ err, msg: JSON.stringify(err), string: err.toString() });
-  }
-});
-
-router.post("/pay_with_rz", validateUser, async (req, res) => {
-  try {
-    const { rz_payment_id, plan, amount } = req.body;
-    if (!rz_payment_id || !plan || !amount) {
-      return res.json({ msg: "please send required fields" });
-    }
-
-    // getting plan
-    const getPlan = await query(`SELECT * FROM plan WHERE id = ?`, [plan?.id]);
-
-    if (getPlan.length < 1) {
-      return res.json({
-        msg: "Invalid plan found",
-      });
-    }
-
-    // getting private web
-    const [webPrivate] = await query(`SELECT * from web_private`, []);
-    const [webPublic] = await query(`SELECT * FROM web_public`, []);
-
-    const rzId = webPrivate?.rz_id;
-    const rzKeys = webPrivate?.rz_key;
-
-    if (!rzId || !rzKeys) {
-      return res.json({
-        msg: `Please fill your razorpay credentials! if: ${rzId} keys: ${rzKeys}`,
-      });
-    }
-
-    const finalamt =
-      (parseInt(amount) / parseInt(webPublic.exchange_rate)) * 80;
-
-    const resp = await rzCapturePayment(
-      rz_payment_id,
-      Math.round(finalamt) * 100,
-      rzId,
-      rzKeys,
-    );
-
-    if (!resp) {
-      res.json({ success: false, msg: resp.description });
-      return;
-    }
-
-    await updateUserPlan(getPlan[0], req.decode.uid);
-
-    await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-      [req.decode.uid, "RAZORPAY", plan?.price, JSON.stringify(resp)],
-    );
-
-    res.json({
-      success: true,
-      msg: "Thank for your payment you are good to go now.",
-    });
-  } catch (err) {
-    res.json({ msg: err.toString(), err });
-    logger.log({ err, msg: JSON.stringify(err), string: err.toString() });
-  }
-});
-
-// pay with paypal
-router.post("/pay_with_paypal", validateUser, async (req, res) => {
-  try {
-    const { orderID, plan } = req.body;
-
-    if (!plan || !orderID) {
-      return res.json({ msg: "order id and plan required" });
-    }
-
-    // getting plan
-    const getPlan = await query(`SELECT * FROM plan WHERE id = ?`, [plan?.id]);
-
-    if (getPlan.length < 1) {
-      return res.json({
-        msg: "Invalid plan found",
-      });
-    }
-
-    // getting private web
-    const [webPrivate] = await query(`SELECT * from web_private`, []);
-
-    const paypalClientId = webPrivate?.pay_paypal_id;
-    const paypalClientSecret = webPrivate?.pay_paypal_key;
-
-    if (!paypalClientId || !paypalClientSecret) {
-      return res.json({
-        msg: "Please provide paypal ID and keys from the Admin",
-      });
-    }
-
-    let response = await fetch(
-      "https://api.sandbox.paypal.com/v1/oauth2/token",
-      {
-        method: "POST",
-        body: "grant_type=client_credentials",
-        headers: {
-          Authorization:
-            "Basic " +
-            Buffer.from(
-              `${paypalClientId}:${paypalClientSecret}`,
-              "binary",
-            ).toString("base64"),
-        },
-      },
-    );
-
-    let data = await response.json();
-
-    let resp_order = await fetch(
-      `https://api.sandbox.paypal.com/v1/checkout/orders/${orderID}`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: "Bearer " + data.access_token,
-        },
-      },
-    );
-
-    let order_details = await resp_order.json();
-
-    if (order_details.status === "COMPLETED") {
-      await updateUserPlan(getPlan[0], req.decode.uid);
-
-      await query(
-        `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-        [req.decode.uid, "PAYPAL", plan?.price, JSON.stringify(order_details)],
-      );
-
-      res.json({
-        success: true,
-        msg: "Thank for your payment you are good to go now.",
-      });
-    } else {
-      res.json({ success: false, msg: "error_description" });
-      return;
-    }
+    res.json({ data: web || {}, userData: userData || {}, success: true });
   } catch (err) {
     logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    res.json({ success: false, msg: "something went wrong" });
   }
 });
 
-function checlStripePayment(orderId) {
-  return new Promise(async (resolve) => {
-    try {
-      const getStripe = await query(`SELECT * FROM web_private`, []);
-
-      const stripeClient = new Stripe(getStripe[0]?.pay_stripe_key);
-      const getPay = await stripeClient.checkout.sessions.retrieve(orderId);
-
-      // logger.log({ status: getPay?.payment_status });
-
-      if (getPay?.payment_status === "paid") {
-        resolve({ success: true, data: getPay });
-      } else {
-        resolve({ success: false });
-      }
-    } catch (err) {
-      resolve({ success: false, data: {} });
-    }
+// SEC-07: Legacy payment gateways retired in favor of /api/billing
+const retiredPaymentHandler = (req, res) => {
+  return res.status(410).json({
+    success: false,
+    msg: "This legacy payment gateway endpoint has been retired. Please use /api/billing checkout.",
   });
-}
+};
 
-function returnHtmlRes(msg) {
-  const html = `<!DOCTYPE html>
-    <html>
-    <head>
-      <meta http-equiv="refresh" content="5;url=${process.env.FRONTENDURI}/user">
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          background-color: #f4f4f4;
-          text-align: center;
-          margin: 0;
-          padding: 0;
-        }
+router.post("/create_stripe_session", validateUser, retiredPaymentHandler);
+router.post("/pay_with_rz", validateUser, retiredPaymentHandler);
+router.post("/pay_with_paypal", validateUser, retiredPaymentHandler);
+router.get("/stripe_payment", retiredPaymentHandler);
+router.post("/pay_with_paystack", validateUser, retiredPaymentHandler);
 
-        .container {
-          background-color: #ffffff;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-          margin: 100px auto;
-          padding: 20px;
-          width: 300px;
-        }
-
-        p {
-          font-size: 18px;
-          color: #333;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <p>${msg}</p>
-      </div>
-    </body>
-    </html>
-    `;
-  return html;
-}
-
-router.get("/stripe_payment", async (req, res) => {
-  try {
-    const { order, plan } = req.query;
-
-    if (!order || !plan) {
-      return res.send("INVALID REQUEST");
-    }
-
-    const getOrder = await query(
-      `SELECT * FROM orders WHERE data = ? AND payment_mode = ? LIMIT 1`,
-      [order || "", "STRIPE"],
-    );
-
-    if (getOrder.length < 1) {
-      return res.send("Invalid payment found");
-    }
-
-    if (getOrder[0]?.status === "COMPLETED") {
-      return res.send(
-        returnHtmlRes("Payment already processed. Redirecting..."),
-      );
-    }
-
-    const getPlan = await query(`SELECT * FROM plan WHERE id = ? LIMIT 1`, [
-      plan,
-    ]);
-
-    if (getPlan.length < 1) {
-      return res.send("Invalid plan found");
-    }
-
-    const checkPayment = await checlStripePayment(getOrder[0]?.s_token);
-
-    if (!checkPayment.success) {
-      return res.send(
-        "Payment Failed! If the balance was deducted please contact support. Redirecting...",
-      );
-    }
-
-    await query(
-      `UPDATE orders 
-       SET data = ?, status = ? 
-       WHERE id = ? AND payment_mode = ?`,
-      [
-        JSON.stringify(checkPayment?.data),
-        "COMPLETED",
-        getOrder[0].id,
-        "STRIPE",
-      ],
-    );
-
-    await updateUserPlan(getPlan[0], getOrder[0]?.uid);
-
-    return res.send(returnHtmlRes("Payment Success! Redirecting..."));
-  } catch (err) {
-    logger.log(err);
-    return res.json({ msg: "Something went wrong", success: false });
-  }
-});
-
-// pay with paystack
-router.post("/pay_with_paystack", validateUser, async (req, res) => {
-  try {
-    const { planData, trans_id, reference } = req.body;
-
-    if (!planData || !trans_id) {
-      return res.json({
-        msg: "Order id and plan required",
-      });
-    }
-
-    // getting plan
-    const plan = await query(`SELECT * FROM plan WHERE id = ?`, [planData.id]);
-
-    if (plan.length < 1) {
-      return res.json({ msg: "Sorry this plan was not found" });
-    }
-
-    // gettings paystack keys
-    const getWebPrivate = await query(`SELECT * FROM web_private`, []);
-    const paystackSecretKey = getWebPrivate[0]?.pay_paystack_key;
-    const paystackId = getWebPrivate[0]?.pay_paystack_id;
-
-    if (!paystackSecretKey || !paystackId) {
-      return res.json({ msg: "Paystack credentials not found" });
-    }
-
-    var response = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        headers: {
-          Authorization: `Bearer ${paystackSecretKey}`,
-          "Content-Type": "application/json",
-        },
-      },
-    );
-
-    const resp = await response.json();
-
-    if (resp.data?.status !== "success") {
-      res.json({ success: false, msg: `${resp.message} - Ref:-${reference}` });
-      return;
-    }
-
-    await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-      [req.decode.uid, "PAYSTACK", plan[0]?.price, reference],
-    );
-
-    await updateUserPlan(plan[0], req.decode.uid);
-
-    res.json({
-      success: true,
-      msg: "Payment success! Redirecting...",
-    });
-  } catch (err) {
-    logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
-  }
-});
-
-// update profile
+// update profile (AUTH-02: requires currentPassword for password changes, validates email uniqueness)
 router.post("/update_profile", validateUser, async (req, res) => {
   try {
     let mobile_with_country_code;
     const {
       newPassword,
+      currentPassword,
       name,
       mobile: mobileFromBody,
       mobile_with_country_code: mobile_with_country_codeNew,
@@ -2244,34 +1813,89 @@ router.post("/update_profile", validateUser, async (req, res) => {
     }
 
     if (!name || !mobile_with_country_code || !email || !timezone) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         msg: "Name, Mobile, Email, Timezone are required fields",
       });
     }
 
-    if (newPassword) {
-      const hash = await bcrypt.hash(newPassword, 10);
-
-      await query(
-        `UPDATE user 
-         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, timezone = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
-         WHERE uid = ?`,
-        [name, email, hash, mobile_with_country_code, timezone, req.decode.uid],
-      );
-    } else {
-      await query(
-        `UPDATE user 
-         SET name = ?, email = ?, mobile_with_country_code = ?, timezone = ? 
-         WHERE uid = ?`,
-        [name, email, mobile_with_country_code, timezone, req.decode.uid],
-      );
+    const cleanEmail = email.toLowerCase().trim();
+    if (!isValidEmail(cleanEmail)) {
+      return res.status(400).json({ success: false, msg: "Please enter a valid email" });
     }
+
+    const currentUser = await prisma.user.findFirst({
+      where: { uid: req.decode.uid },
+    });
+
+    if (!currentUser) {
+      return res.status(404).json({ success: false, msg: "User account not found" });
+    }
+
+    let emailVerifiedAt = currentUser.email_verified_at;
+    // Email uniqueness check across user, admin, and agents (AUTH-02)
+    if (cleanEmail !== (currentUser.email || "").toLowerCase().trim()) {
+      const [userConflict, adminConflict, agentConflict] = await Promise.all([
+        prisma.user.findFirst({
+          where: { email: cleanEmail, NOT: { uid: req.decode.uid } },
+        }),
+        prisma.admin.findFirst({ where: { email: cleanEmail } }),
+        prisma.agents.findFirst({ where: { email: cleanEmail } }),
+      ]);
+      if (userConflict || adminConflict || agentConflict) {
+        return res.status(400).json({
+          success: false,
+          msg: "Email is already in use by another account",
+        });
+      }
+      emailVerifiedAt = null;
+    }
+
+    let newHashedPassword = currentUser.password;
+    let nextTokenVersion = currentUser.tokenVersion || 0;
+
+    // Password change verification (AUTH-02)
+    if (newPassword) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          success: false,
+          msg: "Current password is required to set a new password",
+        });
+      }
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
+        return res.status(400).json({
+          success: false,
+          msg: "New password must be at least 8 characters long",
+        });
+      }
+      const isMatch = await bcrypt.compare(currentPassword, currentUser.password || "");
+      if (!isMatch) {
+        return res.status(400).json({
+          success: false,
+          msg: "Current password does not match",
+        });
+      }
+      newHashedPassword = await bcrypt.hash(newPassword, 10);
+      nextTokenVersion += 1;
+    }
+
+    await prisma.user.update({
+      where: { uid: req.decode.uid },
+      data: {
+        name,
+        email: cleanEmail,
+        password: newHashedPassword,
+        mobile_with_country_code,
+        timezone,
+        tokenVersion: nextTokenVersion,
+        email_verified_at: emailVerifiedAt,
+      },
+    });
 
     res.json({ success: true, msg: "Profile was updated" });
   } catch (err) {
     logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    res.status(500).json({ msg: "Something went wrong", success: false });
   }
 });
 
@@ -2430,49 +2054,15 @@ router.get("/get_dashboard", validateUser, async (req, res) => {
   }
 });
 
-// enroll free plan
+// enroll free plan (ONB-02: deprecated in favor of /api/billing/activate_trial)
 router.post("/start_free_trial", validateUser, async (req, res) => {
-  try {
-    const { planId } = req.body;
-
-    const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    if (getUser[0]?.trial > 0) {
-      return res.json({
-        success: false,
-        msg: "You have already taken Trial once. You can not enroll for trial again.",
-      });
-    }
-
-    const getPlan = await query(`SELECT * FROM plan WHERE id = ?`, [planId]);
-    if (getPlan.length < 1) {
-      return res.json({ msg: "Invalid plan found" });
-    }
-
-    if (getPlan[0]?.price > 0) {
-      return res.json({ msg: "This plan is not a trial plan." });
-    }
-    await query(
-      `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-      [req.decode.uid, "OFFLINE", 0, JSON.stringify({ plan: getPlan[0] })],
-    );
-
-    await updateUserPlan(getPlan[0], getUser[0]?.uid);
-
-    await query(`UPDATE user SET trial = ? WHERE uid = ?`, [1, req.decode.uid]);
-
-    res.json({
-      success: true,
-      msg: "Your trial plan has been activated. You are redirecting to the panel...",
-    });
-  } catch (err) {
-    logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
-  }
+  return res.status(410).json({
+    success: false,
+    msg: "Deprecated endpoint. Please use /api/billing/activate_trial",
+  });
 });
 
-// send recover
+// send recover (SEC-04: Prisma conversion & purpose verification)
 router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "recovery_user" }), async (req, res) => {
   try {
     const { email } = req.body;
@@ -2481,43 +2071,43 @@ router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "recovery_user
       return res.status(400).json({ success: false, msg: "Please enter a valid email" });
     }
 
-    const checkEmailValid = await query(`SELECT * FROM user WHERE email = ?`, [
-      email,
-    ]);
-    if (checkEmailValid.length < 1) {
+    const cleanEmail = email.toLowerCase().trim();
+    const checkEmailValid = await prisma.user.findFirst({
+      where: { email: cleanEmail },
+    });
+    if (!checkEmailValid) {
       return res.json({
         success: true,
         msg: "We have sent a recovery link if this email is associated with user account.",
       });
     }
 
-    const getWeb = await query(`SELECT * FROM web_public`, []);
-    const appName = getWeb[0]?.app_name || "Resend";
+    const webPub = await prisma.web_public.findFirst();
+    const appName = webPub?.app_name || "Resend";
 
-    // Secure token: does NOT contain user password hash; includes purpose and tokenVersion for single-use
+    // Secure token: does NOT contain user password hash; includes purpose and tokenVersion for single-use (SEC-04)
     const jsontoken = sign(
       {
-        uid: checkEmailValid[0].uid,
-        email: checkEmailValid[0].email,
+        uid: checkEmailValid.uid,
+        email: checkEmailValid.email,
         purpose: "password_reset",
-        tokenVersion: checkEmailValid[0].tokenVersion || 0,
+        tokenVersion: checkEmailValid.tokenVersion || 0,
       },
       process.env.JWTKEY,
       { expiresIn: "1h" },
     );
 
     const recpveryUrl = `${process.env.FRONTENDURI || "http://localhost:3000"}/recovery-user/${jsontoken}`;
-
     const getHtml = recoverEmail(appName, recpveryUrl);
 
-    // getting smtp
-    const smtp = await query(`SELECT * FROM smtp`, []);
+    // getting smtp via Prisma
+    const smtp = await prisma.smtp.findFirst();
     if (
-      !smtp[0]?.email ||
-      !smtp[0]?.host ||
-      !smtp[0]?.port ||
-      !smtp[0]?.password ||
-      !smtp[0]?.username
+      !smtp?.email ||
+      !smtp?.host ||
+      !smtp?.port ||
+      !smtp?.password ||
+      !smtp?.username
     ) {
       return res.json({
         success: false,
@@ -2526,15 +2116,15 @@ router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "recovery_user
     }
 
     await sendEmail(
-      smtp[0]?.host,
-      smtp[0]?.port,
-      smtp[0]?.email,
-      smtp[0]?.password,
+      smtp.host,
+      smtp.port,
+      smtp.email,
+      smtp.password,
       getHtml,
       `${appName} - Password Recovery`,
-      smtp[0]?.email,
-      email,
-      smtp[0]?.username,
+      smtp.email,
+      cleanEmail,
+      smtp.username,
     );
 
     res.json({
@@ -2547,18 +2137,21 @@ router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "recovery_user
   }
 });
 
-// modify recovery password handler
+// modify recovery password handler (SEC-04: POST only, purpose check, tokenVersion required, min 8 chars)
 const handleModifyPassword = async (req, res) => {
   try {
-    const pass = req.body?.password || req.body?.pass || req.query?.pass;
+    if (req.method !== "POST") {
+      return res.status(405).json({ success: false, msg: "Method not allowed. Use POST." });
+    }
+
+    const pass = req.body?.password || req.body?.pass;
     const authHeader = req.get("Authorization");
     const token =
       req.body?.token ||
-      (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null) ||
-      req.query?.token;
+      (authHeader && authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null);
 
-    if (!pass) {
-      return res.status(400).json({ success: false, msg: "Please provide a password" });
+    if (!pass || typeof pass !== "string" || pass.length < 8) {
+      return res.status(400).json({ success: false, msg: "Password must be at least 8 characters long" });
     }
 
     if (!token) {
@@ -2572,27 +2165,37 @@ const handleModifyPassword = async (req, res) => {
       return res.status(400).json({ success: false, msg: "Reset token has expired or is invalid." });
     }
 
-    const email = decoded.email || decoded.old_email;
-    const uid = decoded.uid;
-
-    let user;
-    if (uid) {
-      const users = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
-      user = users[0];
-    } else if (email) {
-      const users = await query(`SELECT * FROM user WHERE email = ?`, [email]);
-      user = users[0];
+    // SEC-04: Require purpose === 'password_reset'
+    if (decoded.purpose !== "password_reset") {
+      return res.status(400).json({
+        success: false,
+        msg: "Invalid reset token purpose",
+      });
     }
+
+    // SEC-04: Require defined tokenVersion
+    if (typeof decoded.tokenVersion === "undefined") {
+      return res.status(400).json({
+        success: false,
+        msg: "Malformed reset token: missing version",
+      });
+    }
+
+    const uid = decoded.uid;
+    const email = decoded.email;
+
+    const user = uid
+      ? await prisma.user.findFirst({ where: { uid } })
+      : email
+      ? await prisma.user.findFirst({ where: { email } })
+      : null;
 
     if (!user) {
       return res.status(404).json({ success: false, msg: "User account not found" });
     }
 
     // Single-use token verification:
-    if (
-      typeof decoded.tokenVersion !== "undefined" &&
-      Number(user.tokenVersion || 0) !== Number(decoded.tokenVersion)
-    ) {
+    if (Number(user.tokenVersion || 0) !== Number(decoded.tokenVersion)) {
       return res.status(400).json({
         success: false,
         msg: "This reset link has already been used or has expired. Please request a new one.",
@@ -2600,13 +2203,16 @@ const handleModifyPassword = async (req, res) => {
     }
 
     const hashpassword = await bcrypt.hash(pass, 10);
+    const nextVersion = (user.tokenVersion || 0) + 1;
 
-    await query(
-      `UPDATE user 
-       SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
-       WHERE uid = ?`,
-      [hashpassword, user.uid],
-    );
+    await prisma.user.update({
+      where: { uid: user.uid },
+      data: {
+        password: hashpassword,
+        tokenVersion: nextVersion,
+        email_verified_at: user.email_verified_at || new Date(),
+      },
+    });
 
     res.json({
       success: true,
@@ -2618,28 +2224,101 @@ const handleModifyPassword = async (req, res) => {
   }
 };
 
-router.get("/modify_password", authRateLimiter({ limit: 10, prefix: "reset_user" }), handleModifyPassword);
+// POST only route for password reset (SEC-04)
 router.post("/modify_password", authRateLimiter({ limit: 10, prefix: "reset_user" }), handleModifyPassword);
 
-// generate api keys
+// generate api keys (SEC-04: purpose 'api_key' prevents token misuse as password reset)
 router.get("/generate_api_keys", validateUser, async (req, res) => {
   try {
     const token = sign(
-      { uid: req.decode.uid, role: "user" },
+      { uid: req.decode.uid, role: "user", purpose: "api_key" },
       process.env.JWTKEY,
       {},
     );
 
-    // saving keys to user
-    await query(`UPDATE user SET api_key = ? WHERE uid = ?`, [
-      token,
-      req.decode.uid,
-    ]);
+    // saving keys to user via Prisma
+    await prisma.user.update({
+      where: { uid: req.decode.uid },
+      data: { api_key: token },
+    });
 
     res.json({ success: true, token, msg: "New keys has been generated" });
   } catch (err) {
     logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    res.json({ msg: "Something went wrong", success: false });
+  }
+});
+
+// Dodo Payments webhook reconciliation endpoint (PAY-04)
+router.post("/dodo_payment_success", async (req, res) => {
+  try {
+    const internalSecret = req.headers["x-internal-secret"];
+    const expectedKey = process.env.DODO_PAYMENTS_WEBHOOK_KEY;
+    if (expectedKey && internalSecret !== expectedKey) {
+      return res.status(401).json({ success: false, msg: "Unauthorized webhook relay" });
+    }
+
+    const { webhookId, eventType, paymentId, subscriptionId, customerEmail, metadata, amount, currency } = req.body;
+
+    if (!webhookId) {
+      return res.status(400).json({ success: false, msg: "webhookId is required" });
+    }
+
+    // Atomic DB-backed idempotency check
+    const existing = await prisma.processed_webhook_events.findUnique({
+      where: { event_id: webhookId },
+    });
+    if (existing) {
+      return res.json({ success: true, duplicate: true, msg: "Event already processed" });
+    }
+
+    // Insert idempotency record
+    await prisma.processed_webhook_events.create({
+      data: {
+        event_id: webhookId,
+        provider: "dodo",
+      },
+    });
+
+    // Resolve user
+    let uid = metadata?.uid;
+    if (!uid && customerEmail) {
+      const user = await prisma.user.findFirst({
+        where: { email: customerEmail.toLowerCase().trim() },
+        select: { uid: true },
+      });
+      uid = user?.uid;
+    }
+
+    if (!uid) {
+      logger.warn(`[Dodo Webhook] No matching user found for event ${webhookId}`);
+      return res.json({ success: true, warning: "User not found" });
+    }
+
+    // Resolve plan
+    const planId = parseInt(metadata?.planId, 10);
+    const plan = planId
+      ? await prisma.plan.findFirst({ where: { id: planId } })
+      : await prisma.plan.findFirst({ where: { price: { gt: 0 } }, orderBy: { id: "asc" } });
+
+    if (plan) {
+      await updateUserPlan(plan, uid);
+      await prisma.orders.create({
+        data: {
+          uid,
+          payment_mode: "DODO",
+          amount: String(amount || plan.price || 0),
+          data: JSON.stringify({ paymentId, subscriptionId, eventType, metadata, currency }),
+          status: "paid",
+          s_token: paymentId || subscriptionId || webhookId,
+        },
+      });
+    }
+
+    return res.json({ success: true, msg: "Payment processed and plan updated" });
+  } catch (err) {
+    logger.error("[Dodo Webhook Relay] Error:", err);
+    return res.status(500).json({ success: false, msg: "Failed to process payment event" });
   }
 });
 
@@ -3785,14 +3464,16 @@ router.post("/add_quick_reply", validateUser, async (req, res) => {
     const { msg } = req.body;
     if (!msg) return res.json({ msg: "Please enter message to add" });
 
-    await query(`INSERT INTO quick_reply (uid, msg) VALUES (?,?)`, [
-      req.decode.uid,
-      msg,
-    ]);
+    await prisma.quick_reply.create({
+      data: {
+        uid: req.decode.uid,
+        msg,
+      },
+    });
 
     res.json({ success: true, msg: "Quick reply added" });
   } catch (err) {
-    logger.error("Error sending template message:", err);
+    logger.error("Error adding quick reply:", err);
     res.json({
       success: false,
       msg: "something went wrong",
@@ -3804,10 +3485,12 @@ router.post("/add_quick_reply", validateUser, async (req, res) => {
 // get all quick reply
 router.get("/get_all_quick_reply", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM quick_reply WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    res.json({ data, success: true });
+    const data = await prisma.quick_reply.findMany({
+      where: {
+        uid: req.decode.uid,
+      },
+    });
+    res.json({ data: sanitizeBigInt(data), success: true });
   } catch (err) {
     logger.log(err);
     res.json({
@@ -3822,10 +3505,12 @@ router.get("/get_all_quick_reply", validateUser, async (req, res) => {
 router.post("/del_quick_r", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM quick_reply WHERE uid = ? AND id = ?`, [
-      req.decode.uid,
-      id,
-    ]);
+    await prisma.quick_reply.deleteMany({
+      where: {
+        uid: req.decode.uid,
+        id: parseInt(id, 10),
+      },
+    });
     res.json({
       success: true,
       msg: "Quick reply deleted",
@@ -4096,208 +3781,10 @@ router.post("/try_js", validateUser, async (req, res) => {
   }
 });
 
-// Create MercadoPago preference
-router.post(
-  "/create_mercadopago_preference",
-  validateUser,
-  async (req, res) => {
-    try {
-      const { planId } = req.body;
-
-      const getWeb = await query(`SELECT * FROM web_private`, []);
-      const [webPublic] = await query(`SELECT * FROM web_public`, []);
-
-      if (
-        getWeb.length < 1 ||
-        !getWeb[0]?.pay_mercadopago_access_token ||
-        !getWeb[0]?.pay_mercadopago_public_key
-      ) {
-        return res.json({
-          success: false,
-          msg: "MercadoPago credentials not found",
-        });
-      }
-
-      const plan = await query(`SELECT * FROM plan WHERE id = ?`, [planId]);
-
-      if (plan.length < 1) {
-        return res.json({ msg: "No plan found with the id" });
-      }
-
-      const randomSt = randomstring.generate();
-      const orderID = `MERCADOPAGO_${randomSt}`;
-
-      await query(
-        `INSERT INTO orders (uid, payment_mode, amount, data) VALUES (?,?,?,?)`,
-        [req.decode.uid, "MERCADOPAGO", plan[0]?.price, orderID],
-      );
-
-      // ✅ NEW SDK: Initialize MercadoPago client
-      const client = new MercadoPagoConfig({
-        accessToken: getWeb[0]?.pay_mercadopago_access_token,
-        options: { timeout: 5000 },
-      });
-
-      const preference = new Preference(client);
-
-      // ✅ Create preference body
-      const body = {
-        items: [
-          {
-            title: plan[0]?.title,
-            unit_price: parseFloat(plan[0]?.price),
-            quantity: 1,
-            currency_id: webPublic?.currency_code || "USD",
-          },
-        ],
-        back_urls: {
-          success: `${process.env.BACKURI}/api/user/mercadopago_payment?order=${orderID}&plan=${plan[0]?.id}&status=success`,
-          failure: `${process.env.BACKURI}/api/user/mercadopago_payment?order=${orderID}&plan=${plan[0]?.id}&status=failure`,
-          pending: `${process.env.BACKURI}/api/user/mercadopago_payment?order=${orderID}&plan=${plan[0]?.id}&status=pending`,
-        },
-        auto_return: "approved",
-        external_reference: orderID,
-        notification_url: `${process.env.BACKURI}/api/user/mercadopago_webhook`,
-        statement_descriptor: webPublic?.app_name || "Payment",
-        metadata: {
-          user_id: req.decode.uid,
-          plan_id: planId,
-        },
-      };
-
-      // ✅ Create preference
-      const response = await preference.create({ body });
-
-      await query(`UPDATE orders SET s_token = ? WHERE data = ?`, [
-        response.id,
-        orderID,
-      ]);
-
-      res.json({
-        success: true,
-        init_point: response.init_point,
-        preference_id: response.id,
-      });
-    } catch (err) {
-      logger.error("MercadoPago error:", err);
-      res.json({
-        msg: err.message || err.toString(),
-        err: err.message,
-        success: false,
-      });
-    }
-  },
-);
-
-// MercadoPago payment callback
-router.get("/mercadopago_payment", async (req, res) => {
-  try {
-    const { order, plan, status, payment_id, collection_status } = req.query;
-
-    if (!order || !plan) {
-      return res.send("INVALID REQUEST");
-    }
-
-    const getOrder = await query(`SELECT * FROM orders WHERE data = ?`, [
-      order || "",
-    ]);
-    const getPlan = await query(`SELECT * FROM plan WHERE id = ?`, [plan]);
-
-    if (getOrder.length < 1) {
-      return res.send(returnHtmlRes("Invalid payment found"));
-    }
-
-    if (getPlan.length < 1) {
-      return res.send(returnHtmlRes("Invalid plan found"));
-    }
-
-    // Check payment status
-    if (status === "success" || collection_status === "approved") {
-      res.send(returnHtmlRes("Payment Success! Redirecting..."));
-
-      // Update order with payment details
-      await query(`UPDATE orders SET data = ? WHERE data = ?`, [
-        JSON.stringify({
-          payment_id,
-          status,
-          collection_status,
-          order_id: order,
-        }),
-        order,
-      ]);
-
-      // Update user plan
-      await updateUserPlan(getPlan[0], getOrder[0]?.uid);
-    } else if (status === "pending") {
-      res.send(
-        returnHtmlRes(
-          "Payment is pending. We will update you once it's confirmed. Redirecting...",
-        ),
-      );
-    } else {
-      res.send(
-        returnHtmlRes(
-          "Payment Failed! If the balance was deducted please contact support. Redirecting...",
-        ),
-      );
-    }
-  } catch (err) {
-    logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
-  }
-});
-
-// MercadoPago webhook (for IPN notifications)
-router.post("/mercadopago_webhook", async (req, res) => {
-  try {
-    const { type, data } = req.body;
-
-    logger.log("MercadoPago Webhook:", { type, data });
-
-    if (type === "payment") {
-      const getWeb = await query(`SELECT * FROM web_private`, []);
-
-      // ✅ NEW SDK: Initialize client
-      const client = new MercadoPagoConfig({
-        accessToken: getWeb[0]?.pay_mercadopago_access_token,
-      });
-
-      const payment = new Payment(client);
-
-      // ✅ Get payment details
-      const paymentInfo = await payment.get({ id: data.id });
-
-      const externalReference = paymentInfo.external_reference;
-      const status = paymentInfo.status;
-
-      if (status === "approved") {
-        const getOrder = await query(`SELECT * FROM orders WHERE data = ?`, [
-          externalReference,
-        ]);
-
-        if (getOrder.length > 0) {
-          // Get plan ID from metadata
-          const planId = paymentInfo.metadata?.plan_id;
-
-          if (planId) {
-            const getPlan = await query(`SELECT * FROM plan WHERE id = ?`, [
-              planId,
-            ]);
-
-            if (getPlan.length > 0) {
-              await updateUserPlan(getPlan[0], getOrder[0]?.uid);
-            }
-          }
-        }
-      }
-    }
-
-    res.status(200).send("OK");
-  } catch (err) {
-    logger.error("MercadoPago webhook error:", err);
-    res.status(500).send("Error");
-  }
-});
+// MercadoPago endpoints retired in favor of /api/billing (SEC-07)
+router.post("/create_mercadopago_preference", validateUser, retiredPaymentHandler);
+router.get("/mercadopago_payment", retiredPaymentHandler);
+router.post("/mercadopago_webhook", retiredPaymentHandler);
 
 // get fcm data admin
 router.get("/get_fcm_data", validateUser, async (req, res) => {
@@ -4376,10 +3863,12 @@ router.post("/update_fcm_choice", validateUser, async (req, res) => {
 // GET all tags (already exists)
 router.get("/get_chat_tags", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM chat_tags WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    res.json({ success: true, data });
+    const data = await prisma.chat_tags.findMany({
+      where: {
+        uid: req.decode.uid,
+      },
+    });
+    res.json({ success: true, data: sanitizeBigInt(data) });
   } catch (err) {
     logger.error(err);
     res.json({ success: false });
@@ -4393,11 +3882,13 @@ router.post("/add_chat_tag", validateUser, async (req, res) => {
     if (!title || title.length > 12)
       return res.json({ success: false, msg: "Invalid title" });
 
-    await query(`INSERT INTO chat_tags (uid, title, hex) VALUES (?, ?, ?)`, [
-      req.decode.uid,
-      title,
-      hex || "#6366F1",
-    ]);
+    await prisma.chat_tags.create({
+      data: {
+        uid: req.decode.uid,
+        title,
+        hex: hex || "#6366F1",
+      },
+    });
     res.json({ success: true });
   } catch (err) {
     logger.error(err);
@@ -4409,10 +3900,12 @@ router.post("/add_chat_tag", validateUser, async (req, res) => {
 router.post("/delete_chat_tag", validateUser, async (req, res) => {
   try {
     const { labelId } = req.body;
-    await query(`DELETE FROM chat_tags WHERE id = ? AND uid = ?`, [
-      labelId,
-      req.decode.uid,
-    ]);
+    await prisma.chat_tags.deleteMany({
+      where: {
+        id: parseInt(labelId, 10),
+        uid: req.decode.uid,
+      },
+    });
     res.json({ success: true });
   } catch (err) {
     logger.error(err);
@@ -4549,24 +4042,25 @@ router.get("/analytics", validateUser, async (req, res) => {
 router.get("/notifications", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    const notifications = await query(
-      `SELECT * FROM in_app_notifications 
-       WHERE uid = ? OR uid = 'ALL' 
-       ORDER BY created_at DESC 
-       LIMIT 30`,
-      [uid]
-    );
+    const notifications = await prisma.in_app_notifications.findMany({
+      where: {
+        OR: [{ uid }, { uid: "ALL" }],
+      },
+      orderBy: { created_at: "desc" },
+      take: 30,
+    });
 
-    const [unread] = await query(
-      `SELECT COUNT(*) as count FROM in_app_notifications 
-       WHERE (uid = ? OR uid = 'ALL') AND is_read = 0`,
-      [uid]
-    );
+    const unreadCount = await prisma.in_app_notifications.count({
+      where: {
+        OR: [{ uid }, { uid: "ALL" }],
+        is_read: false,
+      },
+    });
 
     res.json({
       success: true,
-      data: notifications || [],
-      unreadCount: unread?.count || 0,
+      data: sanitizeBigInt(notifications) || [],
+      unreadCount: unreadCount || 0,
     });
   } catch (err) {
     logger.error("Fetch notifications error:", err);
@@ -4580,10 +4074,12 @@ router.post("/mark_notification_read", validateUser, async (req, res) => {
     const { id, all } = req.body;
 
     if (all) {
-      await query(
-        `UPDATE in_app_notifications SET is_read = 1 WHERE uid = ? OR uid = 'ALL'`,
-        [uid]
-      );
+      await prisma.in_app_notifications.updateMany({
+        where: {
+          OR: [{ uid }, { uid: "ALL" }],
+        },
+        data: { is_read: true },
+      });
       return res.json({ success: true, msg: "All notifications marked as read" });
     }
 
@@ -4591,10 +4087,13 @@ router.post("/mark_notification_read", validateUser, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Notification ID required" });
     }
 
-    await query(
-      `UPDATE in_app_notifications SET is_read = 1 WHERE id = ? AND (uid = ? OR uid = 'ALL')`,
-      [id, uid]
-    );
+    await prisma.in_app_notifications.updateMany({
+      where: {
+        id: parseInt(id, 10),
+        OR: [{ uid }, { uid: "ALL" }],
+      },
+      data: { is_read: true },
+    });
 
     res.json({ success: true, msg: "Notification marked as read" });
   } catch (err) {

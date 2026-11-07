@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -323,76 +324,67 @@ router.post(
           : null;
       }
 
-      // ── Transaction ───────────────────────────────────────
-      await query("START TRANSACTION");
-
-      try {
-        await query(
-          `INSERT INTO beta_campaign (
-              campaign_id, uid, title,
-              template_name, template_language,
-              template_type,
-              phonebook_id, phonebook_name,
-              status, total_contacts,
-              body_variables,
-              header_variable,
-              button_variables,
-              schedule, timezone
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?, ?, ?, ?, ?, ?)`,
-          [
-            campaignId,
-            req.decode.uid,
-            campaign_title,
-            template_name,
-            template_language,
-            template_type || "STANDARD",
-            phonebook_id,
-            phonebooks[0].name,
-            contacts.length,
-            JSON.stringify(body_variables || []), // body vars
-            JSON.stringify(packedHeader), // ← packed header
-            JSON.stringify(button_variables || []), // button vars
-            mysqlSchedule,
-            timezone || null,
-          ],
-        );
-
-        // ── Batch insert logs ─────────────────────────────
-        const batchSize = 1000;
-        for (let i = 0; i < contacts.length; i += batchSize) {
-          const batch = contacts.slice(i, i + batchSize);
-          const values = batch.map((contact) => [
-            req.decode.uid,
-            campaignId,
-            contact.name || "NA",
-            contact.mobile,
-            "PENDING",
-          ]);
-          await query(
-            `INSERT INTO beta_campaign_logs
-             (uid, campaign_id, contact_name, contact_mobile, status)
-             VALUES ?`,
-            [values],
-          );
+      // ── Transaction via Atomic Prisma Transaction ────────
+      let scheduleDate = null;
+      if (schedule) {
+        const d = new Date(schedule);
+        if (!isNaN(d.getTime())) {
+          scheduleDate = d;
         }
-
-        await query("COMMIT");
-
-        logger.log(
-          `✅ Campaign ${campaignId} | type: ${template_type || "STANDARD"} | contacts: ${contacts.length}`,
-        );
-
-        return res.json({
-          success: true,
-          msg: "Campaign created successfully",
-          campaignId,
-          totalContacts: contacts.length,
-          templateType: template_type || "STANDARD",
-        });
-      } catch (err) {
-        await query("ROLLBACK");
-        throw err;
       }
+
+      await prisma.$transaction(
+        async (tx) => {
+          await tx.beta_campaign.create({
+            data: {
+              campaign_id: campaignId,
+              uid: req.decode.uid,
+              title: campaign_title,
+              template_name: template_name,
+              template_language: template_language,
+              template_type: template_type || "STANDARD",
+              phonebook_id: String(phonebook_id),
+              phonebook_name: phonebooks[0].name,
+              status: "PENDING",
+              total_contacts: contacts.length,
+              body_variables: JSON.stringify(body_variables || []),
+              header_variable: JSON.stringify(packedHeader),
+              button_variables: JSON.stringify(button_variables || []),
+              schedule: scheduleDate,
+              timezone: timezone || null,
+            },
+          });
+
+          // ── Batch insert logs ─────────────────────────────
+          const batchSize = 1000;
+          for (let i = 0; i < contacts.length; i += batchSize) {
+            const batch = contacts.slice(i, i + batchSize);
+            const values = batch.map((contact) => ({
+              uid: req.decode.uid,
+              campaign_id: campaignId,
+              contact_name: contact.name || "NA",
+              contact_mobile: contact.mobile,
+              status: "PENDING",
+            }));
+            await tx.beta_campaign_logs.createMany({
+              data: values,
+            });
+          }
+        },
+        { timeout: 30000, maxWait: 10000 },
+      );
+
+      logger.log(
+        `✅ Campaign ${campaignId} | type: ${template_type || "STANDARD"} | contacts: ${contacts.length}`,
+      );
+
+      return res.json({
+        success: true,
+        msg: "Campaign created successfully",
+        campaignId,
+        totalContacts: contacts.length,
+        templateType: template_type || "STANDARD",
+      });
     } catch (error) {
       logger.error("Error creating campaign:", error);
       return res.json({ success: false, msg: "An error occurred" });
@@ -905,31 +897,26 @@ router.post("/del_campaign", validateUser, async (req, res) => {
       });
     }
 
-    // Start transaction
-    await query("START TRANSACTION");
+    // Atomic Transaction via Prisma
+    await prisma.$transaction(
+      async (tx) => {
+        // Delete logs first (foreign key constraint)
+        await tx.beta_campaign_logs.deleteMany({
+          where: { campaign_id: id },
+        });
 
-    try {
-      // Delete logs first (foreign key constraint)
-      await query("DELETE FROM beta_campaign_logs WHERE campaign_id = ?", [id]);
+        // Delete campaign
+        await tx.beta_campaign.deleteMany({
+          where: { campaign_id: id, uid: uid },
+        });
+      },
+      { timeout: 30000, maxWait: 10000 },
+    );
 
-      // Delete campaign
-      await query(
-        "DELETE FROM beta_campaign WHERE campaign_id = ? AND uid = ?",
-        [id, uid],
-      );
-
-      // Commit transaction
-      await query("COMMIT");
-
-      res.json({
-        success: true,
-        message: "Campaign deleted successfully",
-      });
-    } catch (error) {
-      // Rollback on error
-      await query("ROLLBACK");
-      throw error;
-    }
+    res.json({
+      success: true,
+      message: "Campaign deleted successfully",
+    });
   } catch (error) {
     logger.error("Error deleting campaign:", error);
     res.status(500).json({

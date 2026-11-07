@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { query } = require("../database/dbpromise");
+const { prisma, sanitizeBigInt } = require("../database/prisma");
 const logger = require("../utils/logger");
 const {
   resolveUserPlan,
@@ -20,11 +20,11 @@ const checkPlan = async (req, res, next) => {
       req.decode.uid = req.owner.uid;
     }
 
-    const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const user = await prisma.user.findFirst({
+      where: { uid: req.decode.uid },
+    });
 
-    if (!getUser || getUser.length === 0) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         code: "USER_NOT_FOUND",
@@ -32,7 +32,7 @@ const checkPlan = async (req, res, next) => {
       });
     }
 
-    const resolution = await resolveUserPlan(getUser[0]);
+    const resolution = await resolveUserPlan(sanitizeBigInt(user));
 
     if (!resolution.isValid) {
       if (resolution.isExpired) {

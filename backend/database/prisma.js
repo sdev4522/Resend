@@ -1,7 +1,7 @@
 const path = require("path");
 require("dotenv").config({ path: path.resolve(__dirname, "../.env") });
 const { PrismaMariaDb } = require("@prisma/adapter-mariadb");
-const { PrismaClient } = require("@prisma/client");
+const { PrismaClient, Prisma } = require("@prisma/client");
 
 const adapter = new PrismaMariaDb({
   host: process.env.DBHOST || "localhost",
@@ -22,4 +22,37 @@ process.on("beforeExit", async () => {
   await prisma.$disconnect();
 });
 
-module.exports = { prisma, PrismaClient };
+/**
+ * Recursively converts BigInt and Prisma.Decimal values for JSON safety.
+ * Only converts BigInt to Number if within Number.MIN_SAFE_INTEGER and MAX_SAFE_INTEGER,
+ * otherwise serializes to string to prevent precision loss.
+ */
+function sanitizeBigInt(obj) {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === "bigint") {
+    if (obj >= BigInt(Number.MIN_SAFE_INTEGER) && obj <= BigInt(Number.MAX_SAFE_INTEGER)) {
+      return Number(obj);
+    }
+    return obj.toString();
+  }
+  if (typeof obj === "object") {
+    if (typeof obj.toNumber === "function") {
+      return obj.toNumber();
+    }
+    if (obj instanceof Date) {
+      return obj;
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeBigInt);
+    }
+    const res = {};
+    for (const [k, v] of Object.entries(obj)) {
+      res[k] = sanitizeBigInt(v);
+    }
+    return res;
+  }
+  return obj;
+}
+
+module.exports = { prisma, PrismaClient, Prisma, sanitizeBigInt };
+

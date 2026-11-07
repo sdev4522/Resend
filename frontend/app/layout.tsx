@@ -78,7 +78,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: `${siteConfig.name} — WhatsApp Business API, CRM & Automation`,
     description: siteConfig.description,
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

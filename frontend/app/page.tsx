@@ -4,6 +4,8 @@ import { MarketingCapabilityMarquee } from '@/components/marketing/capability-ma
 import { MarketingBentoFeatures } from '@/components/marketing/bento-features';
 import { MarketingHowItWorks } from '@/components/marketing/how-it-works';
 import { MarketingFeatureComparison } from '@/components/marketing/feature-comparison';
+import { CompetitorComparison } from '@/components/marketing/competitor-comparison';
+import { MarketingUseCases } from '@/components/marketing/use-cases';
 import { MarketingPricing } from '@/components/marketing/pricing';
 import { MarketingFAQ } from '@/components/marketing/faq';
 import { MarketingCTABanner } from '@/components/marketing/cta-banner';
@@ -131,38 +133,42 @@ export default function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-
-
       <main className="flex-1 pb-16 sm:pb-0">
-        {/* Section 2: Hero */}
+        {/* Section 1: Hero */}
         <Hero5 />
 
-        {/* Section 3: Capability Marquee */}
+        {/* Section 2: Capability Marquee */}
         <MarketingCapabilityMarquee />
 
-        {/* Section 4: Feature Bento Grid */}
+        {/* Section 3: Feature Bento Grid */}
         <MarketingBentoFeatures />
 
-        {/* Section 5: How It Works */}
+        {/* Section 4: How It Works */}
         <MarketingHowItWorks />
 
-        {/* Section 6: Feature Comparison */}
+        {/* Section 5: Feature Comparison */}
         <MarketingFeatureComparison />
 
-        {/* Section 7: Pricing Preview */}
+        {/* Section 6: Competitor Comparison (Resend vs WATI vs AiSensy) */}
+        <CompetitorComparison />
+
+        {/* Section 7: Use Cases */}
+        <MarketingUseCases />
+
+        {/* Section 8: Pricing Preview */}
         <MarketingPricing />
 
-        {/* Section 8: FAQ */}
+        {/* Section 9: FAQ */}
         <MarketingFAQ />
 
-        {/* Section 9: Final CTA */}
+        {/* Section 10: Final CTA */}
         <MarketingCTABanner />
       </main>
 
       {/* Mobile Sticky CTA Bar */}
       <StickyMobileCTA />
 
-      {/* Section 10: Footer */}
+      {/* Section 11: Footer */}
       <MarketingFooter />
     </div>
   );

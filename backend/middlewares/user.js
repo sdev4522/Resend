@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { query } = require("../database/dbpromise");
+const { prisma, sanitizeBigInt } = require("../database/prisma");
 const logger = require("../utils/logger");
 
 const validateUser = async (req, res, next) => {
@@ -36,12 +36,14 @@ const validateUser = async (req, res, next) => {
       });
     }
 
-    const getUser = await query(
-      `SELECT * FROM user WHERE uid = ? AND role = ?`,
-      [decode.uid, "user"],
-    );
+    const user = await prisma.user.findFirst({
+      where: {
+        uid: decode.uid,
+        role: "user",
+      },
+    });
 
-    if (getUser.length < 1) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         msg: "Invalid token found",
@@ -49,7 +51,7 @@ const validateUser = async (req, res, next) => {
       });
     }
 
-    if (getUser[0].is_blocked) {
+    if (user.is_blocked) {
       return res.status(403).json({
         success: false,
         code: "ACCOUNT_SUSPENDED",
@@ -57,20 +59,20 @@ const validateUser = async (req, res, next) => {
       });
     }
 
-    if (!getUser[0].email_verified_at) {
+    if (!user.email_verified_at) {
       return res.status(403).json({
         success: false,
         code: "EMAIL_VERIFICATION_REQUIRED",
         logout: true,
         email_unverified: true,
-        email: getUser[0].email,
+        email: user.email,
         msg: "Please verify your email address before accessing the application.",
       });
     }
 
     if (
       typeof decode.tokenVersion === "undefined" ||
-      Number(getUser[0].tokenVersion || 0) !== Number(decode.tokenVersion)
+      Number(user.tokenVersion || 0) !== Number(decode.tokenVersion)
     ) {
       return res.status(401).json({
         success: false,
@@ -80,11 +82,11 @@ const validateUser = async (req, res, next) => {
     }
 
     req.decode = {
-      uid: getUser[0].uid,
+      uid: user.uid,
       role: "user",
-      email: getUser[0].email,
-      tokenVersion: getUser[0].tokenVersion || 0,
-      userData: getUser[0],
+      email: user.email,
+      tokenVersion: user.tokenVersion || 0,
+      userData: sanitizeBigInt(user),
     };
 
     next();
