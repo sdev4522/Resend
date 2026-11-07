@@ -1,5 +1,40 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, str, whereStr } = require("../database/prismaHelpers");
+
+/**
+ * Delivery status only moves forward (former SQL CASE):
+ *  - a 'read' message stays 'read'
+ *  - a 'delivered' message is not downgraded by a late 'sent' receipt
+ */
+/** Instance of `uid` addressed by uniqueId, numeric id or phone number (former OR lookup). */
+async function findInstanceByAccount(uid, accountId, select) {
+  if (accountId === null || accountId === undefined || accountId === "") return undefined;
+  const isNum = !isNaN(accountId) && /^\d+$/.test(String(accountId));
+  const row = await prisma.instance.findFirst({
+    where: {
+      uid,
+      OR: [
+        { uniqueId: String(accountId) },
+        { id: isNum ? parseInt(accountId) : -1 },
+        { number: String(accountId) },
+      ],
+    },
+    select,
+  });
+  return row ? plain(row) : undefined;
+}
+
+async function advanceConversationStatus(id, newStatus) {
+  const notDowngradable = newStatus === "sent" ? ["read", "delivered"] : ["read"];
+  return prisma.beta_conversation.updateMany({
+    where: {
+      id,
+      OR: [{ status: null }, { status: { notIn: notDowngradable } }],
+    },
+    data: { status: str(newStatus) },
+  });
+}
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -42,10 +77,7 @@ function logToFile(label, data) {}
  */
 async function verifyMetaSignature(req) {
   const signature = req.headers["x-hub-signature-256"];
-  const [web] = await query(
-    `SELECT embed_app_sec FROM web_private LIMIT 1`,
-    [],
-  );
+  const [web] = plain(await prisma.web_private.findMany({ select: { embed_app_sec: true }, take: 1 }));
   const secret = web?.embed_app_sec || process.env.META_APP_SECRET;
 
   if (signature && secret) {
@@ -73,7 +105,7 @@ async function verifyMetaSignature(req) {
 // WhatsApp Webhook Verification
 router.get("/embed/webhook/:uid", async (req, res) => {
   try {
-    const [admin] = await query(`SELECT uid FROM admin LIMIT 1`);
+    const [admin] = plain(await prisma.admin.findMany({ select: { uid: true }, take: 1 }));
     if (!admin) {
       return res.sendStatus(400);
     }
@@ -124,21 +156,13 @@ router.post("/embed/webhook/:uid", async (req, res) => {
                   await updateMessageStatus(status.id, status.status);
 
                   // Update beta_conversation status & broadcast to inbox socket
-                  const [conv] = await query(
-                    `SELECT id, chat_id, uid FROM beta_conversation WHERE metaChatId = ? LIMIT 1`,
-                    [status.id],
-                  );
+                  const [conv] = plain(await prisma.beta_conversation.findMany({
+                    where: { metaChatId: whereStr(status.id) },
+                    select: { id: true, chat_id: true, uid: true },
+                    take: 1,
+                  }));
                   if (conv) {
-                    await query(
-                      `UPDATE beta_conversation 
-                       SET status = CASE 
-                         WHEN status = 'read' THEN 'read'
-                         WHEN status = 'delivered' AND ? = 'sent' THEN 'delivered'
-                         ELSE ?
-                       END 
-                       WHERE id = ?`,
-                      [status.status, status.status, conv.id],
-                    );
+                    await advanceConversationStatus(conv.id, status.status);
 
                     sendToUid(
                       conv.uid,
@@ -165,15 +189,12 @@ router.post("/embed/webhook/:uid", async (req, res) => {
       const errorData = JSON.stringify(body);
 
       if (status === "failed") {
-        await query(
-          `UPDATE beta_api_logs SET status = ?, err = ? WHERE msg_id = ?`,
-          [status, errorData, id],
-        );
+        await prisma.beta_api_logs.updateMany({
+          where: { msg_id: whereStr(id) },
+          data: { status: str(status), err: str(errorData) },
+        });
       } else if (id) {
-        await query(`UPDATE beta_api_logs SET status = ? WHERE msg_id = ?`, [
-          status,
-          id,
-        ]);
+        await prisma.beta_api_logs.updateMany({ where: { msg_id: whereStr(id) }, data: { status: str(status) } });
       }
     }
 
@@ -182,15 +203,12 @@ router.post("/embed/webhook/:uid", async (req, res) => {
       const errorData = JSON.stringify(body);
 
       if (status === "failed") {
-        await query(
-          `UPDATE beta_campaign_logs SET delivery_status = ?, error_message = ? WHERE meta_msg_id = ?`,
-          [status, errorData, id],
-        );
+        await prisma.beta_campaign_logs.updateMany({
+          where: { meta_msg_id: whereStr(id) },
+          data: { delivery_status: str(status), error_message: str(errorData) },
+        });
       } else if (id) {
-        await query(
-          `UPDATE beta_campaign_logs SET delivery_status = ? WHERE meta_msg_id = ?`,
-          [status, id],
-        );
+        await prisma.beta_campaign_logs.updateMany({ where: { meta_msg_id: whereStr(id) }, data: { delivery_status: str(status) } });
       }
     }
 
@@ -205,10 +223,7 @@ router.post("/embed/webhook/:uid", async (req, res) => {
     if (phoneNumId) {
       logToFile("QUERYING_META_API", { wabaId, phoneNumId });
 
-      const getMyMetaApi = await query(
-        `SELECT * FROM meta_api WHERE business_phone_number_id = ?`,
-        [phoneNumId],
-      );
+      const getMyMetaApi = plain(await prisma.meta_api.findMany({ where: { business_phone_number_id: whereStr(phoneNumId) } }));
 
       logToFile("META_API_QUERY_RESULT", getMyMetaApi);
 
@@ -387,7 +402,12 @@ router.post("/embed/webhook/:uid", async (req, res) => {
     }
   } catch (err) {
     logToFile("FATAL_ERROR", { message: err.message, stack: err.stack });
-    res.json({ err, success: false, msg: "Something went wrong" });
+    logger.error("[Inbox webhook] processing error:", err);
+    // The webhook is acknowledged before processing; a second response would throw
+    // ERR_HTTP_HEADERS_SENT as an unhandled rejection and crash the process.
+    if (!res.headersSent) {
+      res.json({ success: false, msg: "Something went wrong" });
+    }
   }
 });
 
@@ -416,10 +436,11 @@ router.post("/webhook/:uid", async (req, res) => {
     // Authoritatively resolve tenant UID from phone_number_id in metadata if present
     const phoneNumId = change.value?.metadata?.phone_number_id;
     if (phoneNumId) {
-      const [matchedMeta] = await query(
-        `SELECT uid FROM meta_api WHERE business_phone_number_id = ? LIMIT 1`,
-        [phoneNumId],
-      );
+      const [matchedMeta] = plain(await prisma.meta_api.findMany({
+        where: { business_phone_number_id: whereStr(phoneNumId) },
+        select: { uid: true },
+        take: 1,
+      }));
       if (matchedMeta?.uid) {
         userUID = matchedMeta.uid;
       }
@@ -546,8 +567,10 @@ async function updateBroadcastContactPermission(mobile, status, reply) {
   try {
     logger.log(`🔄 Updating permission for ${mobile} to ${status}...`);
 
-    const broadcasts = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE status IN ('requesting_permissions', 'ready', 'running', 'draft')`,
+    const broadcasts = plain(
+      await prisma.wa_call_broadcasts.findMany({
+        where: { status: { in: ["requesting_permissions", "ready", "running", "draft"] } },
+      }),
     );
 
     let updated = false;
@@ -585,18 +608,10 @@ async function updateBroadcastContactPermission(mobile, status, reply) {
               (broadcast.permission_denied || 0) + 1;
           }
 
-          let updateQuery = `UPDATE wa_call_broadcasts SET contacts = ?`;
-          let updateParams = [JSON.stringify(contacts)];
-
-          Object.keys(statsUpdate).forEach((key) => {
-            updateQuery += `, ${key} = ?`;
-            updateParams.push(statsUpdate[key]);
+          await prisma.wa_call_broadcasts.updateMany({
+            where: { campaign_id: whereStr(broadcast.campaign_id) },
+            data: { contacts: JSON.stringify(contacts), ...statsUpdate },
           });
-
-          updateQuery += ` WHERE campaign_id = ?`;
-          updateParams.push(broadcast.campaign_id);
-
-          await query(updateQuery, updateParams);
 
           logger.log(
             `✅ Updated permission for ${mobile} in campaign ${broadcast.campaign_id}`,
@@ -622,10 +637,11 @@ async function handleMessages(change, uid, body) {
   // Authoritatively resolve tenant UID from phone_number_id in metadata if present
   const phoneNumId = value?.metadata?.phone_number_id;
   if (phoneNumId) {
-    const [metaRecord] = await query(
-      `SELECT uid FROM meta_api WHERE business_phone_number_id = ? LIMIT 1`,
-      [phoneNumId],
-    );
+    const [metaRecord] = plain(await prisma.meta_api.findMany({
+      where: { business_phone_number_id: whereStr(phoneNumId) },
+      select: { uid: true },
+      take: 1,
+    }));
     if (metaRecord?.uid) {
       targetUid = metaRecord.uid;
     }
@@ -647,21 +663,13 @@ async function handleMessages(change, uid, body) {
         await updateMessageStatus(status.id, status.status);
 
         // Update beta_conversation status & broadcast to inbox socket
-        const [conv] = await query(
-          `SELECT id, chat_id, uid FROM beta_conversation WHERE metaChatId = ? LIMIT 1`,
-          [status.id],
-        );
+        const [conv] = plain(await prisma.beta_conversation.findMany({
+          where: { metaChatId: whereStr(status.id) },
+          select: { id: true, chat_id: true, uid: true },
+          take: 1,
+        }));
         if (conv) {
-          await query(
-            `UPDATE beta_conversation 
-             SET status = CASE 
-               WHEN status = 'read' THEN 'read'
-               WHEN status = 'delivered' AND ? = 'sent' THEN 'delivered'
-               ELSE ?
-             END 
-             WHERE id = ?`,
-            [status.status, status.status, conv.id],
-          );
+          await advanceConversationStatus(conv.id, status.status);
 
           sendToUid(
             conv.uid,
@@ -682,28 +690,22 @@ async function handleMessages(change, uid, body) {
     const errorData = JSON.stringify(body);
 
     if (status === "failed") {
-      await query(
-        `UPDATE beta_api_logs SET status = ?, err = ? WHERE msg_id = ?`,
-        [status, errorData, id],
-      );
+      await prisma.beta_api_logs.updateMany({
+        where: { msg_id: whereStr(id) },
+        data: { status: str(status), err: str(errorData) },
+      });
     } else if (id) {
-      await query(`UPDATE beta_api_logs SET status = ? WHERE msg_id = ?`, [
-        status,
-        id,
-      ]);
+      await prisma.beta_api_logs.updateMany({ where: { msg_id: whereStr(id) }, data: { status: str(status) } });
     }
 
     // Update campaign logs
     if (status === "failed") {
-      await query(
-        `UPDATE beta_campaign_logs SET delivery_status = ?, error_message = ? WHERE meta_msg_id = ?`,
-        [status, errorData, id],
-      );
+      await prisma.beta_campaign_logs.updateMany({
+        where: { meta_msg_id: whereStr(id) },
+        data: { delivery_status: str(status), error_message: str(errorData) },
+      });
     } else if (id) {
-      await query(
-        `UPDATE beta_campaign_logs SET delivery_status = ? WHERE meta_msg_id = ?`,
-        [status, id],
-      );
+      await prisma.beta_campaign_logs.updateMany({ where: { meta_msg_id: whereStr(id) }, data: { delivery_status: str(status) } });
     }
   }
 
@@ -723,7 +725,7 @@ router.get("/webhook/:uid", async (req, res) => {
     const queryParan = req.query;
     const body = req.body;
 
-    const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
 
     let verify_token = "";
 
@@ -782,10 +784,7 @@ router.post("/send_templet", validateUser, checkPlan, async (req, res) => {
     }
 
     if (chatId) {
-      const [chat] = await query(
-        `SELECT * FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-        [chatId, req.decode.uid],
-      );
+      const [chat] = plain(await prisma.beta_chats.findMany({ where: { chat_id: whereStr(chatId), uid: whereStr(req.decode.uid) }, take: 1 }));
       if (chat && chat.origin === "qr") {
         return res.json({
           success: false,
@@ -839,14 +838,26 @@ router.get("/get_chats", validateUser, async (req, res) => {
     const parsedLimit = Math.min(Math.max(parseInt(limit) || 30, 1), 50);
     const parsedOffset = Math.max(parseInt(offset) || 0, 0);
 
-    const conditions = ["uid = ?"];
-    const params = [uid];
+    // Every entry is ANDed together (former `conditions.join(" AND ")`)
+    const and = [{ uid }];
 
     // Origin filter (when no specific account is selected)
     if (origin && origin !== "all" && (!accountId || accountId === "all")) {
-      conditions.push("origin = ?");
-      params.push(origin);
+      and.push({ origin: String(origin) });
     }
+
+    // QR chat belongs to an instance: chat_id "<number>_..." or the instance in origin_instance_id
+    const qrChatOf = (inst) => {
+      const cleanNum = inst.number.replace(/[^0-9]/g, "");
+      return {
+        origin: "qr",
+        OR: [
+          { chat_id: { startsWith: `${cleanNum}_` } },
+          { origin_instance_id: { contains: `"${cleanNum}` } },
+          { origin_instance_id: { contains: `"${inst.uniqueId}` } },
+        ],
+      };
+    };
 
     // Account scoping
     if (accountId && accountId !== "all") {
@@ -854,18 +865,29 @@ router.get("/get_chats", validateUser, async (req, res) => {
       let matchedMeta = null;
 
       const isNumericId = !isNaN(accountId) && /^\d+$/.test(accountId);
-      const [qrInst] = await query(
-        `SELECT id, uniqueId, number, status FROM instance WHERE uid = ? AND (uniqueId = ? OR id = ? OR number = ?) LIMIT 1`,
-        [uid, accountId, isNumericId ? parseInt(accountId) : -1, accountId]
-      );
+      const accountIdNum = isNumericId ? parseInt(accountId) : -1;
+      const qrInst = await prisma.instance.findFirst({
+        where: {
+          uid,
+          OR: [{ uniqueId: String(accountId) }, { id: accountIdNum }, { number: String(accountId) }],
+        },
+        select: { id: true, uniqueId: true, number: true, status: true },
+      });
 
       if (qrInst) {
         matchedInstance = qrInst;
       } else {
-        const [metaInst] = await query(
-          `SELECT id, business_phone_number_id, waba_id FROM meta_api WHERE uid = ? AND (business_phone_number_id = ? OR id = ? OR waba_id = ?) LIMIT 1`,
-          [uid, accountId, isNumericId ? parseInt(accountId) : -1, accountId]
-        );
+        const metaInst = await prisma.meta_api.findFirst({
+          where: {
+            uid,
+            OR: [
+              { business_phone_number_id: String(accountId) },
+              { id: accountIdNum },
+              { waba_id: String(accountId) },
+            ],
+          },
+          select: { id: true, business_phone_number_id: true, waba_id: true },
+        });
         if (metaInst) {
           matchedMeta = metaInst;
         }
@@ -900,86 +922,79 @@ router.get("/get_chats", validateUser, async (req, res) => {
       if (matchedMeta) {
         const busId = matchedMeta.business_phone_number_id || "";
         const wabaId = matchedMeta.waba_id || "";
-        conditions.push("(origin = 'meta' AND (origin_instance_id LIKE ? OR origin_instance_id LIKE ? OR chat_id LIKE 'meta_%'))");
-        params.push(`%"${busId}%`, `%"${wabaId}%`);
+        and.push({
+          origin: "meta",
+          OR: [
+            { origin_instance_id: { contains: `"${busId}` } },
+            { origin_instance_id: { contains: `"${wabaId}` } },
+            { chat_id: { startsWith: "meta_" } },
+          ],
+        });
       } else if (matchedInstance) {
         if (matchedInstance.number) {
-          const cleanNum = matchedInstance.number.replace(/[^0-9]/g, "");
-          conditions.push("(origin = 'qr' AND (chat_id LIKE ? OR origin_instance_id LIKE ? OR origin_instance_id LIKE ?))");
-          params.push(`${cleanNum}_%`, `%"${cleanNum}%`, `%"${matchedInstance.uniqueId}%`);
+          and.push(qrChatOf(matchedInstance));
         } else {
-          conditions.push("1 = 0");
+          and.push({ id: -1 }); // former `1 = 0`
         }
       }
     } else {
       // "All Connections" mode: Only show QR chats from ACTIVE instances.
       // Meta chats always show (Cloud API is stateless — no live socket needed).
-      const activeInstances = await query(
-        `SELECT number, uniqueId FROM instance WHERE uid = ? AND status = 'ACTIVE'`,
-        [uid]
-      );
+      const activeInstances = await prisma.instance.findMany({
+        where: { uid, status: "ACTIVE" },
+        select: { number: true, uniqueId: true },
+      });
 
-      if (activeInstances.length === 0) {
+      const withNumber = activeInstances.filter((i) => i.number);
+      if (withNumber.length === 0) {
         // No connected QR instances — only show Meta/Telegram/other non-QR chats
-        conditions.push("(origin != 'qr')");
+        and.push({ origin: { not: "qr" } });
       } else {
-        // Build a number-match filter for each active QR instance
-        const qrOrParts = activeInstances
-          .filter((i) => i.number)
-          .map(() => "(origin = 'qr' AND (chat_id LIKE ? OR origin_instance_id LIKE ? OR origin_instance_id LIKE ?))")
-          .join(" OR ");
-
-        const qrParams = [];
-        activeInstances.filter((i) => i.number).forEach((i) => {
-          const cleanNum = i.number.replace(/[^0-9]/g, "");
-          qrParams.push(`${cleanNum}_%`, `%"${cleanNum}%`, `%"${i.uniqueId}%`);
-        });
-
-        if (qrOrParts) {
-          conditions.push(`(origin != 'qr' OR (${qrOrParts}))`);
-          params.push(...qrParams);
-        } else {
-          conditions.push("(origin != 'qr')");
-        }
+        and.push({ OR: [{ origin: { not: "qr" } }, ...withNumber.map(qrChatOf)] });
       }
     }
 
     // Tab filter
     if (filter === "unread") {
-      conditions.push("unread_count > 0");
+      and.push({ unread_count: { gt: BigInt(0) } });
     } else if (filter === "has_note") {
-      conditions.push("(chat_note IS NOT NULL AND chat_note != '' AND chat_note != '[]')");
+      and.push({ chat_note: { not: null } }, { chat_note: { notIn: ["", "[]"] } });
     }
 
     // Search filter
     if (search && search.trim()) {
-      const s = `%${search.trim()}%`;
-      conditions.push("(sender_name LIKE ? OR sender_mobile LIKE ? OR last_message LIKE ? OR chat_label LIKE ?)");
-      params.push(s, s, s, s);
+      const term = search.trim();
+      and.push({
+        OR: [
+          { sender_name: { contains: term } },
+          { sender_mobile: { contains: term } },
+          { last_message: { contains: term } },
+          { chat_label: { contains: term } },
+        ],
+      });
     }
 
-    const whereClause = conditions.join(" AND ");
+    const where = { AND: and };
 
-    const [totalRow] = await query(
-      `SELECT COUNT(*) as total FROM beta_chats WHERE ${whereClause}`,
-      params,
-    );
-    const total = totalRow?.total || 0;
-
-    const chats = await query(
-      `SELECT * FROM beta_chats WHERE ${whereClause} ORDER BY updatedAt DESC, id DESC LIMIT ? OFFSET ?`,
-      [...params, parsedLimit, parsedOffset],
-    );
+    const [total, chatRows] = await Promise.all([
+      prisma.beta_chats.count({ where }),
+      prisma.beta_chats.findMany({
+        where,
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        take: parsedLimit,
+        skip: parsedOffset,
+      }),
+    ]);
+    const chats = plain(chatRows);
 
     // Efficiently match contact phonebook without querying whole table
     const senderMobiles = Array.from(new Set(chats.map((c) => c.sender_mobile).filter(Boolean)));
     let contactsMap = {};
     if (senderMobiles.length > 0) {
-      const placeholders = senderMobiles.map(() => "?").join(",");
-      const contacts = await query(
-        `SELECT id, name, mobile, phonebook_name FROM contact WHERE uid = ? AND mobile IN (${placeholders})`,
-        [uid, ...senderMobiles],
-      );
+      const contacts = await prisma.contact.findMany({
+        where: { uid, mobile: { in: senderMobiles.map(String) } },
+        select: { id: true, name: true, mobile: true, phonebook_name: true },
+      });
       contacts.forEach((ct) => {
         contactsMap[ct.mobile] = ct;
       });
@@ -1035,13 +1050,27 @@ router.get("/get_messages", validateUser, async (req, res) => {
     const candidateIds = [chat_id, `meta_${cleanChatId}`, `+${cleanChatId}`, cleanChatId];
 
     // Verify conversation ownership
-    const [chat] = await query(
-      `SELECT id, chat_id, sender_name, sender_mobile, origin, chat_label, chat_note, unread_count 
-       FROM beta_chats 
-       WHERE (chat_id IN (?, ?, ?, ?) OR (sender_mobile IN (?, ?) AND origin = 'meta')) AND uid = ? 
-       ORDER BY id DESC LIMIT 1`,
-      [...candidateIds, cleanChatId, `+${cleanChatId}`, uid],
-    );
+    const chatRow = await prisma.beta_chats.findFirst({
+      where: {
+        uid,
+        OR: [
+          { chat_id: { in: candidateIds.map(String) } },
+          { sender_mobile: { in: [cleanChatId, `+${cleanChatId}`] }, origin: "meta" },
+        ],
+      },
+      select: {
+        id: true,
+        chat_id: true,
+        sender_name: true,
+        sender_mobile: true,
+        origin: true,
+        chat_label: true,
+        chat_note: true,
+        unread_count: true,
+      },
+      orderBy: { id: "desc" },
+    });
+    const chat = chatRow ? plain(chatRow) : undefined;
 
     if (!chat) {
       return res.status(404).json({ success: false, msg: "Conversation not found" });
@@ -1049,32 +1078,31 @@ router.get("/get_messages", validateUser, async (req, res) => {
 
     // Mark unread as 0
     if (chat.unread_count > 0) {
-      await query(`UPDATE beta_chats SET unread_count = 0 WHERE chat_id = ? AND uid = ?`, [chat_id, uid]);
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chat_id), uid: whereStr(uid) },
+        data: { unread_count: BigInt(0) },
+      });
     }
 
     const parsedLimit = Math.min(Math.max(parseInt(limit) || 30, 1), 50);
     const parsedOffset = Math.max(parseInt(offset) || 0, 0);
 
-    const conditions = ["chat_id = ?", "uid = ?"];
-    const params = [chat_id, uid];
-
+    const messageWhere = { chat_id: String(chat_id), uid };
     if (before) {
-      conditions.push("timestamp < ?");
-      params.push(String(before));
+      messageWhere.timestamp = { lt: String(before) };
     }
 
-    const whereClause = conditions.join(" AND ");
-
-    const [totalRow] = await query(
-      `SELECT COUNT(*) as total FROM beta_conversation WHERE chat_id = ? AND uid = ?`,
-      [chat_id, uid],
-    );
+    const [totalRow] = [{ total: await prisma.beta_conversation.count({ where: { chat_id: whereStr(chat_id), uid: whereStr(uid) } }) }];
     const total = totalRow?.total || 0;
 
     // Fetch messages (DESC: newest first in DB query for pagination slice)
-    const messages = await query(
-      `SELECT * FROM beta_conversation WHERE ${whereClause} ORDER BY timestamp DESC, id DESC LIMIT ? OFFSET ?`,
-      [...params, parsedLimit, parsedOffset],
+    const messages = plain(
+      await prisma.beta_conversation.findMany({
+        where: messageWhere,
+        orderBy: [{ timestamp: "desc" }, { id: "desc" }],
+        take: parsedLimit,
+        skip: parsedOffset,
+      }),
     );
 
     // Parse JSON contexts
@@ -1098,10 +1126,7 @@ router.get("/get_messages", validateUser, async (req, res) => {
     const chronologicalMessages = [...parsedMessages].reverse();
 
     // Get contact info if available
-    const [contact] = await query(
-      `SELECT * FROM contact WHERE uid = ? AND mobile = ? LIMIT 1`,
-      [uid, chat.sender_mobile],
-    );
+    const [contact] = plain(await prisma.contact.findMany({ where: { uid: whereStr(uid), mobile: whereStr(chat.sender_mobile) }, take: 1 }));
 
     res.json({
       success: true,
@@ -1143,43 +1168,57 @@ router.post("/check_conversation", validateUser, async (req, res) => {
     if (accountType === "qr" && accountId) {
       let cleanAcc = accountId.replace(/[^0-9]/g, "");
       const isNum = !isNaN(accountId) && /^\d+$/.test(accountId);
-      const [inst] = await query(
-        `SELECT number, uniqueId FROM instance WHERE uid = ? AND (uniqueId = ? OR id = ? OR number = ?) LIMIT 1`,
-        [uid, accountId, isNum ? parseInt(accountId) : -1, accountId]
-      );
+      const inst = await findInstanceByAccount(uid, accountId, { number: true, uniqueId: true });
       if (inst && inst.number) {
         cleanAcc = inst.number.replace(/[^0-9]/g, "");
       }
       const targetChatId = `${cleanAcc}_${cleanMobile}_${uid}`;
-      const [found] = await query(
-        `SELECT * FROM beta_chats WHERE (chat_id = ? OR (sender_mobile = ? AND origin = 'qr' AND chat_id LIKE ?)) AND uid = ? LIMIT 1`,
-        [targetChatId, cleanMobile, `${cleanAcc}_%`, uid],
-      );
-      existingChat = found;
+      const found = await prisma.beta_chats.findFirst({
+        where: {
+          uid,
+          OR: [
+            { chat_id: targetChatId },
+            { sender_mobile: cleanMobile, origin: "qr", chat_id: { startsWith: `${cleanAcc}_` } },
+          ],
+        },
+      });
+      existingChat = found ? plain(found) : undefined;
     } else if (accountType === "meta") {
       const metaChatId = `meta_${cleanMobile}`;
-      const [found] = await query(
-        `SELECT * FROM beta_chats 
-         WHERE (chat_id IN (?, ?, ?, ?) OR (sender_mobile IN (?, ?) AND origin = 'meta')) AND uid = ? 
-         ORDER BY id DESC LIMIT 1`,
-        [metaChatId, `meta_+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, uid],
-      );
-      existingChat = found;
+      const found = await prisma.beta_chats.findFirst({
+        where: {
+          uid,
+          OR: [
+            { chat_id: { in: [metaChatId, `meta_+${cleanMobile}`, cleanMobile, `+${cleanMobile}`] } },
+            { sender_mobile: { in: [cleanMobile, `+${cleanMobile}`] }, origin: "meta" },
+          ],
+        },
+        orderBy: { id: "desc" },
+      });
+      existingChat = found ? plain(found) : undefined;
     } else {
-      const [found] = await query(
-        `SELECT * FROM beta_chats 
-         WHERE (sender_mobile IN (?, ?) OR chat_id IN (?, ?, ?, ?)) AND uid = ? 
-         ORDER BY id DESC LIMIT 1`,
-        [cleanMobile, `+${cleanMobile}`, cleanMobile, `+${cleanMobile}`, `meta_${cleanMobile}`, `meta_+${cleanMobile}`, uid],
-      );
-      existingChat = found;
+      const found = await prisma.beta_chats.findFirst({
+        where: {
+          uid,
+          OR: [
+            { sender_mobile: { in: [cleanMobile, `+${cleanMobile}`] } },
+            {
+              chat_id: {
+                in: [cleanMobile, `+${cleanMobile}`, `meta_${cleanMobile}`, `meta_+${cleanMobile}`],
+              },
+            },
+          ],
+        },
+        orderBy: { id: "desc" },
+      });
+      existingChat = found ? plain(found) : undefined;
     }
 
     if (existingChat) {
-      const [contact] = await query(
-        `SELECT * FROM contact WHERE uid = ? AND mobile = ? LIMIT 1`,
-        [uid, existingChat.sender_mobile],
-      );
+      const [contact] = plain(await prisma.contact.findMany({
+        where: { uid: whereStr(uid), mobile: whereStr(existingChat.sender_mobile) },
+        take: 1,
+      }));
       existingChat.contactData = contact || null;
 
       return res.json({
@@ -1194,10 +1233,7 @@ router.post("/check_conversation", validateUser, async (req, res) => {
     if (accountType === "qr") {
       let cleanAcc = (accountId || "").replace(/[^0-9]/g, "");
       const isNum = !isNaN(accountId) && /^\d+$/.test(accountId);
-      const [inst] = await query(
-        `SELECT number, uniqueId FROM instance WHERE uid = ? AND (uniqueId = ? OR id = ? OR number = ?) LIMIT 1`,
-        [uid, accountId, isNum ? parseInt(accountId) : -1, accountId]
-      );
+      const inst = await findInstanceByAccount(uid, accountId, { number: true, uniqueId: true });
       if (inst && inst.number) {
         cleanAcc = inst.number.replace(/[^0-9]/g, "");
       }
@@ -1206,10 +1242,7 @@ router.post("/check_conversation", validateUser, async (req, res) => {
       candidateChatId = `meta_${cleanMobile}`;
     }
 
-    const [contact] = await query(
-      `SELECT * FROM contact WHERE uid = ? AND mobile = ? LIMIT 1`,
-      [uid, cleanMobile],
-    );
+    const [contact] = plain(await prisma.contact.findMany({ where: { uid: whereStr(uid), mobile: whereStr(cleanMobile) }, take: 1 }));
 
     const newChatDraft = {
       chat_id: candidateChatId,
@@ -1242,12 +1275,9 @@ router.post("/send_message", validateUser, checkPlan, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Message or media content is required" });
     }
 
-    let [chat] = await query(
-      `SELECT * FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [chat_id, uid],
-    );
+    let [chat] = plain(await prisma.beta_chats.findMany({ where: { chat_id: whereStr(chat_id), uid: whereStr(uid) }, take: 1 }));
 
-    const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     const userTimezone = getCurrentTimestampInTimeZone(user?.timezone || "Asia/Kolkata");
 
     let msgCon = null;
@@ -1290,10 +1320,7 @@ router.post("/send_message", validateUser, checkPlan, async (req, res) => {
       } else {
         // New conversation: resolve instance uniqueId
         const isNum = !isNaN(accountId) && /^\d+$/.test(accountId);
-        const [inst] = await query(
-          `SELECT * FROM instance WHERE uid = ? AND (number = ? OR uniqueId = ? OR id = ?) LIMIT 1`,
-          [uid, accountId, accountId, isNum ? parseInt(accountId) : -1],
-        );
+        const inst = await findInstanceByAccount(uid, accountId);
         if (!inst) {
           return res.status(400).json({ success: false, msg: "WhatsApp session not found" });
         }
@@ -1358,23 +1385,22 @@ router.post("/send_message", validateUser, checkPlan, async (req, res) => {
     });
 
     if (chat) {
-      await query(
-        `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify(messageData), chat_id, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chat_id), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify(messageData)), updatedAt: new Date() },
+      });
     } else {
-      await query(
-        `INSERT INTO beta_chats (uid, origin_instance_id, chat_id, last_message, sender_name, sender_mobile, origin) VALUES (?,?,?,?,?,?,?)`,
-        [
-          uid,
-          JSON.stringify(sendResult?.sessionData?.user || { id: targetMobile }),
-          chat_id,
-          JSON.stringify(messageData),
-          targetMobile,
-          targetMobile,
-          targetOrigin,
-        ],
-      );
+      await prisma.beta_chats.create({
+        data: {
+          uid: str(uid),
+          origin_instance_id: str(JSON.stringify(sendResult?.sessionData?.user || { id: targetMobile })),
+          chat_id: str(chat_id),
+          last_message: str(JSON.stringify(messageData)),
+          sender_name: str(targetMobile),
+          sender_mobile: str(targetMobile),
+          origin: str(targetOrigin),
+        },
+      });
     }
 
     // Notify sockets
