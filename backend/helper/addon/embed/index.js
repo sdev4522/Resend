@@ -1,5 +1,6 @@
 const axios = require("axios");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { plain } = require("../../../database/prismaHelpers");
 const logger = require("../../../utils/logger");
 
 function checkEmbed() {
@@ -309,7 +310,7 @@ async function exchangeEmbedToken({
 
 async function genEmbedWebhook(params) {
   try {
-    const [admin] = await query(`SELECT * FROM admin LIMIT 1`, []);
+    const [admin] = plain(await prisma.admin.findMany({ take: 1 }));
     const webhook = `${process.env.FRONTENDURI}/api/inbox/embed/webhook/${admin?.uid}`;
     return webhook;
   } catch (err) {

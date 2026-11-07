@@ -1,7 +1,8 @@
 // socket.js
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
-const { query } = require("./database/dbpromise");
+const { prisma } = require("./database/prisma");
+const { plain, whereStr } = require("./database/prismaHelpers");
 const { processSocketEvent } = require("./helper/socket");
 
 let ioInstance = null;
@@ -9,7 +10,7 @@ let ioInstance = null;
 // Database functions
 async function getUserData(uid) {
   try {
-    const [user] = await query("SELECT * FROM user WHERE uid = ?", [uid]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     return user || null;
   } catch (error) {
     console.error("Error fetching user data:", error);
@@ -19,11 +20,9 @@ async function getUserData(uid) {
 
 async function getAgentData(uid) {
   try {
-    const [agent] = await query(`SELECT * FROM agents where uid = ?`, [uid]);
+    const [agent] = plain(await prisma.agents.findMany({ where: { uid: whereStr(uid) } }));
     if (agent) {
-      const [owner] = await query(`SELECT * FROM user where uid = ?`, [
-        agent?.owner_uid,
-      ]);
+      const [owner] = plain(await prisma.user.findMany({ where: { uid: whereStr(agent?.owner_uid) } }));
       return {
         ...agent,
         owner: owner || {},

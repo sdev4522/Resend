@@ -1,4 +1,5 @@
-const { query } = require("../../../../database/dbpromise");
+const { prisma } = require("../../../../database/prisma");
+const { idParam, plain, whereStr } = require("../../../../database/prismaHelpers");
 
 function mergeObjects(arrayA, arrayB, idKey, passedNameKey) {
   const mergedArray = [];
@@ -16,8 +17,8 @@ function mergeObjects(arrayA, arrayB, idKey, passedNameKey) {
 }
 
 async function getWarmerFromDB() {
-  const warmer = await query(`SELECT * FROM warmers WHERE is_active = ?`, [1]);
-  const warmerScript = await query(`SELECT * FROM warmer_script`, []);
+  const warmer = plain(await prisma.warmers.findMany({ where: { is_active: idParam(1) } }));
+  const warmerScript = plain(await prisma.warmer_script.findMany());
   return mergeObjects(warmer, warmerScript, "uid", "script");
 }
 
@@ -73,7 +74,7 @@ async function sendTyping(session, jid) {
 
 async function checkWarmerPlan({ uid }) {
   try {
-    const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     const warmer = user?.plan ? JSON.parse(user?.plan)?.wa_warmer : 0;
     return parseInt(warmer) > 0 ? true : false;
   } catch (err) {

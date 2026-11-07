@@ -1,4 +1,5 @@
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { plain } = require("../../../database/prismaHelpers");
 const fetch = require("node-fetch");
 
 const API_VERSION = "v21.0";
@@ -9,7 +10,7 @@ function checkInsta() {
 
 async function genInstaWebhook() {
   try {
-    const [admin] = await query(`SELECT * FROM admin LIMIT 1`, []);
+    const [admin] = plain(await prisma.admin.findMany({ take: 1 }));
     const webhook = `${process.env.BACKURI}/api/insta/webhook/${admin?.uid}`;
     return webhook;
   } catch (err) {

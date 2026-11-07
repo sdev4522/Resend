@@ -1,7 +1,8 @@
 const { TelegramClient } = require("telegram");
 const { StringSession } = require("telegram/sessions");
 const { NewMessage } = require("telegram/events");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { okPacket, plain, str, whereStr } = require("../../../database/prismaHelpers");
 const logger = require("../../../utils/logger");
 
 // Store active clients in memory
@@ -106,10 +107,7 @@ async function initTele() {
   try {
     logger.log("Initializing Telegram sessions...");
 
-    const sessions = await query(
-      "SELECT * FROM telegram_session WHERE status = ?",
-      ["active"],
-    );
+    const sessions = plain(await prisma.telegram_session.findMany({ where: { status: whereStr("active") } }));
 
     let successCount = 0;
     let failCount = 0;
@@ -125,10 +123,10 @@ async function initTele() {
           getErrorMessage(error),
         );
 
-        await query(
-          "UPDATE telegram_session SET status = ? WHERE session_id = ?",
-          ["inactive", session.session_id],
-        ).catch(() => {});
+        okPacket(await prisma.telegram_session.updateMany({
+          where: { session_id: whereStr(session.session_id) },
+          data: { status: str("inactive") },
+        })).catch(() => {});
       }
     }
 
@@ -150,10 +148,7 @@ async function connectSession(sessionId, isNew = false) {
       return { success: true, message: "Already connected" };
     }
 
-    [sessionData] = await query(
-      "SELECT * FROM telegram_session WHERE session_id = ?",
-      [sessionId],
-    );
+    [sessionData] = plain(await prisma.telegram_session.findMany({ where: { session_id: whereStr(sessionId) } }));
 
     if (!sessionData) {
       throw new Error("Session not found");
@@ -193,19 +188,16 @@ async function connectSession(sessionId, isNew = false) {
       });
 
       // Update 'data' column with profile metadata
-      await query("UPDATE telegram_session SET data = ? WHERE session_id = ?", [
-        JSON.stringify(profile),
-        sessionId,
-      ]).catch(() => {});
+      okPacket(await prisma.telegram_session.updateMany({
+        where: { session_id: whereStr(sessionId) },
+        data: { data: str(JSON.stringify(profile)) },
+      })).catch(() => {});
     }
 
     setupMessageListener(client, sessionData.title, sessionId);
     activeClients.set(sessionId, client);
 
-    await query("UPDATE telegram_session SET status = ? WHERE session_id = ?", [
-      "active",
-      sessionId,
-    ]);
+    await prisma.telegram_session.updateMany({ where: { session_id: whereStr(sessionId) }, data: { status: str("active") } });
 
     logger.log(`Connected: ${sessionData.title} (${sessionId})`);
     return { success: true, message: "Connected successfully" };
@@ -215,10 +207,10 @@ async function connectSession(sessionId, isNew = false) {
     const errorMessage = getErrorMessage(error);
 
     if (sessionData) {
-      await query(
-        "UPDATE telegram_session SET status = ? WHERE session_id = ?",
-        [`failed:${errorMessage}`, sessionId],
-      ).catch(() => {});
+      okPacket(await prisma.telegram_session.updateMany({
+        where: { session_id: whereStr(sessionId) },
+        data: { status: str(`failed:${errorMessage}`) },
+      })).catch(() => {});
     }
 
     if (activeClients.has(sessionId)) {
@@ -248,10 +240,7 @@ async function createSession(
       throw new Error("Telegram API credentials are required");
     }
 
-    const [existing] = await query(
-      "SELECT * FROM telegram_session WHERE session_id = ?",
-      [sessionId],
-    );
+    const [existing] = plain(await prisma.telegram_session.findMany({ where: { session_id: whereStr(sessionId) } }));
 
     if (existing) {
       if (
@@ -259,9 +248,7 @@ async function createSession(
         existing.status?.startsWith("failed:") ||
         existing.status === "pending_otp"
       ) {
-        await query("DELETE FROM telegram_session WHERE session_id = ?", [
-          sessionId,
-        ]);
+        await prisma.telegram_session.deleteMany({ where: { session_id: whereStr(sessionId) } });
 
         if (pendingClients.has(sessionId)) {
           const { client } = pendingClients.get(sessionId);
@@ -278,12 +265,16 @@ async function createSession(
     }
 
     // Insert with api_id, api_hash, and empty session/data
-    await query(
-      `INSERT INTO telegram_session 
-       (uid, status, session_id, title, session, data) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [uid, "pending_otp", sessionId, title, "", ""],
-    );
+    await prisma.telegram_session.create({
+      data: {
+        uid: str(uid),
+        status: str("pending_otp"),
+        session_id: str(sessionId),
+        title: str(title),
+        session: str(""),
+        data: str(""),
+      },
+    });
 
     const session = new StringSession("");
     const client = new TelegramClient(session, parseInt(apiId), apiHash, {
@@ -329,10 +320,10 @@ async function createSession(
     const errorMessage = getErrorMessage(error);
 
     if (sessionId) {
-      await query(
-        "UPDATE telegram_session SET status = ? WHERE session_id = ?",
-        [`failed:${errorMessage}`, sessionId],
-      ).catch(() => {});
+      okPacket(await prisma.telegram_session.updateMany({
+        where: { session_id: whereStr(sessionId) },
+        data: { status: str(`failed:${errorMessage}`) },
+      })).catch(() => {});
 
       if (pendingClients.has(sessionId)) {
         const { client } = pendingClients.get(sessionId);
@@ -355,10 +346,7 @@ async function verifyCode(sessionId, code) {
     const pendingData = pendingClients.get(sessionId);
 
     if (!pendingData) {
-      const [session] = await query(
-        "SELECT status FROM telegram_session WHERE session_id = ?",
-        [sessionId],
-      );
+      const [session] = plain(await prisma.telegram_session.findMany({ where: { session_id: whereStr(sessionId) }, select: { status: true } }));
 
       if (session?.status === "active") {
         return { success: true, message: "Session already active" };
@@ -390,10 +378,14 @@ async function verifyCode(sessionId, code) {
     const profile = await getUserProfile(client);
 
     // Save session string in 'session' column and profile in 'data' column
-    await query(
-      "UPDATE telegram_session SET status = ?, session = ?, data = ? WHERE session_id = ?",
-      ["active", sessionString, JSON.stringify(profile || {}), sessionId],
-    );
+    await prisma.telegram_session.updateMany({
+      where: { session_id: whereStr(sessionId) },
+      data: {
+        status: str("active"),
+        session: str(sessionString),
+        data: str(JSON.stringify(profile || {})),
+      },
+    });
 
     if (profile) {
       sessionMetadata.set(sessionId, {
@@ -421,10 +413,10 @@ async function verifyCode(sessionId, code) {
 
     const errorMessage = getErrorMessage(error);
 
-    await query("UPDATE telegram_session SET status = ? WHERE session_id = ?", [
-      `failed:${errorMessage}`,
-      sessionId,
-    ]).catch(() => {});
+    okPacket(await prisma.telegram_session.updateMany({
+      where: { session_id: whereStr(sessionId) },
+      data: { status: str(`failed:${errorMessage}`) },
+    })).catch(() => {});
 
     if (pendingClients.has(sessionId)) {
       const { client } = pendingClients.get(sessionId);
@@ -446,10 +438,18 @@ async function getSessionStatus(sessionId) {
     const connected = activeClients.has(sessionId);
     const metadata = sessionMetadata.get(sessionId);
 
-    const [sessionData] = await query(
-      "SELECT id, uid, status, session_id, title, data, createdAt FROM telegram_session WHERE session_id = ?",
-      [sessionId],
-    );
+    const [sessionData] = plain(await prisma.telegram_session.findMany({
+      where: { session_id: whereStr(sessionId) },
+      select: {
+        id: true,
+        uid: true,
+        status: true,
+        session_id: true,
+        title: true,
+        data: true,
+        createdAt: true,
+      },
+    }));
 
     if (!sessionData) {
       throw new Error("Session not found");
@@ -497,10 +497,18 @@ async function getSessionStatus(sessionId) {
 // Update getUserSessions function
 async function getUserSessions(uid) {
   try {
-    const sessions = await query(
-      "SELECT id, uid, status, session_id, title, data, createdAt FROM telegram_session WHERE uid = ?",
-      [uid],
-    );
+    const sessions = plain(await prisma.telegram_session.findMany({
+      where: { uid: whereStr(uid) },
+      select: {
+        id: true,
+        uid: true,
+        status: true,
+        session_id: true,
+        title: true,
+        data: true,
+        createdAt: true,
+      },
+    }));
 
     return sessions.map((s) => {
       const isFailed = s.status?.startsWith("failed:");
@@ -559,9 +567,7 @@ async function deleteSession(sessionId) {
       pendingClients.delete(sessionId);
     }
 
-    await query("DELETE FROM telegram_session WHERE session_id = ?", [
-      sessionId,
-    ]);
+    await prisma.telegram_session.deleteMany({ where: { session_id: whereStr(sessionId) } });
 
     logger.log(`Session deleted: ${sessionId}`);
     return { success: true, message: "Session deleted successfully" };
@@ -585,10 +591,7 @@ async function disconnectSession(sessionId) {
       activeClients.delete(sessionId);
     }
 
-    await query("UPDATE telegram_session SET status = ? WHERE session_id = ?", [
-      "inactive",
-      sessionId,
-    ]);
+    await prisma.telegram_session.updateMany({ where: { session_id: whereStr(sessionId) }, data: { status: str("inactive") } });
 
     logger.log(`Session disconnected: ${sessionId}`);
     return { success: true, message: "Session disconnected successfully" };
@@ -621,10 +624,7 @@ async function sendMessage(sessionId, chatId, message) {
       error.message.includes("connection") ||
       error.message.includes("AUTH")
     ) {
-      await query(
-        "UPDATE telegram_session SET status = ? WHERE session_id = ?",
-        ["inactive", sessionId],
-      ).catch(() => {});
+      okPacket(await prisma.telegram_session.updateMany({ where: { session_id: whereStr(sessionId) }, data: { status: str("inactive") } })).catch(() => {});
 
       activeClients.delete(sessionId);
     }
@@ -664,10 +664,7 @@ async function getChats(sessionId, limit = 50) {
       error.message.includes("connection") ||
       error.message.includes("AUTH")
     ) {
-      await query(
-        "UPDATE telegram_session SET status = ? WHERE session_id = ?",
-        ["inactive", sessionId],
-      ).catch(() => {});
+      okPacket(await prisma.telegram_session.updateMany({ where: { session_id: whereStr(sessionId) }, data: { status: str("inactive") } })).catch(() => {});
 
       activeClients.delete(sessionId);
     }

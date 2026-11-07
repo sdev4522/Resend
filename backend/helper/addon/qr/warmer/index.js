@@ -1,4 +1,5 @@
-const { query } = require("../../../../database/dbpromise");
+const { prisma } = require("../../../../database/prisma");
+const { plain, whereStr } = require("../../../../database/prismaHelpers");
 const { checkQr, getSession, isExists } = require("../index");
 const {
   mergeObjects,
@@ -26,10 +27,7 @@ async function runWarmer(warmer) {
         const instanceTo = getRandomElementFromArray(instanceArr, instanceFrom);
 
         // Getting the target instance from DB
-        const instanceToObj = await query(
-          `SELECT * FROM instance WHERE uniqueId = ?`,
-          [instanceTo]
-        );
+        const instanceToObj = plain(await prisma.instance.findMany({ where: { uniqueId: whereStr(instanceTo) } }));
 
         // Get the session with a timeout
         let session;

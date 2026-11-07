@@ -421,7 +421,8 @@ def main():
 
 def fix_imports(src, path, helpers):
     import os
-    backend = path[:path.index('/backend/') + len('/backend/')] if '/backend/' in path else None
+    path = os.path.abspath(path)
+    backend = path[:path.index("/backend/") + len("/backend/")] if "/backend/" in path else None
     rel = os.path.relpath(os.path.join(backend, 'database'), os.path.dirname(os.path.abspath(path))) if backend else '../database'
     if not rel.startswith('.'): rel = './' + rel
     still_raw = re.search(r'(?<![.\w])query\(', src) is not None

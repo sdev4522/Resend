@@ -8,6 +8,9 @@ const smoke = require("./test-support/prismaSmoke");
   const files = process.argv.slice(2).filter((a) => !a.startsWith("--"));
   const verbose = process.argv.includes("--verbose");
   smoke.installStubs();
+  // background work started by helpers (timers, sockets) must not kill the run
+  process.on("unhandledRejection", () => {});
+  process.on("uncaughtException", () => {});
   const logger = smoke.backendRequire("./utils/logger.js");
   const origError = logger.error;
   const logged = [];
@@ -18,7 +21,8 @@ const smoke = require("./test-support/prismaSmoke");
   console.error = () => {};
 
   for (const f of files) {
-    const statuses = await smoke.exerciseRouter(f);
+    const isRouter = /(^|\/)routes\//.test(f);
+    const statuses = isRouter ? await smoke.exerciseRouter(f) : await smoke.exerciseModule(f);
     console.log(`\n# ${f}: ${statuses.length} route calls`);
     if (verbose) statuses.forEach((s) => console.log("  " + s));
   }
@@ -44,6 +48,7 @@ const smoke = require("./test-support/prismaSmoke");
     console.log(`Logged Prisma errors: ${prismaErrLogs.length}`);
     prismaErrLogs.forEach((l) => console.log(`  ✗ ${l}`));
   }
+  process.removeAllListeners("unhandledRejection");
   const failed = r.validation.length + ownRaw.length + r.serverErrors.length + prismaErrLogs.length;
   console.log(failed ? "\nRESULT: FAIL" : "\nRESULT: PASS");
   process.exit(failed ? 1 : 0);

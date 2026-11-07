@@ -1,5 +1,6 @@
 const { OAuth2Client } = require("google-auth-library");
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { plain } = require("../database/prismaHelpers");
 const logger = require("../utils/logger");
 
 /**
@@ -8,12 +9,8 @@ const logger = require("../utils/logger");
  */
 async function getGoogleAuthConfig() {
   try {
-    const [webPublic] = await query(
-      "SELECT google_client_id, google_login_active FROM web_public LIMIT 1"
-    );
-    const [webPrivate] = await query(
-      "SELECT google_client_secret FROM web_private LIMIT 1"
-    );
+    const [webPublic] = plain(await prisma.web_public.findMany({ select: { google_client_id: true, google_login_active: true }, take: 1 }));
+    const [webPrivate] = plain(await prisma.web_private.findMany({ select: { google_client_secret: true }, take: 1 }));
 
     const clientId = (
       webPublic?.google_client_id ||

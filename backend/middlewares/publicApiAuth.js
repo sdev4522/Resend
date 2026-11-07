@@ -1,5 +1,6 @@
 const { validateApiKey } = require("../services/api/apiKeyService");
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { plain, whereStr } = require("../database/prismaHelpers");
 const { resolveUserPlan, getAllEntitlements } = require("../helper/entitlements");
 const logger = require("../utils/logger");
 
@@ -39,7 +40,7 @@ async function publicApiAuth(req, res, next) {
     const { key, scopes } = authResult;
 
     // Resolve tenant workspace from user table
-    const userRows = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [key.uid]);
+    const userRows = plain(await prisma.user.findMany({ where: { uid: whereStr(key.uid) }, take: 1 }));
     if (userRows.length === 0) {
       return res.status(401).json({
         error: {

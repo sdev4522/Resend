@@ -280,4 +280,61 @@ async function exerciseRouter(relFile) {
   return statuses;
 }
 
-module.exports = { installStubs, exerciseRouter, report, prisma, store, BACKEND, backendRequire };
+// ---------------- non-router module exerciser ----------------
+function paramList(fn) {
+  const src = Function.prototype.toString.call(fn);
+  const open = src.indexOf("(");
+  if (open < 0 || /^class\b/.test(src)) return null;
+  let depth = 0, i = open, end = -1;
+  for (; i < src.length; i++) {
+    const c = src[i];
+    if (c === "(" || c === "{" || c === "[") depth++;
+    else if (c === ")" || c === "}" || c === "]") { depth--; if (depth === 0) { end = i; break; } }
+  }
+  const inner = end > open ? src.slice(open + 1, end) : "";
+  const parts = []; let d = 0, start = 0;
+  for (let j = 0; j < inner.length; j++) {
+    const c = inner[j];
+    if ("({[".includes(c)) d++; else if (")}]".includes(c)) d--;
+    else if (c === "," && d === 0) { parts.push(inner.slice(start, j)); start = j + 1; }
+  }
+  if (inner.slice(start).trim()) parts.push(inner.slice(start));
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
+const fakeRes = () => { const r = { headersSent: false, statusCode: 200 }; r.status = () => r; r.json = () => r; r.send = () => r; r.sendStatus = () => r; r.setHeader = () => r; r.end = () => r; return r; };
+function argFor(param) {
+  const p = param.replace(/^\.\.\./, "").split("=")[0].trim();
+  if (p.startsWith("{")) {
+    const keys = p.slice(1, -1).split(",").map((k) => k.split(/[:=]/)[0].trim()).filter((k) => /^[A-Za-z_$][\w$]*$/.test(k));
+    return Object.fromEntries(keys.map((k) => [k, argFor(k)]));
+  }
+  if (p.startsWith("[")) return [];
+  if (/^(req|request)$/.test(p)) return { body: {}, query: {}, params: {}, headers: {}, decode: { uid: "u1" }, owner: { uid: "u1" }, get: () => "" };
+  if (/^(res|response)$/.test(p)) return fakeRes();
+  if (/^(next|cb|callback|fn|resolve)$/.test(p)) return () => {};
+  if (/^(io|socket|sock|session|client|sessionObj)$/i.test(p)) return new Proxy({}, { get: (t, k) => (k === "then" ? undefined : k === "user" ? { id: "91999@s.whatsapp.net" } : () => ({ emit() {}, to() { return this; } })) });
+  if (/^(uid|ownerUid|owner_uid|userId|user_id|agentUid)$/i.test(p)) return "u1";
+  if (/(Arr|List|ids|Ids|contacts|messages|rows|items)$/.test(p)) return [];
+  if (/(obj|Obj|data|Data|payload|body|options|opts|config|plan|user|chat|message|msg|context|row|entity|flow|node|campaign|broadcast)$/i.test(p)) return { uid: "u1", id: 1, chat_id: "c1", data: "{}", plan: "{}" };
+  return guessValue(p);
+}
+async function exerciseModule(relFile) {
+  const abs = path.join(BACKEND, relFile);
+  let mod;
+  try { mod = backendRequire(abs); } catch (e) { report.serverErrors.push({ where: relFile, msg: `load failed: ${e.message}` }); return []; }
+  const fns = typeof mod === "function" ? { default: mod } : Object.fromEntries(Object.entries(mod || {}).filter(([, v]) => typeof v === "function"));
+  const statuses = [];
+  for (const [name, fn] of Object.entries(fns)) {
+    const params = paramList(fn);
+    if (!params) continue;
+    const args = params.map(argFor);
+    const outcome = await Promise.race([
+      Promise.resolve().then(() => fn(...args)).then(() => "ok", (e) => `threw: ${String(e?.message || e).slice(0, 80)}`),
+      new Promise((r) => setTimeout(() => r("timeout"), 8000)),
+    ]);
+    statuses.push(`${name}(${params.length}) ${outcome}`);
+  }
+  return statuses;
+}
+
+module.exports = { installStubs, exerciseRouter, exerciseModule, report, prisma, store, BACKEND, backendRequire };

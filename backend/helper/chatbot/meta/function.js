@@ -1,4 +1,5 @@
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { intOrNull, plain, str, whereStr } = require("../../../database/prismaHelpers");
 const {
   getCurrentTimestampInTimeZone,
   addObjectToFile,
@@ -155,10 +156,8 @@ function getOriginData(chatbotFromMysq) {
 function sendMetaMsgCloud({ uid, msgObj, toNumber, savObj, chatId }) {
   return new Promise(async (resolve) => {
     try {
-      const getMeta = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-        uid,
-      ]);
-      const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+      const getMeta = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
+      const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
 
       if (getMeta.length < 1) {
         return resolve({ success: false, msg: "Unable to to find API " });
@@ -214,15 +213,16 @@ function sendMetaMsgCloud({ uid, msgObj, toNumber, savObj, chatId }) {
 
         addObjectToFile(finalSaveMsg, chatPath);
 
-        await query(
-          `UPDATE chats SET last_message_came = ?, last_message = ?, is_opened = ? WHERE chat_id = ?`,
-          [userTimezone, JSON.stringify(finalSaveMsg), 1, chatId]
-        );
+        await prisma.chats.updateMany({
+          where: { chat_id: whereStr(chatId) },
+          data: {
+            last_message_came: str(userTimezone),
+            last_message: str(JSON.stringify(finalSaveMsg)),
+            is_opened: intOrNull(1),
+          },
+        });
 
-        await query(`UPDATE chats SET is_opened = ? WHERE chat_id = ?`, [
-          1,
-          chatId,
-        ]);
+        await prisma.chats.updateMany({ where: { chat_id: whereStr(chatId) }, data: { is_opened: intOrNull(1) } });
       }
 
       resolve({ success: true });
@@ -278,7 +278,7 @@ async function sendQrMsg({
         msg: `Could not send message: ${send?.toString()}`,
       };
     } else {
-      const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+      const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
 
       const userTimezone = getCurrentTimestampInTimeZone(
         getUser[0]?.timezone || Date.now() / 1000
@@ -296,15 +296,16 @@ async function sendQrMsg({
 
       addObjectToFile(finalSaveMsg, chatPath);
 
-      await query(
-        `UPDATE chats SET last_message_came = ?, last_message = ?, is_opened = ? WHERE chat_id = ?`,
-        [userTimezone, JSON.stringify(finalSaveMsg), 1, chatIdNew]
-      );
+      await prisma.chats.updateMany({
+        where: { chat_id: whereStr(chatIdNew) },
+        data: {
+          last_message_came: str(userTimezone),
+          last_message: str(JSON.stringify(finalSaveMsg)),
+          is_opened: intOrNull(1),
+        },
+      });
 
-      await query(`UPDATE chats SET is_opened = ? WHERE chat_id = ?`, [
-        1,
-        chatIdNew,
-      ]);
+      await prisma.chats.updateMany({ where: { chat_id: whereStr(chatIdNew) }, data: { is_opened: intOrNull(1) } });
     }
   } catch (err) {
     console.log(err);

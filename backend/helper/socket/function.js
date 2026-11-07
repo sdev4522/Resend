@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { plain, whereStr } = require("../../database/prismaHelpers");
 const { validateSafeUrl } = require("../../utils/ssrfGuard");
 const fetch = require("node-fetch");
 const mime = require("mime-types");
@@ -44,10 +45,7 @@ async function sendInstaMsg({ uid, to, msgObj, chatInfo }) {
       return { success: false, msg: "Could not resolve Instagram account" };
     }
 
-    const [igAccount] = await query(
-      `SELECT * FROM instagram_accounts WHERE user_id = ? AND uid = ? LIMIT 1`,
-      [myIgUserId, uid],
-    );
+    const [igAccount] = plain(await prisma.instagram_accounts.findMany({ where: { user_id: whereStr(myIgUserId), uid: whereStr(uid) }, take: 1 }));
 
     if (!igAccount?.access_token) {
       return { success: false, msg: "Instagram account not connected" };
@@ -200,10 +198,7 @@ function extractObjFromChatId(str) {
 
 async function getSessionIdFromChatIdQr(str) {
   const obj = extractObjFromChatId(str);
-  const sessionId = await query(
-    `SELECT * FROM instance WHERE number = ? AND uid = ?`,
-    [obj.fromNumber, obj.uid],
-  );
+  const sessionId = plain(await prisma.instance.findMany({ where: { number: whereStr(obj.fromNumber), uid: whereStr(obj.uid) } }));
   return sessionId[0]?.uniqueId || "na";
 }
 
@@ -258,19 +253,13 @@ async function deleteMediaFromConversation({
 
       case "clear":
         // Handle "clear" type: Clear the entire conversation JSON
-        await query(
-          `DELETE FROM beta_conversation WHERE chat_id = ? AND uid = ?`,
-          [chatId, uid],
-        );
+        await prisma.beta_conversation.deleteMany({ where: { chat_id: whereStr(chatId), uid: whereStr(uid) } });
         logger.log("Conversation JSON cleared successfully.");
         break;
 
       case "delete":
         // Handle "delete" type: Delete the JSON file
-        await query(
-          `DELETE FROM beta_conversation WHERE chat_id = ? AND uid = ?`,
-          [chatId, uid],
-        );
+        await prisma.beta_conversation.deleteMany({ where: { chat_id: whereStr(chatId), uid: whereStr(uid) } });
         break;
 
       default:
@@ -306,7 +295,7 @@ function returnMsgObjAfterAddingKey(overrides = {}) {
 
 async function sendMetaMsg({ uid, to, msgObj }) {
   try {
-    const [api] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [uid]);
+    const [api] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
     if (!api || !api?.access_token || !api?.business_phone_number_id) {
       return { success: false, msg: "Please add your meta API keys" };
     }
@@ -647,10 +636,7 @@ async function sendMessengerMsg({ uid, to, msgObj, chatInfo }) {
       return { success: false, msg: "Could not resolve Messenger page" };
     }
 
-    const [account] = await query(
-      `SELECT * FROM messenger_accounts WHERE page_id = ? AND uid = ? LIMIT 1`,
-      [pageId, uid],
-    );
+    const [account] = plain(await prisma.messenger_accounts.findMany({ where: { page_id: whereStr(pageId), uid: whereStr(uid) }, take: 1 }));
 
     if (!account?.page_access_token) {
       return { success: false, msg: "Messenger page not connected" };

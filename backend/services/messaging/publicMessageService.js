@@ -1,5 +1,6 @@
 const crypto = require("crypto");
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { plain, str, whereStr } = require("../../database/prismaHelpers");
 const logger = require("../../utils/logger");
 const { sendAPIMessage } = require("../../functions/function");
 
@@ -205,40 +206,37 @@ async function dispatchPublicMessage({
 
   // Persist message record to beta_api_logs and beta_conversation
   try {
-    await query(
-      `INSERT INTO beta_api_logs (uid, msg_id, request, response, status) VALUES (?, ?, ?, ?, ?)`,
-      [
-        uid,
-        publicMsgId,
-        JSON.stringify({
+    await prisma.beta_api_logs.create({
+      data: {
+        uid: str(uid),
+        msg_id: str(publicMsgId),
+        request: str(JSON.stringify({
           to: normalizedTo,
           type,
           connection_id: connection.public_id,
           provider_msg_id: providerMsgId,
-        }),
-        JSON.stringify({ status: initialStatus, providerMsgId }),
-        initialStatus,
-      ]
-    );
+        })),
+        response: str(JSON.stringify({ status: initialStatus, providerMsgId })),
+        status: str(initialStatus),
+      },
+    });
 
     // Also store reference in beta_conversation for inbox traceability
     const chatId = `${connection.phone_number || "api"}_${normalizedTo}_${uid}`;
-    await query(
-      `INSERT INTO beta_conversation 
-       (chat_id, uid, type, status, metaChatId, senderMobile, route, origin, msgContext, timestamp) 
-       VALUES (?, ?, ?, ?, ?, ?, 'OUTGOING', ?, ?, ?)`,
-      [
-        chatId,
-        uid,
-        type,
-        initialStatus,
-        publicMsgId,
-        normalizedTo,
-        provider,
-        JSON.stringify(messagePayload),
-        Math.floor(Date.now() / 1000).toString(),
-      ]
-    );
+    await prisma.beta_conversation.create({
+      data: {
+        chat_id: str(chatId),
+        uid: str(uid),
+        type: str(type),
+        status: str(initialStatus),
+        metaChatId: str(publicMsgId),
+        senderMobile: str(normalizedTo),
+        route: "OUTGOING",
+        origin: str(provider),
+        msgContext: str(JSON.stringify(messagePayload)),
+        timestamp: str(Math.floor(Date.now() / 1000).toString()),
+      },
+    });
   } catch (logErr) {
     logger.error("Failed to log public message send:", logErr);
   }
@@ -323,22 +321,21 @@ async function dispatchPublicTemplateMessage({
   const initialStatus = "sent";
 
   try {
-    await query(
-      `INSERT INTO beta_api_logs (uid, msg_id, request, response, status) VALUES (?, ?, ?, ?, ?)`,
-      [
-        uid,
-        publicMsgId,
-        JSON.stringify({
+    await prisma.beta_api_logs.create({
+      data: {
+        uid: str(uid),
+        msg_id: str(publicMsgId),
+        request: str(JSON.stringify({
           to: normalizedTo,
           type: "template",
           templateName,
           connection_id: connection.public_id,
           provider_msg_id: providerMsgId,
-        }),
-        JSON.stringify(metaResponse),
-        initialStatus,
-      ]
-    );
+        })),
+        response: str(JSON.stringify(metaResponse)),
+        status: str(initialStatus),
+      },
+    });
   } catch (err) {
     logger.error("Failed to log template message send:", err);
   }
@@ -362,10 +359,7 @@ async function dispatchPublicTemplateMessage({
  */
 async function getPublicMessageStatus(publicMsgId, uid) {
   // Query beta_api_logs first
-  const logRows = await query(
-    `SELECT * FROM beta_api_logs WHERE msg_id = ? AND uid = ? LIMIT 1`,
-    [publicMsgId, uid]
-  );
+  const logRows = plain(await prisma.beta_api_logs.findMany({ where: { msg_id: whereStr(publicMsgId), uid: whereStr(uid) }, take: 1 }));
 
   if (logRows.length > 0) {
     const row = logRows[0];
@@ -388,10 +382,7 @@ async function getPublicMessageStatus(publicMsgId, uid) {
   }
 
   // Check beta_conversation by metaChatId
-  const convRows = await query(
-    `SELECT * FROM beta_conversation WHERE metaChatId = ? AND uid = ? LIMIT 1`,
-    [publicMsgId, uid]
-  );
+  const convRows = plain(await prisma.beta_conversation.findMany({ where: { metaChatId: whereStr(publicMsgId), uid: whereStr(uid) }, take: 1 }));
 
   if (convRows.length > 0) {
     const row = convRows[0];
