@@ -1,39 +1,81 @@
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { Prisma } = require("@prisma/client");
+const { plain, whereStr } = require("../../database/prismaHelpers");
 
 /**
- * Builds SQL condition and parameters for date range filtering.
+ * Builds the date-range filter for analytics queries.
  * Supported ranges: 'today', 'yesterday', '7d', '30d', '90d', 'custom'
+ *
+ * Returns the same fields as before (conditionSql/params are kept for backward compatibility)
+ * plus `range` as a Prisma filter object ({ gte, lt/lte }) used by the ORM queries, and
+ * `sql(column)` producing a parameterised Prisma.sql fragment for the time-series queries.
  *
  * @param {Object} queryParams - { range, startDate, endDate }
  * @param {string} dateColumn - Name of the date column, default 'createdAt'
- * @returns {{ conditionSql: string, params: Array<any>, range: string, startDate?: string, endDate?: string }}
  */
 function buildDateRangeFilter(queryParams = {}, dateColumn = "createdAt") {
   const { range = "30d", startDate, endDate } = queryParams;
-  let conditionSql = "";
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysAgo = (n) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
+
+  let filter;
+  let conditionSql;
   let params = [];
 
   if (range === "today") {
+    filter = { gte: startOfToday };
     conditionSql = `${dateColumn} >= CURDATE()`;
   } else if (range === "yesterday") {
+    const startOfYesterday = new Date(startOfToday);
+    startOfYesterday.setDate(startOfYesterday.getDate() - 1);
+    filter = { gte: startOfYesterday, lt: startOfToday };
     conditionSql = `${dateColumn} >= DATE_SUB(CURDATE(), INTERVAL 1 DAY) AND ${dateColumn} < CURDATE()`;
   } else if (range === "7d") {
+    filter = { gte: daysAgo(7) };
     conditionSql = `${dateColumn} >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
-  } else if (range === "30d") {
-    conditionSql = `${dateColumn} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
   } else if (range === "90d") {
+    filter = { gte: daysAgo(90) };
     conditionSql = `${dateColumn} >= DATE_SUB(NOW(), INTERVAL 90 DAY)`;
   } else if (range === "custom" && startDate && endDate) {
     const cleanStart = String(startDate).slice(0, 10);
     const cleanEnd = String(endDate).slice(0, 10);
+    filter = {
+      gte: new Date(`${cleanStart}T00:00:00`),
+      lte: new Date(`${cleanEnd}T23:59:59`),
+    };
     conditionSql = `${dateColumn} >= ? AND ${dateColumn} <= ?`;
     params = [`${cleanStart} 00:00:00`, `${cleanEnd} 23:59:59`];
   } else {
-    // Default fallback: 30 days
+    // '30d' and default fallback
+    filter = { gte: daysAgo(30) };
     conditionSql = `${dateColumn} >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
   }
 
-  return { conditionSql, params, range, startDate, endDate };
+  if (Number.isNaN(filter.gte?.getTime?.()) || Number.isNaN(filter.lte?.getTime?.())) {
+    filter = { gte: daysAgo(30) }; // invalid custom dates
+  }
+
+  // Parameterised SQL fragment for raw time-series queries (column names are fixed literals)
+  const sql = (column) => {
+    const col = Prisma.raw(column);
+    const parts = [];
+    if (filter.gte) parts.push(Prisma.sql`${col} >= ${filter.gte}`);
+    if (filter.lt) parts.push(Prisma.sql`${col} < ${filter.lt}`);
+    if (filter.lte) parts.push(Prisma.sql`${col} <= ${filter.lte}`);
+    return parts.length ? Prisma.join(parts, " AND ") : Prisma.sql`1 = 1`;
+  };
+
+  return { conditionSql, params, range, startDate, endDate, filter, sql };
+}
+
+/** Rows from $queryRaw: COUNT/SUM come back as BigInt/Decimal -> numbers (as mysql2 returned). */
+function toNumberRows(rows, numericKeys) {
+  return plain(rows || []).map((row) => {
+    const out = { ...row };
+    for (const key of numericKeys) out[key] = Number(out[key] || 0);
+    return out;
+  });
 }
 
 /**
@@ -52,10 +94,13 @@ async function resolveInstanceScope(uid, instanceId) {
   const numericId = isNumeric ? parseInt(instanceId, 10) : -1;
 
   // 1. Check QR instance ownership
-  const [qrInst] = await query(
-    `SELECT id, uniqueId, number, title, status FROM instance WHERE uid = ? AND (uniqueId = ? OR id = ? OR number = ?) LIMIT 1`,
-    [uid, instanceId, numericId, instanceId]
-  );
+  const qrInst = await prisma.instance.findFirst({
+    where: {
+      uid: whereStr(uid),
+      OR: [{ uniqueId: String(instanceId) }, { id: numericId }, { number: String(instanceId) }],
+    },
+    select: { id: true, uniqueId: true, number: true, title: true, status: true },
+  });
 
   if (qrInst) {
     return {
@@ -69,10 +114,17 @@ async function resolveInstanceScope(uid, instanceId) {
   }
 
   // 2. Check Meta API ownership
-  const [metaInst] = await query(
-    `SELECT id, business_phone_number_id, waba_id FROM meta_api WHERE uid = ? AND (business_phone_number_id = ? OR id = ? OR waba_id = ?) LIMIT 1`,
-    [uid, instanceId, numericId, instanceId]
-  );
+  const metaInst = await prisma.meta_api.findFirst({
+    where: {
+      uid: whereStr(uid),
+      OR: [
+        { business_phone_number_id: String(instanceId) },
+        { id: numericId },
+        { waba_id: String(instanceId) },
+      ],
+    },
+    select: { id: true, business_phone_number_id: true, waba_id: true },
+  });
 
   if (metaInst) {
     return {
@@ -99,180 +151,198 @@ async function resolveInstanceScope(uid, instanceId) {
  * @param {Object} filters - { range, startDate, endDate, instanceId }
  */
 async function getUserWorkspaceAnalytics(uid, filters = {}) {
-  const { conditionSql: dateSql, params: dateParams, range, startDate, endDate } = buildDateRangeFilter(filters, "createdAt");
+  const dateRange = buildDateRangeFilter(filters, "createdAt");
+  const { range, startDate, endDate, filter: period } = dateRange;
   const instanceScope = await resolveInstanceScope(uid, filters.instanceId);
+  const tenant = whereStr(uid);
 
-  // 1. Build message filtering conditions
-  const msgConditions = ["uid = ?", dateSql];
-  const msgParams = [uid, ...dateParams];
+  // 1. Message filtering (ORM filter + equivalent SQL fragment for the time series)
+  const msgAnd = [{ uid: tenant }, { createdAt: period }];
+  const msgSqlParts = [Prisma.sql`uid = ${tenant}`, dateRange.sql("createdAt")];
 
   if (instanceScope.isScoped) {
     if (instanceScope.type === "qr") {
       if (instanceScope.number) {
         const cleanNum = instanceScope.number.replace(/[^0-9]/g, "");
-        msgConditions.push("(chat_id LIKE ? OR origin = 'qr')");
-        msgParams.push(`${cleanNum}_%`);
+        msgAnd.push({ OR: [{ chat_id: { startsWith: `${cleanNum}_` } }, { origin: "qr" }] });
+        msgSqlParts.push(Prisma.sql`(chat_id LIKE ${`${cleanNum}\\_%`} OR origin = 'qr')`);
       } else {
-        msgConditions.push("1 = 0"); // Unpaired instance has no messages
+        msgAnd.push({ id: -1 }); // Unpaired instance has no messages
+        msgSqlParts.push(Prisma.sql`1 = 0`);
       }
     } else if (instanceScope.type === "meta") {
-      msgConditions.push("origin = 'meta'");
+      msgAnd.push({ origin: "meta" });
+      msgSqlParts.push(Prisma.sql`origin = 'meta'`);
     }
   }
 
-  const msgWhere = msgConditions.join(" AND ");
+  const msgWhere = { AND: msgAnd };
+  const failedFilter = { OR: [{ status: "failed" }, { err: { not: null } }] };
 
-  // Message aggregate counts
-  const [msgSummary] = await query(
-    `SELECT 
-      COUNT(*) as total,
-      COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
-      COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
-      COUNT(CASE WHEN status IN ('delivered', 'read') THEN 1 END) as delivered,
-      COUNT(CASE WHEN status = 'read' THEN 1 END) as readCount,
-      COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failed
-    FROM beta_conversation 
-    WHERE ${msgWhere}`,
-    msgParams
-  );
+  // Message aggregate counts (former COUNT(CASE ...) columns)
+  const [msgTotal, msgIncoming, msgOutgoing, msgDelivered, msgRead, msgFailed] = await Promise.all([
+    prisma.beta_conversation.count({ where: msgWhere }),
+    prisma.beta_conversation.count({ where: { AND: [...msgAnd, { route: "INCOMING" }] } }),
+    prisma.beta_conversation.count({ where: { AND: [...msgAnd, { route: "OUTGOING" }] } }),
+    prisma.beta_conversation.count({ where: { AND: [...msgAnd, { status: { in: ["delivered", "read"] } }] } }),
+    prisma.beta_conversation.count({ where: { AND: [...msgAnd, { status: "read" }] } }),
+    prisma.beta_conversation.count({ where: { AND: [...msgAnd, failedFilter] } }),
+  ]);
+  const msgSummary = {
+    total: msgTotal,
+    incoming: msgIncoming,
+    outgoing: msgOutgoing,
+    delivered: msgDelivered,
+    readCount: msgRead,
+    failed: msgFailed,
+  };
 
-  // Message daily time series
-  const msgTimeSeries = await query(
-    `SELECT 
-      DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
-      COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
-      COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
-      COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failed,
-      COUNT(*) as total
-    FROM beta_conversation
-    WHERE ${msgWhere}
-    GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
-    ORDER BY date ASC`,
-    msgParams
+  // Message daily time series (date bucketing needs SQL; filters are parameterised)
+  const msgTimeSeries = toNumberRows(
+    await prisma.$queryRaw`
+      SELECT
+        DATE_FORMAT(createdAt, '%Y-%m-%d') AS date,
+        COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) AS incoming,
+        COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) AS outgoing,
+        COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) AS failed,
+        COUNT(*) AS total
+      FROM beta_conversation
+      WHERE ${Prisma.join(msgSqlParts, " AND ")}
+      GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
+      ORDER BY date ASC`,
+    ["incoming", "outgoing", "failed", "total"],
   );
 
   // 2. Conversations Summary
-  const chatConditions = ["uid = ?"];
-  const chatParams = [uid];
+  const chatAnd = [{ uid: tenant }];
 
   if (instanceScope.isScoped) {
     if (instanceScope.type === "qr") {
       if (instanceScope.number) {
         const cleanNum = instanceScope.number.replace(/[^0-9]/g, "");
-        chatConditions.push("(origin = 'qr' AND (chat_id LIKE ? OR origin_instance_id LIKE ?))");
-        chatParams.push(`${cleanNum}_%`, `%"${cleanNum}%`);
+        chatAnd.push({
+          origin: "qr",
+          OR: [
+            { chat_id: { startsWith: `${cleanNum}_` } },
+            { origin_instance_id: { contains: `"${cleanNum}` } },
+          ],
+        });
       } else {
-        chatConditions.push("1 = 0");
+        chatAnd.push({ id: -1 });
       }
     } else if (instanceScope.type === "meta") {
       const busId = instanceScope.metaId || "";
-      chatConditions.push("(origin = 'meta' AND (origin_instance_id LIKE ? OR chat_id LIKE 'meta_%'))");
-      chatParams.push(`%"${busId}%`);
+      chatAnd.push({
+        origin: "meta",
+        OR: [
+          { origin_instance_id: { contains: `"${busId}` } },
+          { chat_id: { startsWith: "meta_" } },
+        ],
+      });
     }
   }
 
-  const chatWhere = chatConditions.join(" AND ");
+  const chatWhere = { AND: chatAnd };
 
-  const [chatSummary] = await query(
-    `SELECT 
-      COUNT(*) as total,
-      COUNT(CASE WHEN ${dateSql.replace(/createdAt/g, "updatedAt")} THEN 1 END) as activeInPeriod,
-      COALESCE(SUM(unread_count), 0) as totalUnread
-    FROM beta_chats
-    WHERE ${chatWhere}`,
-    [...chatParams, ...dateParams]
-  );
+  const [chatTotal, chatActive, chatUnread, originGroups] = await Promise.all([
+    prisma.beta_chats.count({ where: chatWhere }),
+    prisma.beta_chats.count({ where: { AND: [...chatAnd, { updatedAt: period }] } }),
+    prisma.beta_chats.aggregate({ where: chatWhere, _sum: { unread_count: true } }),
+    prisma.beta_chats.groupBy({ by: ["origin"], where: chatWhere, _count: { _all: true } }),
+  ]);
+  const chatSummary = {
+    total: chatTotal,
+    activeInPeriod: chatActive,
+    totalUnread: Number(chatUnread._sum.unread_count || 0),
+  };
 
-  const chatsByOrigin = await query(
-    `SELECT 
-      COALESCE(NULLIF(origin, ''), 'other') as origin,
-      COUNT(*) as count
-    FROM beta_chats
-    WHERE ${chatWhere}
-    GROUP BY COALESCE(NULLIF(origin, ''), 'other')
-    ORDER BY count DESC`,
-    chatParams
-  );
+  // former COALESCE(NULLIF(origin, ''), 'other') grouping
+  const chatsByOrigin = mergeGroups(originGroups, "origin", "other").map(([origin, count]) => ({
+    origin,
+    count,
+  }));
 
   // 3. Contacts Metrics
-  const [contactSummary] = await query(
-    `SELECT 
-      COUNT(*) as total,
-      COUNT(CASE WHEN ${dateSql} THEN 1 END) as newInPeriod
-    FROM contact 
-    WHERE uid = ?`,
-    [uid, ...dateParams]
-  );
+  const [contactTotal, contactNew, phonebookGroups] = await Promise.all([
+    prisma.contact.count({ where: { uid: tenant } }),
+    prisma.contact.count({ where: { uid: tenant, createdAt: period } }),
+    prisma.contact.groupBy({ by: ["phonebook_name"], where: { uid: tenant }, _count: { _all: true } }),
+  ]);
+  const contactSummary = { total: contactTotal, newInPeriod: contactNew };
 
-  const contactsByPhonebook = await query(
-    `SELECT 
-      COALESCE(NULLIF(phonebook_name, ''), 'Default') as phonebook,
-      COUNT(*) as count
-    FROM contact 
-    WHERE uid = ?
-    GROUP BY COALESCE(NULLIF(phonebook_name, ''), 'Default')
-    ORDER BY count DESC
-    LIMIT 8`,
-    [uid]
-  );
+  // former COALESCE(NULLIF(phonebook_name, ''), 'Default') grouping, top 8
+  const contactsByPhonebook = mergeGroups(phonebookGroups, "phonebook_name", "Default")
+    .slice(0, 8)
+    .map(([phonebook, count]) => ({ phonebook, count }));
 
   // 4. WhatsApp Connections (Available instances for user)
-  const instancesList = await query(
-    `SELECT id, uniqueId, title, number, status, createdAt FROM instance WHERE uid = ? ORDER BY id DESC`,
-    [uid]
-  );
+  const instancesList = plain(await prisma.instance.findMany({
+    where: { uid: whereStr(uid) },
+    select: {
+      id: true,
+      uniqueId: true,
+      title: true,
+      number: true,
+      status: true,
+      createdAt: true,
+    },
+    orderBy: { id: "desc" },
+  }));
 
-  const [metaRow] = await query(
-    `SELECT id, business_phone_number_id, waba_id, createdAt FROM meta_api WHERE uid = ? LIMIT 1`,
-    [uid]
-  );
+  const [metaRow] = plain(await prisma.meta_api.findMany({
+    where: { uid: whereStr(uid) },
+    select: { id: true, business_phone_number_id: true, waba_id: true, createdAt: true },
+    take: 1,
+  }));
 
   const activeQr = instancesList.filter((i) => i.status === "ACTIVE").length;
   const disconnectedQr = instancesList.filter((i) => i.status !== "ACTIVE").length;
   const metaCount = metaRow ? 1 : 0;
 
   // 5. Campaign Metrics
-  const [campaignSummary] = await query(
-    `SELECT 
-      COUNT(*) as totalCampaigns,
-      COALESCE(SUM(sent_count), 0) as sent,
-      COALESCE(SUM(delivered_count), 0) as delivered,
-      COALESCE(SUM(read_count), 0) as readCount,
-      COALESCE(SUM(failed_count), 0) as failed
-    FROM beta_campaign 
-    WHERE uid = ? AND ${dateSql}`,
-    [uid, ...dateParams]
-  );
+  const campaignAgg = await prisma.beta_campaign.aggregate({
+    where: { uid: tenant, createdAt: period },
+    _count: { _all: true },
+    _sum: { sent_count: true, delivered_count: true, read_count: true, failed_count: true },
+  });
+  const campaignSummary = {
+    totalCampaigns: campaignAgg._count._all,
+    sent: campaignAgg._sum.sent_count || 0,
+    delivered: campaignAgg._sum.delivered_count || 0,
+    readCount: campaignAgg._sum.read_count || 0,
+    failed: campaignAgg._sum.failed_count || 0,
+  };
 
-  const recentCampaigns = await query(
-    `SELECT id, campaign_id, title, status, total_contacts, sent_count, delivered_count, read_count, failed_count, createdAt
-    FROM beta_campaign 
-    WHERE uid = ? 
-    ORDER BY id DESC 
-    LIMIT 5`,
-    [uid]
-  );
+  const recentCampaigns = plain(await prisma.beta_campaign.findMany({
+    where: { uid: whereStr(uid) },
+    select: {
+      id: true,
+      campaign_id: true,
+      title: true,
+      status: true,
+      total_contacts: true,
+      sent_count: true,
+      delivered_count: true,
+      read_count: true,
+      failed_count: true,
+      createdAt: true,
+    },
+    orderBy: { id: "desc" },
+    take: 5,
+  }));
 
   // 6. Automations & Chatbots
-  const [flowSummary] = await query(
-    `SELECT COUNT(*) as totalFlows FROM beta_flows WHERE uid = ?`,
-    [uid]
-  );
+  const [flowSummary] = [{ totalFlows: await prisma.beta_flows.count({ where: { uid: whereStr(uid) } }) }];
 
-  const [chatbotSummary] = await query(
-    `SELECT 
-      COUNT(*) as totalBots,
-      COUNT(CASE WHEN active = 1 THEN 1 END) as activeBots,
-      COUNT(CASE WHEN active = 0 THEN 1 END) as inactiveBots
-    FROM beta_chatbot WHERE uid = ?`,
-    [uid]
-  );
+  const [totalBots, activeBots, inactiveBots] = await Promise.all([
+    prisma.beta_chatbot.count({ where: { uid: tenant } }),
+    prisma.beta_chatbot.count({ where: { uid: tenant, active: 1 } }),
+    prisma.beta_chatbot.count({ where: { uid: tenant, active: 0 } }),
+  ]);
+  const chatbotSummary = { totalBots, activeBots, inactiveBots };
 
   // 7. Live Subscription & Usage Limits
-  const [userRow] = await query(
-    `SELECT plan, plan_expire FROM user WHERE uid = ?`,
-    [uid]
-  );
+  const [userRow] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) }, select: { plan: true, plan_expire: true } }));
 
   let planData = {};
   try {
@@ -385,150 +455,179 @@ async function getUserWorkspaceAnalytics(uid, filters = {}) {
  * @param {Object} filters - { range, startDate, endDate }
  */
 async function getAdminPlatformAnalytics(filters = {}) {
-  const { conditionSql: dateSql, params: dateParams, range, startDate, endDate } = buildDateRangeFilter(filters, "createdAt");
+  const dateRange = buildDateRangeFilter(filters, "createdAt");
+  const { range, startDate, endDate, filter: period } = dateRange;
+  const periodSql = dateRange.sql("createdAt");
 
   // 1. Platform User Metrics
-  const [userStats] = await query(
-    `SELECT 
-      COUNT(*) as totalUsers,
-      COUNT(CASE WHEN is_blocked = 0 OR is_blocked IS NULL THEN 1 END) as activeUsers,
-      COUNT(CASE WHEN is_blocked = 1 THEN 1 END) as blockedUsers,
-      COUNT(CASE WHEN ${dateSql} THEN 1 END) as newUsersInPeriod
-    FROM user`,
-    dateParams
+  const [totalUsers, activeUsers, blockedUsers, newUsersInPeriod] = await Promise.all([
+    prisma.user.count(),
+    prisma.user.count({ where: { is_blocked: false } }),
+    prisma.user.count({ where: { is_blocked: true } }),
+    prisma.user.count({ where: { createdAt: period } }),
+  ]);
+  const userStats = { totalUsers, activeUsers, blockedUsers, newUsersInPeriod };
+
+  const userGrowthTimeSeries = toNumberRows(
+    await prisma.$queryRaw`
+      SELECT DATE_FORMAT(createdAt, '%Y-%m-%d') AS date, COUNT(*) AS count
+      FROM user
+      WHERE ${periodSql}
+      GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
+      ORDER BY date ASC`,
+    ["count"],
   );
 
-  const userGrowthTimeSeries = await query(
-    `SELECT 
-      DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
-      COUNT(*) as count
-    FROM user
-    WHERE ${dateSql}
-    GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
-    ORDER BY date ASC`,
-    dateParams
+  // plan is a JSON text column; title extraction needs JSON_EXTRACT
+  const planDistribution = toNumberRows(
+    await prisma.$queryRaw`
+      SELECT
+        COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(plan, '$.title'))), ''), 'Free / Trial') AS planTitle,
+        COUNT(*) AS count
+      FROM user
+      GROUP BY planTitle
+      ORDER BY count DESC`,
+    ["count"],
   );
 
-  const planDistribution = await query(
-    `SELECT 
-      COALESCE(NULLIF(TRIM(JSON_UNQUOTE(JSON_EXTRACT(plan, '$.title'))), ''), 'Free / Trial') as planTitle,
-      COUNT(*) as count
-    FROM user
-    GROUP BY planTitle
-    ORDER BY count DESC`
-  );
+  // 2. Platform Revenue & Orders (amount is VARCHAR, so sums need CAST in SQL)
+  const [revenueRow] = await prisma.$queryRaw`
+    SELECT
+      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) AS totalRevenue,
+      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') AND ${periodSql} THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) AS periodRevenue,
+      COUNT(*) AS totalOrders,
+      COUNT(CASE WHEN status IN ('SUCCESS', 'PAID') THEN 1 END) AS successfulOrders,
+      COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pendingOrders,
+      COUNT(CASE WHEN status = 'FAILED' THEN 1 END) AS failedOrders
+    FROM orders`;
+  const revenueStats = plain(revenueRow || {});
 
-  // 2. Platform Revenue & Orders (orders table)
-  const [revenueStats] = await query(
-    `SELECT 
-      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) as totalRevenue,
-      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') AND ${dateSql} THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) as periodRevenue,
-      COUNT(*) as totalOrders,
-      COUNT(CASE WHEN status IN ('SUCCESS', 'PAID') THEN 1 END) as successfulOrders,
-      COUNT(CASE WHEN status = 'PENDING' THEN 1 END) as pendingOrders,
-      COUNT(CASE WHEN status = 'FAILED' THEN 1 END) as failedOrders
-    FROM orders`,
-    dateParams
-  );
-
-  const revenueTimeSeries = await query(
-    `SELECT 
-      DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
-      COALESCE(SUM(CAST(amount AS DECIMAL(10,2))), 0) as revenue,
-      COUNT(*) as orderCount
-    FROM orders
-    WHERE status IN ('SUCCESS', 'PAID') AND ${dateSql}
-    GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
-    ORDER BY date ASC`,
-    dateParams
+  const revenueTimeSeries = toNumberRows(
+    await prisma.$queryRaw`
+      SELECT
+        DATE_FORMAT(createdAt, '%Y-%m-%d') AS date,
+        COALESCE(SUM(CAST(amount AS DECIMAL(10,2))), 0) AS revenue,
+        COUNT(*) AS orderCount
+      FROM orders
+      WHERE status IN ('SUCCESS', 'PAID') AND ${periodSql}
+      GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
+      ORDER BY date ASC`,
+    ["revenue", "orderCount"],
   );
 
   // 3. Platform WhatsApp Accounts
-  const [instanceStats] = await query(
-    `SELECT 
-      COUNT(*) as totalInstances,
-      COUNT(CASE WHEN status = 'ACTIVE' THEN 1 END) as activeInstances,
-      COUNT(CASE WHEN status != 'ACTIVE' THEN 1 END) as disconnectedInstances
-    FROM instance`
-  );
+  const [totalInstances, activeInstances, disconnectedInstances] = await Promise.all([
+    prisma.instance.count(),
+    prisma.instance.count({ where: { status: "ACTIVE" } }),
+    prisma.instance.count({ where: { status: { not: "ACTIVE" } } }),
+  ]);
+  const instanceStats = { totalInstances, activeInstances, disconnectedInstances };
 
-  const [metaStats] = await query(
-    `SELECT COUNT(*) as metaCount FROM meta_api`
-  );
+  const [metaStats] = [{ metaCount: await prisma.meta_api.count() }];
 
   // 4. Platform Throughput & Activity
-  const [throughputStats] = await query(
-    `SELECT 
-      COUNT(*) as totalMessagesInPeriod,
-      COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incomingInPeriod,
-      COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoingInPeriod,
-      COUNT(CASE WHEN status IN ('delivered', 'read') THEN 1 END) as deliveredInPeriod,
-      COUNT(CASE WHEN status = 'read' THEN 1 END) as readInPeriod,
-      COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failedInPeriod
-    FROM beta_conversation
-    WHERE ${dateSql}`,
-    dateParams
+  const inPeriod = { createdAt: period };
+  const [msgTotal, msgIn, msgOut, msgDelivered, msgRead, msgFailed] = await Promise.all([
+    prisma.beta_conversation.count({ where: inPeriod }),
+    prisma.beta_conversation.count({ where: { ...inPeriod, route: "INCOMING" } }),
+    prisma.beta_conversation.count({ where: { ...inPeriod, route: "OUTGOING" } }),
+    prisma.beta_conversation.count({ where: { ...inPeriod, status: { in: ["delivered", "read"] } } }),
+    prisma.beta_conversation.count({ where: { ...inPeriod, status: "read" } }),
+    prisma.beta_conversation.count({
+      where: { ...inPeriod, OR: [{ status: "failed" }, { err: { not: null } }] },
+    }),
+  ]);
+  const throughputStats = {
+    totalMessagesInPeriod: msgTotal,
+    incomingInPeriod: msgIn,
+    outgoingInPeriod: msgOut,
+    deliveredInPeriod: msgDelivered,
+    readInPeriod: msgRead,
+    failedInPeriod: msgFailed,
+  };
+
+  const throughputTimeSeries = toNumberRows(
+    await prisma.$queryRaw`
+      SELECT
+        DATE_FORMAT(createdAt, '%Y-%m-%d') AS date,
+        COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) AS incoming,
+        COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) AS outgoing,
+        COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) AS failed,
+        COUNT(*) AS total
+      FROM beta_conversation
+      WHERE ${periodSql}
+      GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
+      ORDER BY date ASC`,
+    ["incoming", "outgoing", "failed", "total"],
   );
 
-  const throughputTimeSeries = await query(
-    `SELECT 
-      DATE_FORMAT(createdAt, '%Y-%m-%d') as date,
-      COUNT(CASE WHEN route = 'INCOMING' THEN 1 END) as incoming,
-      COUNT(CASE WHEN route = 'OUTGOING' THEN 1 END) as outgoing,
-      COUNT(CASE WHEN status = 'failed' OR err IS NOT NULL THEN 1 END) as failed,
-      COUNT(*) as total
-    FROM beta_conversation
-    WHERE ${dateSql}
-    GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
-    ORDER BY date ASC`,
-    dateParams
-  );
+  const campaignAgg = await prisma.beta_campaign.aggregate({
+    where: inPeriod,
+    _count: { _all: true },
+    _sum: { sent_count: true, delivered_count: true, read_count: true, failed_count: true },
+  });
+  const campaignStats = {
+    totalCampaigns: campaignAgg._count._all,
+    totalSent: campaignAgg._sum.sent_count || 0,
+    totalDelivered: campaignAgg._sum.delivered_count || 0,
+    totalRead: campaignAgg._sum.read_count || 0,
+    totalFailed: campaignAgg._sum.failed_count || 0,
+  };
 
-  const [campaignStats] = await query(
-    `SELECT 
-      COUNT(*) as totalCampaigns,
-      COALESCE(SUM(sent_count), 0) as totalSent,
-      COALESCE(SUM(delivered_count), 0) as totalDelivered,
-      COALESCE(SUM(read_count), 0) as totalRead,
-      COALESCE(SUM(failed_count), 0) as totalFailed
-    FROM beta_campaign
-    WHERE ${dateSql}`,
-    dateParams
-  );
+  const [flowStats] = [{ totalFlows: await prisma.beta_flows.count() }];
 
-  const [flowStats] = await query(
-    `SELECT COUNT(*) as totalFlows FROM beta_flows`
-  );
-
-  const [chatbotStats] = await query(
-    `SELECT 
-      COUNT(*) as totalBots,
-      COUNT(CASE WHEN active = 1 THEN 1 END) as activeBots
-    FROM beta_chatbot`
-  );
+  const [chatbotTotal, chatbotActive] = await Promise.all([
+    prisma.beta_chatbot.count(),
+    prisma.beta_chatbot.count({ where: { active: 1 } }),
+  ]);
+  const chatbotStats = { totalBots: chatbotTotal, activeBots: chatbotActive };
 
   // 5. Recent Admin Audit Logs
   let auditLogs = [];
   try {
-    auditLogs = await query(
-      `SELECT id, admin_uid, action, target_type, target_id, details, ip_address, created_at
-      FROM admin_audit_logs
-      ORDER BY id DESC
-      LIMIT 10`
-    );
+    auditLogs = plain(await prisma.admin_audit_logs.findMany({
+      select: {
+        id: true,
+        admin_uid: true,
+        action: true,
+        target_type: true,
+        target_id: true,
+        details: true,
+        ip_address: true,
+        created_at: true,
+      },
+      orderBy: { id: "desc" },
+      take: 10,
+    }));
   } catch (_) {}
 
   // 6. Top Workspaces approaching limits or highest usage
-  const topWorkspaces = await query(
-    `SELECT 
-      u.uid, u.name, u.email,
-      COUNT(c.id) as contactCount
-    FROM user u
-    LEFT JOIN contact c ON u.uid = c.uid
-    GROUP BY u.uid, u.name, u.email
-    ORDER BY contactCount DESC
-    LIMIT 5`
-  );
+  // former `user LEFT JOIN contact ... ORDER BY contactCount DESC LIMIT 5`
+  const contactCounts = await prisma.contact.groupBy({
+    by: ["uid"],
+    where: { uid: { not: null } },
+    _count: { id: true },
+    orderBy: { _count: { id: "desc" } },
+    take: 50, // headroom for contacts whose uid has no user row
+  });
+  const countUsers = await prisma.user.findMany({
+    where: { uid: { in: contactCounts.map((c) => c.uid) } },
+    select: { uid: true, name: true, email: true },
+  });
+  const userByUid = new Map(countUsers.map((u) => [u.uid, u]));
+  const topWorkspaces = contactCounts
+    .filter((c) => userByUid.has(c.uid))
+    .slice(0, 5)
+    .map((c) => ({ ...userByUid.get(c.uid), contactCount: c._count.id }));
+  if (topWorkspaces.length < 5) {
+    // LEFT JOIN also listed users with zero contacts
+    const zeroContactUsers = await prisma.user.findMany({
+      where: { uid: { notIn: topWorkspaces.map((w) => w.uid) } },
+      select: { uid: true, name: true, email: true },
+      take: 5 - topWorkspaces.length,
+    });
+    zeroContactUsers.forEach((u) => topWorkspaces.push({ ...u, contactCount: 0 }));
+  }
 
   return {
     range,
@@ -577,6 +676,16 @@ async function getAdminPlatformAnalytics(filters = {}) {
     topWorkspaces: topWorkspaces || [],
     auditLogs: auditLogs || [],
   };
+}
+
+/** Merge groupBy rows whose key is NULL or '' into `fallback`, sorted by count desc. */
+function mergeGroups(groups, key, fallback) {
+  const counts = new Map();
+  for (const g of groups) {
+    const k = g[key] === null || g[key] === undefined || g[key] === "" ? fallback : g[key];
+    counts.set(k, (counts.get(k) || 0) + g._count._all);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
 module.exports = {
