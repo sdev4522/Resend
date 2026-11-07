@@ -1,5 +1,12 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, idParam, str, intOrNull } = require("../database/prismaHelpers");
+
+async function getInstaKeys() {
+  return prisma.web_private.findFirst({
+    select: { insta_app_id: true, insta_app_secret: true },
+  });
+}
 const validateUser = require("../middlewares/user.js");
 const {
   exchangeShortToken,
@@ -29,10 +36,7 @@ const pageStyle = `
 // ─── Get Auth URL ─────────────────────────────────────────
 router.get("/auth-url", validateUser, async (req, res) => {
   try {
-    const [apiKeys] = await query(
-      `SELECT insta_app_id, insta_app_secret FROM web_private`,
-      [],
-    );
+    const apiKeys = await getInstaKeys();
 
     const instaCallbackUri = await getInstaCallbackUri();
 
@@ -74,12 +78,9 @@ router.get("/callback", async (req, res) => {
   }
 
   try {
-    const [apiKeys] = await query(
-      `SELECT insta_app_id, insta_app_secret FROM web_private`,
-      [],
-    );
+    const apiKeys = await getInstaKeys();
 
-    const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
     const plan = user?.plan ? JSON.parse(user.plan) : null;
     if (!plan) {
       return res.send(`<html><body style="${pageStyle}">
@@ -138,32 +139,27 @@ router.get("/callback", async (req, res) => {
     const igGraphId = String(profile.id);
 
     // ── Delete from ANY uid first (no duplicates across users) ────────────
-    await query(`DELETE FROM instagram_accounts WHERE webhook_id = ?`, [
-      igBusinessId,
+    // ── Fresh insert for current uid (atomic with the delete) ─────────────
+    const expiresIn = intOrNull(longData.expires_in);
+    await prisma.$transaction([
+      prisma.instagram_accounts.deleteMany({ where: { webhook_id: str(igBusinessId) } }),
+      prisma.instagram_accounts.create({
+        data: {
+          uid: str(uid),
+          webhook_id: str(igBusinessId),
+          ig_graph_id: str(igGraphId),
+          user_id: str(igBusinessId),
+          page_id: String(tokenData.user_id || ""),
+          username: str(profile.username),
+          name: profile.name || "",
+          profile_pic: profile.profile_picture_url || "",
+          access_token: str(finalToken),
+          token_type: longData.token_type || "bearer",
+          expires_in: expiresIn === null ? null : BigInt(expiresIn),
+          connected_at: new Date(),
+        },
+      }),
     ]);
-
-    // ── Fresh insert for current uid ──────────────────────────────────────
-    await query(
-      `INSERT INTO instagram_accounts
-        (uid, webhook_id, ig_graph_id, user_id, page_id,
-         username, name, profile_pic, access_token,
-         token_type, expires_in, connected_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        uid,
-        igBusinessId,
-        igGraphId,
-        igBusinessId,
-        String(tokenData.user_id || ""),
-        profile.username,
-        profile.name || "",
-        profile.profile_picture_url || "",
-        finalToken,
-        longData.token_type || "bearer",
-        longData.expires_in || null,
-        new Date(),
-      ],
-    );
 
     await subscribeInstaWebhook(finalToken);
 
@@ -201,12 +197,24 @@ router.get(
   checkInstaInbox,
   async (req, res) => {
     try {
-      const accounts = await query(
-        `SELECT id, uid, webhook_id, ig_graph_id, user_id,
-              username, name, profile_pic, token_type,
-              expires_in, connected_at, createdAt
-              FROM instagram_accounts WHERE uid = ?`,
-        [req.decode.uid],
+      const accounts = plain(
+        await prisma.instagram_accounts.findMany({
+          where: { uid: req.decode.uid },
+          select: {
+            id: true,
+            uid: true,
+            webhook_id: true,
+            ig_graph_id: true,
+            user_id: true,
+            username: true,
+            name: true,
+            profile_pic: true,
+            token_type: true,
+            expires_in: true,
+            connected_at: true,
+            createdAt: true,
+          },
+        }),
       );
 
       res.json({ success: true, accounts });
@@ -226,7 +234,10 @@ router.post(
   async (req, res) => {
     try {
       const { id } = req.body;
-      await query(`DELETE FROM instagram_accounts WHERE id = ?`, [id]);
+      // Scoped to the owner: previously any user could delete any account by id
+      await prisma.instagram_accounts.deleteMany({
+        where: { id: idParam(id), uid: req.decode.uid },
+      });
       res.json({ success: true, msg: "Account disconnected" });
     } catch (err) {
       logger.log(err);
@@ -255,10 +266,9 @@ router.post("/webhook/:uid", async (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
     if (!signature) return res.status(403).send("Forbidden");
 
-    const [apiKeys] = await query(
-      `SELECT insta_app_secret FROM web_private LIMIT 1`,
-      [],
-    );
+    const apiKeys = await prisma.web_private.findFirst({
+      select: { insta_app_secret: true },
+    });
     if (!apiKeys?.insta_app_secret) return res.status(403).send("Forbidden");
 
     const expectedSig =
@@ -295,9 +305,7 @@ router.post("/webhook/:uid", async (req, res) => {
       } = require("../functions/function");
       const randomstring = require("randomstring");
 
-      const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [
-        uid,
-      ]);
+      const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
       if (!user) return;
 
       for (const change of commentChanges) {
@@ -317,22 +325,16 @@ router.post("/webhook/:uid", async (req, res) => {
         const senderMobile = `${commenterId}`;
 
         // ── Find or create chat ──────────────────────────────────────────
-        const [existingChat] = await query(
-          `SELECT * FROM beta_chats 
-           WHERE uid = ? AND sender_mobile = ? AND origin = ? LIMIT 1`,
-          [uid, senderMobile, "instagram_comment"],
-        );
+        const existingChat = await prisma.beta_chats.findFirst({
+          where: { uid: str(uid), sender_mobile: str(senderMobile), origin: "instagram_comment" },
+        });
 
         let chatId;
         if (existingChat) {
           chatId = existingChat.chat_id;
         } else {
           chatId = randomstring.generate(20);
-          await query(
-            `INSERT INTO beta_chats 
-              (uid, chat_id, sender_mobile, sender_name, origin,
-               origin_instance_id, last_message, createdAt)
-             VALUES (?,?,?,?,?,?,?,?)`,
+          await insertCommentChat(
             [
               uid,
               chatId,
@@ -378,11 +380,10 @@ router.post("/webhook/:uid", async (req, res) => {
         });
 
         // ── Update last_message on chat ──────────────────────────────────
-        await query(
-          `UPDATE beta_chats SET last_message = ?, sender_name = ? 
-           WHERE chat_id = ? AND uid = ?`,
-          [JSON.stringify(messageData), commenterName, chatId, uid],
-        );
+        await prisma.beta_chats.updateMany({
+          where: { chat_id: str(chatId), uid: str(uid) },
+          data: { last_message: JSON.stringify(messageData), sender_name: str(commenterName) },
+        });
 
         // ── Build message object for automation ──────────────────────────
         const message = {
@@ -417,8 +418,33 @@ router.post("/webhook/:uid", async (req, res) => {
 
 // Helper at top of file or in a utils
 async function getUserByUid(uid) {
-  const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [uid]);
-  return user;
+  const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
+  return user ? plain(user) : undefined;
+}
+
+// Positional args kept identical to the former INSERT statement
+async function insertCommentChat([
+  uid,
+  chatId,
+  senderMobile,
+  senderName,
+  origin,
+  originInstanceId,
+  lastMessage,
+  createdAt,
+]) {
+  return prisma.beta_chats.create({
+    data: {
+      uid: str(uid),
+      chat_id: str(chatId),
+      sender_mobile: str(senderMobile),
+      sender_name: str(senderName),
+      origin: str(origin),
+      origin_instance_id: str(originInstanceId),
+      last_message: str(lastMessage),
+      createdAt,
+    },
+  });
 }
 
 module.exports = router;

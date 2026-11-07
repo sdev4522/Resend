@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { idParam, str } = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user.js");
 const adminValidator = require("../middlewares/admin.js");
 const { checkPlan } = require("../middlewares/plan.js");
@@ -14,12 +15,11 @@ const API_VERSION = "v21.0";
 // ─── Admin: get messenger config ──────────────────────────────
 router.get("/config", adminValidator, async (req, res) => {
   try {
-    const [data] = await query(
-      `SELECT messenger_app_id, messenger_app_secret FROM web_private`,
-      [],
-    );
+    const data = await prisma.web_private.findFirst({
+      select: { messenger_app_id: true, messenger_app_secret: true },
+    });
 
-    const [admin] = await query(`SELECT uid FROM admin`, []);
+    const admin = await prisma.admin.findFirst({ select: { uid: true } });
 
     // ✅ Now these are actually sent to the frontend
     const webhookUrl = `${process.env.BACKURI}/api/messenger/webhook/${admin?.uid}`;
@@ -44,10 +44,12 @@ router.post("/config", adminValidator, async (req, res) => {
     if (!messenger_app_id || !messenger_app_secret) {
       return res.json({ success: false, msg: "Please provide all fields" });
     }
-    await query(
-      `UPDATE web_private SET messenger_app_id = ?, messenger_app_secret = ?`,
-      [messenger_app_id, messenger_app_secret],
-    );
+    await prisma.web_private.updateMany({
+      data: {
+        messenger_app_id: str(messenger_app_id),
+        messenger_app_secret: str(messenger_app_secret),
+      },
+    });
     res.json({ success: true, msg: "Messenger config updated" });
   } catch (err) {
     logger.error(err);
@@ -58,7 +60,9 @@ router.post("/config", adminValidator, async (req, res) => {
 // ─── User: get auth URL ───────────────────────────────────────
 router.get("/auth-url", validateUser, async (req, res) => {
   try {
-    const [pvt] = await query(`SELECT messenger_app_id FROM web_private`, []);
+    const pvt = await prisma.web_private.findFirst({
+      select: { messenger_app_id: true },
+    });
     if (!pvt?.messenger_app_id) {
       return res.json({
         success: false,
@@ -99,10 +103,9 @@ router.get("/callback", async (req, res) => {
   }
 
   try {
-    const [pvt] = await query(
-      `SELECT messenger_app_id, messenger_app_secret FROM web_private`,
-      [],
-    );
+    const pvt = await prisma.web_private.findFirst({
+      select: { messenger_app_id: true, messenger_app_secret: true },
+    });
 
     if (!pvt?.messenger_app_id || !pvt?.messenger_app_secret) {
       throw new Error("Messenger credentials not configured");
@@ -152,13 +155,20 @@ router.get("/callback", async (req, res) => {
       );
 
       // Remove existing entry for this page
-      await query(`DELETE FROM messenger_accounts WHERE page_id = ?`, [pageId]);
-
-      // Insert fresh
-      await query(
-        `INSERT INTO messenger_accounts (uid, page_id, page_name, page_access_token, user_access_token, webhook_id) VALUES (?,?,?,?,?,?)`,
-        [uid, pageId, pageName, pageToken, userToken, pageId],
-      );
+      await prisma.$transaction([
+        prisma.messenger_accounts.deleteMany({ where: { page_id: str(pageId) } }),
+        // Insert fresh
+        prisma.messenger_accounts.create({
+          data: {
+            uid: str(uid),
+            page_id: str(pageId),
+            page_name: str(pageName),
+            page_access_token: str(pageToken),
+            user_access_token: str(userToken),
+            webhook_id: str(pageId),
+          },
+        }),
+      ]);
     }
 
     return res.send(`<html><body style="${pageStyle}">
@@ -182,10 +192,17 @@ router.get("/callback", async (req, res) => {
 // ─── User: get accounts ───────────────────────────────────────
 router.get("/accounts", validateUser, checkPlan, async (req, res) => {
   try {
-    const accounts = await query(
-      `SELECT id, page_id, page_name, profile_pic, webhook_id, connected_at FROM messenger_accounts WHERE uid = ?`,
-      [req.decode.uid],
-    );
+    const accounts = await prisma.messenger_accounts.findMany({
+      where: { uid: req.decode.uid },
+      select: {
+        id: true,
+        page_id: true,
+        page_name: true,
+        profile_pic: true,
+        webhook_id: true,
+        connected_at: true,
+      },
+    });
     res.json({ success: true, accounts });
   } catch (err) {
     logger.error(err);
@@ -197,10 +214,9 @@ router.get("/accounts", validateUser, checkPlan, async (req, res) => {
 router.post("/delete-account", validateUser, checkPlan, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM messenger_accounts WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.messenger_accounts.deleteMany({
+      where: { id: idParam(id), uid: req.decode.uid },
+    });
     res.json({ success: true, msg: "Account disconnected" });
   } catch (err) {
     logger.error(err);
@@ -227,10 +243,9 @@ router.post("/webhook/:uid", async (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
     if (!signature) return res.status(403).send("Forbidden");
 
-    const [pvt] = await query(
-      `SELECT messenger_app_secret FROM web_private LIMIT 1`,
-      [],
-    );
+    const pvt = await prisma.web_private.findFirst({
+      select: { messenger_app_secret: true },
+    });
     if (!pvt?.messenger_app_secret) return res.status(403).send("Forbidden");
 
     const expectedSig =
@@ -252,10 +267,9 @@ router.post("/webhook/:uid", async (req, res) => {
 
     const pageId = String(entry.id);
 
-    const [account] = await query(
-      `SELECT * FROM messenger_accounts WHERE page_id = ? LIMIT 1`,
-      [pageId],
-    );
+    const account = await prisma.messenger_accounts.findFirst({
+      where: { page_id: str(pageId) },
+    });
     if (!account) return;
 
     const uid = account.uid;

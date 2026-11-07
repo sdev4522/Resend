@@ -1,5 +1,19 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, str, idList } = require("../database/prismaHelpers");
+
+// Positional args kept identical to the former INSERT INTO beta_api_logs statement
+async function insertApiLog([uid, msgId, request, response, status]) {
+  return prisma.beta_api_logs.create({
+    data: {
+      uid: str(uid),
+      msg_id: str(msgId),
+      request: str(request),
+      response: str(response),
+      status: str(status),
+    },
+  });
+}
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -33,9 +47,9 @@ function decodeToken(token) {
           message: "Invalid API keys",
         });
       }
-      const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [
-        decode?.uid,
-      ]);
+      const getUser = plain(
+        await prisma.user.findMany({ where: { uid: str(decode?.uid) }, take: 1 }),
+      );
       if (getUser.length < 1) {
         return resolve({
           success: false,
@@ -107,9 +121,9 @@ router.post("/send-message", async (req, res) => {
       });
     }
 
-    const getMetaApi = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-      user?.uid,
-    ]);
+    const getMetaApi = plain(
+      await prisma.meta_api.findMany({ where: { uid: str(user?.uid) }, take: 1 }),
+    );
     if (getMetaApi.length < 1) {
       return res.json({
         success: false,
@@ -131,8 +145,7 @@ router.post("/send-message", async (req, res) => {
 
     // adding logs
     if (req.body?.enableLog) {
-      await query(
-        `INSERT INTO beta_api_logs (uid, msg_id, request, response, status) VALUES (?,?,?,?,?)`,
+      await insertApiLog(
         [
           user?.uid,
           sendMsg?.data?.id,
@@ -199,9 +212,9 @@ router.post("/send_templet", async (req, res) => {
     // checking plan end
 
     // getting user meta keys
-    const getMetaApi = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-      user?.uid,
-    ]);
+    const getMetaApi = plain(
+      await prisma.meta_api.findMany({ where: { uid: str(user?.uid) }, take: 1 }),
+    );
     if (getMetaApi.length < 1) {
       return res.json({
         success: false,
@@ -276,8 +289,7 @@ router.post("/send_templet", async (req, res) => {
     }
 
     if (req.body?.enableLog) {
-      await query(
-        `INSERT INTO beta_api_logs (uid, msg_id, request, response, status) VALUES (?,?,?,?,?)`,
+      await insertApiLog(
         [
           user?.uid,
           returnMetMsgId(resp),
@@ -319,9 +331,9 @@ router.post("/send_templet", async (req, res) => {
 // get logs
 router.get("/get_logs", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM beta_api_logs WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = await prisma.beta_api_logs.findMany({
+      where: { uid: req.decode.uid },
+    });
     res.json({
       success: true,
       data,
@@ -344,19 +356,15 @@ router.post("/delete_logs", validateUser, async (req, res) => {
       });
     }
 
-    // Create placeholders for SQL query
-    const placeholders = ids.map(() => "?").join(",");
-
     // Delete logs but ensure they belong to the user
-    const result = await query(
-      `DELETE FROM beta_api_logs WHERE id IN (${placeholders}) AND uid = ?`,
-      [...ids, req.decode.uid],
-    );
+    const result = await prisma.beta_api_logs.deleteMany({
+      where: { id: { in: idList(ids) }, uid: req.decode.uid },
+    });
 
     res.json({
       success: true,
       message: "Logs deleted successfully",
-      count: result.affectedRows,
+      count: result.count,
     });
   } catch (err) {
     logger.log(err);

@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, idParam, str, idList } = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user.js");
 const { checkPlan, checkWaForms } = require("../middlewares/plan.js");
 const axios = require("axios");
@@ -10,8 +11,8 @@ const API_VERSION = "v20.0";
 
 // ─── HELPER ───────────────────────────────────────────────────────────────────
 async function getMetaConfig(uid) {
-  const [metaApi] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [uid]);
-  return metaApi;
+  const metaApi = await prisma.meta_api.findFirst({ where: { uid } });
+  return metaApi ? plain(metaApi) : undefined;
 }
 
 // ─── BUILD DYNAMIC FLOW JSON ──────────────────────────────────────────────────
@@ -177,26 +178,26 @@ router.get(
       );
 
       const metaFlows = metaRes.data.data || [];
-      const existingForms = await query(
-        `SELECT flow_id FROM wa_forms WHERE uid = ?`,
-        [req.decode.uid],
-      );
+      const existingForms = await prisma.wa_forms.findMany({
+        where: { uid: req.decode.uid },
+        select: { flow_id: true },
+      });
       const existingFlowIds = existingForms.map((f) => f.flow_id);
 
       let synced = 0;
       for (const flow of metaFlows) {
         if (!existingFlowIds.includes(flow.id)) {
-          await query(
-            `INSERT INTO wa_forms (uid, name, description, flow_id, flow_status, fields_json, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-            [
-              req.decode.uid,
-              flow.name,
-              flow.categories?.join(", ") || "",
-              flow.id,
-              flow.status || "PUBLISHED",
-              JSON.stringify([]),
-            ],
-          );
+          await prisma.wa_forms.create({
+            data: {
+              uid: req.decode.uid,
+              name: str(flow.name),
+              description: flow.categories?.join(", ") || "",
+              flow_id: str(flow.id),
+              flow_status: flow.status || "PUBLISHED",
+              fields_json: JSON.stringify([]),
+              createdAt: new Date(),
+            },
+          });
           synced++;
         }
       }
@@ -219,10 +220,10 @@ router.get(
 // ─── GET ALL FORMS ────────────────────────────────────────────────────────────
 router.get("/get-forms", validateUser, checkPlan, async (req, res) => {
   try {
-    const forms = await query(
-      `SELECT * FROM wa_forms WHERE uid = ? ORDER BY createdAt DESC`,
-      [req.decode.uid],
-    );
+    const forms = await prisma.wa_forms.findMany({
+      where: { uid: req.decode.uid },
+      orderBy: { createdAt: "desc" },
+    });
     // Parse fields_json for each form
     const parsed = forms.map((f) => ({
       ...f,
@@ -303,17 +304,17 @@ router.post(
       );
 
       // 4. Save to DB with fields_json
-      await query(
-        `INSERT INTO wa_forms (uid, name, description, flow_id, flow_status, fields_json, createdAt) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
-        [
-          req.decode.uid,
-          name,
-          description || "",
-          flowId,
-          "PUBLISHED",
-          JSON.stringify(fields),
-        ],
-      );
+      await prisma.wa_forms.create({
+        data: {
+          uid: req.decode.uid,
+          name: str(name),
+          description: str(description || ""),
+          flow_id: str(flowId),
+          flow_status: "PUBLISHED",
+          fields_json: JSON.stringify(fields),
+          createdAt: new Date(),
+        },
+      });
 
       res.json({ success: true, msg: "Form created successfully", flowId });
     } catch (err) {
@@ -340,10 +341,9 @@ router.post(
       if (!metaApi)
         return res.json({ success: false, msg: "Meta API not configured" });
 
-      const [form] = await query(
-        `SELECT * FROM wa_forms WHERE id = ? AND uid = ?`,
-        [id, req.decode.uid],
-      );
+      const form = await prisma.wa_forms.findFirst({
+        where: { id: idParam(id), uid: req.decode.uid },
+      });
       if (!form) return res.json({ success: false, msg: "Form not found" });
 
       const response = await axios.post(
@@ -405,10 +405,9 @@ router.post(
   async (req, res) => {
     try {
       const { id } = req.body;
-      const [form] = await query(
-        `SELECT * FROM wa_forms WHERE id = ? AND uid = ?`,
-        [id, req.decode.uid],
-      );
+      const form = await prisma.wa_forms.findFirst({
+        where: { id: idParam(id), uid: req.decode.uid },
+      });
       if (!form) return res.json({ success: false, msg: "Form not found" });
 
       const metaApi = await getMetaConfig(req.decode.uid);
@@ -420,10 +419,9 @@ router.post(
           .catch(() => {});
       }
 
-      await query(`DELETE FROM wa_forms WHERE id = ? AND uid = ?`, [
-        id,
-        req.decode.uid,
-      ]);
+      await prisma.wa_forms.deleteMany({
+        where: { id: idParam(id), uid: req.decode.uid },
+      });
       res.json({ success: true, msg: "Form deleted" });
     } catch (err) {
       res.json({ success: false, msg: "Something went wrong", error: err });
@@ -437,10 +435,16 @@ router.post("/submit", async (req, res) => {
     // Called from your main WhatsApp webhook when flow_token matches
     const { uid, flow_id, form_name, from_phone, payload } = req.body;
 
-    await query(
-      `INSERT INTO wa_form_submissions (uid, flow_id, form_name, from_phone, raw_payload, createdAt) VALUES (?, ?, ?, ?, ?, NOW())`,
-      [uid, flow_id, form_name, from_phone, JSON.stringify(payload)],
-    );
+    await prisma.wa_form_submissions.create({
+      data: {
+        uid: str(uid),
+        flow_id: str(flow_id),
+        form_name: str(form_name),
+        from_phone: str(from_phone),
+        raw_payload: JSON.stringify(payload),
+        createdAt: new Date(),
+      },
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -451,10 +455,10 @@ router.post("/submit", async (req, res) => {
 // ─── GET SUBMISSIONS ──────────────────────────────────────────────────────────
 router.get("/submissions", validateUser, async (req, res) => {
   try {
-    const data = await query(
-      `SELECT * FROM wa_form_submissions WHERE uid = ? ORDER BY createdAt DESC`,
-      [req.decode.uid],
-    );
+    const data = await prisma.wa_form_submissions.findMany({
+      where: { uid: req.decode.uid },
+      orderBy: { createdAt: "desc" },
+    });
     // Parse raw_payload for frontend
     const parsed = data.map((s) => ({
       ...s,
@@ -479,12 +483,9 @@ router.post("/delete-submissions", validateUser, async (req, res) => {
     if (!Array.isArray(ids) || ids.length === 0)
       return res.json({ success: false, msg: "No IDs provided" });
 
-    // Build placeholders: ?, ?, ?
-    const placeholders = ids.map(() => "?").join(", ");
-    await query(
-      `DELETE FROM wa_form_submissions WHERE uid = ? AND id IN (${placeholders})`,
-      [req.decode.uid, ...ids],
-    );
+    await prisma.wa_form_submissions.deleteMany({
+      where: { uid: req.decode.uid, id: { in: idList(ids) } },
+    });
 
     res.json({ success: true, msg: `${ids.length} submission(s) deleted` });
   } catch (err) {
