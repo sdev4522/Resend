@@ -1,4 +1,5 @@
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { bigOrNull, dateOrNull, plain, str, toData, whereStr } = require("../../../database/prismaHelpers");
 const axios = require("axios");
 const randomstring = require("randomstring");
 const path = require("path");
@@ -65,9 +66,11 @@ async function fetchInstaMediaUrl(mediaId, accessToken) {
 async function resolveAccountFromWebhook(igBusinessId) {
   try {
     // webhook_id = user_id (the IG Business Account ID)
-    const rows = await query(
-      `SELECT * FROM instagram_accounts WHERE webhook_id = ? OR user_id = ? LIMIT 1`,
-      [igBusinessId, igBusinessId],
+    const rows = plain(
+      await prisma.instagram_accounts.findMany({
+        where: { OR: [{ webhook_id: whereStr(igBusinessId) }, { user_id: whereStr(igBusinessId) }] },
+        take: 1,
+      }),
     );
     return rows[0] || null;
   } catch (err) {
@@ -89,10 +92,11 @@ async function updateChatInMysql({
     const allowedTypes = ["text", "image", "video", "audio", "document"];
     const isIncoming = actualMsg?.route === "INCOMING";
 
-    const [chat] = await query(
-      `SELECT unread_count FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [chatId, uid],
-    );
+    const [chat] = plain(await prisma.beta_chats.findMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+      select: { unread_count: true },
+      take: 1,
+    }));
 
     const last_message = JSON.stringify(actualMsg);
     const sender_name = senderName || "Instagram User";
@@ -110,49 +114,32 @@ async function updateChatInMysql({
     }
 
     if (chat) {
-      await query(
-        `UPDATE beta_chats 
-         SET last_message = ?, sender_name = ?, sender_mobile = ?,
-             origin = ?, origin_instance_id = ?
-             ${unread_count > 0 ? ", unread_count = ?" : ""}
-         WHERE chat_id = ? AND uid = ?`,
-        unread_count > 0
-          ? [
-              last_message,
-              sender_name,
-              sender_mobile,
-              origin,
-              origin_instance_id,
-              unread_count,
-              chatId,
-              uid,
-            ]
-          : [
-              last_message,
-              sender_name,
-              sender_mobile,
-              origin,
-              origin_instance_id,
-              chatId,
-              uid,
-            ],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+        data: {
+          last_message: str(last_message),
+          sender_name: str(sender_name),
+          sender_mobile: str(sender_mobile),
+          origin: str(origin),
+          origin_instance_id: str(origin_instance_id),
+          // unread_count only written when > 0 (former conditional SET clause)
+          ...(unread_count > 0 ? { unread_count: BigInt(unread_count) } : {}),
+        },
+      });
     } else {
-      await query(
-        `INSERT INTO beta_chats 
-         (uid, chat_id, last_message, sender_name, sender_mobile, origin, origin_instance_id, unread_count, assigned_agent)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-        [
-          uid,
-          chatId,
-          last_message,
-          sender_name,
-          sender_mobile,
-          origin,
-          origin_instance_id,
-          unread_count,
-        ],
-      );
+      await prisma.beta_chats.create({
+        data: {
+          uid: str(uid),
+          chat_id: str(chatId),
+          last_message: str(last_message),
+          sender_name: str(sender_name),
+          sender_mobile: str(sender_mobile),
+          origin: str(origin),
+          origin_instance_id: str(origin_instance_id),
+          unread_count: bigOrNull(unread_count),
+          assigned_agent: null,
+        },
+      });
     }
   } catch (err) {
     console.error("updateChatInMysql (instagram) error:", err);
@@ -162,7 +149,7 @@ async function updateChatInMysql({
 // ─── Save message to beta_conversation ───────────────────
 async function saveMessageToConversation({ uid, chatId, messageData }) {
   try {
-    await query(`INSERT INTO beta_conversation SET ?`, {
+    await prisma.beta_conversation.create({ data: toData("beta_conversation", {
       type: messageData.type,
       metaChatId: messageData.metaChatId,
       msgContext: JSON.stringify(messageData.msgContext),
@@ -178,7 +165,7 @@ async function saveMessageToConversation({ uid, chatId, messageData }) {
       chat_id: chatId,
       status: messageData.status || "",
       createdAt: new Date(),
-    });
+    }) });
     return true;
   } catch (err) {
     console.error("saveMessageToConversation (instagram) error:", err);
@@ -228,10 +215,11 @@ async function processInstaMsg({ messagingEvent, igAccount, uid }) {
     // ─── Duplicate check ──────────────────────────────────
     const msgId = message.mid;
     if (msgId) {
-      const [existing] = await query(
-        `SELECT id FROM beta_conversation WHERE metaChatId = ? AND uid = ? LIMIT 1`,
-        [msgId, uid],
-      );
+      const [existing] = plain(await prisma.beta_conversation.findMany({
+        where: { metaChatId: whereStr(msgId), uid: whereStr(uid) },
+        select: { id: true },
+        take: 1,
+      }));
       if (existing) return null; // already saved
     }
 
@@ -337,10 +325,10 @@ async function processInstaMsg({ messagingEvent, igAccount, uid }) {
       }
     } else if (message.is_deleted) {
       // Message was unsent/deleted
-      await query(
-        `UPDATE beta_conversation SET status = 'deleted' WHERE metaChatId = ? AND uid = ?`,
-        [msgId, uid],
-      );
+      await prisma.beta_conversation.updateMany({
+        where: { metaChatId: whereStr(msgId), uid: whereStr(uid) },
+        data: { status: "deleted" },
+      });
       return null;
     } else if (message.is_echo) {
       // Echo of outgoing — already handled via route detection above
@@ -353,11 +341,18 @@ async function processInstaMsg({ messagingEvent, igAccount, uid }) {
     // ─── Handle reply_to (context) ────────────────────────
     let contextData = null;
     if (message.reply_to?.mid) {
-      const [replyMsg] = await query(
-        `SELECT metaChatId, msgContext, senderName, senderMobile, type, timestamp
-         FROM beta_conversation WHERE metaChatId = ? AND uid = ? LIMIT 1`,
-        [message.reply_to.mid, uid],
-      );
+      const [replyMsg] = plain(await prisma.beta_conversation.findMany({
+        where: { metaChatId: whereStr(message.reply_to.mid), uid: whereStr(uid) },
+        select: {
+          metaChatId: true,
+          msgContext: true,
+          senderName: true,
+          senderMobile: true,
+          type: true,
+          timestamp: true,
+        },
+        take: 1,
+      }));
       if (replyMsg) {
         contextData = {
           id: replyMsg.metaChatId,
@@ -411,13 +406,16 @@ async function handleInstaRead({ messagingEvent, uid }) {
     if (!watermark) return;
 
     // Mark all messages sent before this watermark as read
-    await query(
-      `UPDATE beta_conversation 
-       SET status = 'read' 
-       WHERE uid = ? AND origin = 'instagram' AND route = 'OUTGOING'
-         AND timestamp <= ? AND status != 'read'`,
-      [uid, Math.round(watermark / 1000)],
-    );
+    await prisma.beta_conversation.updateMany({
+      where: {
+        uid: whereStr(uid),
+        origin: "instagram",
+        route: "OUTGOING",
+        timestamp: { lte: whereStr(Math.round(watermark / 1000)) },
+        status: { not: "read" },
+      },
+      data: { status: "read" },
+    });
   } catch (err) {
     console.error("handleInstaRead error:", err);
   }
@@ -456,13 +454,16 @@ async function processInstaMessage({ body, uid }) {
       if (event.delivery) {
         const watermark = event.delivery?.watermark;
         if (watermark) {
-          await query(
-            `UPDATE beta_conversation 
-             SET status = 'delivered'
-             WHERE uid = ? AND origin = 'instagram' AND route = 'OUTGOING'
-               AND timestamp <= ? AND status = 'sent'`,
-            [resolvedUid, Math.round(watermark / 1000)],
-          );
+          await prisma.beta_conversation.updateMany({
+            where: {
+              uid: whereStr(resolvedUid),
+              origin: "instagram",
+              route: "OUTGOING",
+              timestamp: { lte: whereStr(Math.round(watermark / 1000)) },
+              status: "sent",
+            },
+            data: { status: "delivered" },
+          });
         }
         continue;
       }
@@ -556,11 +557,11 @@ async function resolveOrCreateChat({
   senderName,
   origin,
 }) {
-  const [existing] = await query(
-    `SELECT chat_id FROM beta_chats 
-     WHERE uid = ? AND sender_mobile = ? AND origin = ? LIMIT 1`,
-    [uid, senderId, origin],
-  );
+  const [existing] = plain(await prisma.beta_chats.findMany({
+    where: { uid: whereStr(uid), sender_mobile: whereStr(senderId), origin: whereStr(origin) },
+    select: { chat_id: true },
+    take: 1,
+  }));
 
   if (existing) return existing.chat_id;
 
@@ -575,25 +576,22 @@ async function resolveOrCreateChat({
     name: igAccount.name || "",
   });
 
-  await query(
-    `INSERT INTO beta_chats 
-    (uid, chat_id, sender_mobile, sender_name, origin, origin_instance_id, last_message, createdAt)
-   VALUES (?,?,?,?,?,?,?,?)`,
-    [
-      uid,
-      chatId,
-      senderId,
-      senderName,
-      origin,
-      JSON.stringify({
+  await prisma.beta_chats.create({
+    data: {
+      uid: str(uid),
+      chat_id: str(chatId),
+      sender_mobile: str(senderId),
+      sender_name: str(senderName),
+      origin: str(origin),
+      origin_instance_id: str(JSON.stringify({
         id: igAccount.user_id,
         username: igAccount.username,
         name: igAccount.name || "",
-      }),
-      JSON.stringify({ type: "text", text: { body: "" } }),
-      new Date(),
-    ],
-  );
+      })),
+      last_message: str(JSON.stringify({ type: "text", text: { body: "" } })),
+      createdAt: dateOrNull(new Date()),
+    },
+  });
 
   return chatId;
 }

@@ -1,6 +1,7 @@
 const randomstring = require("randomstring");
 const moment = require("moment");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { bigOrNull, plain, statusAdvanceWhere, str, toData, whereStr } = require("../../../database/prismaHelpers");
 const mime = require("mime-types");
 const { fetchProfileUrl } = require("./control");
 const fs = require("fs");
@@ -44,19 +45,25 @@ async function updateProfileMysql({
     if (!image) return;
 
     // Get existing chat data to preserve other fields
-    const [chat] = await query(
-      `SELECT * FROM beta_chats WHERE uid = ? AND chat_id = ?`,
-      [uid, chatId]
-    );
+    const [chat] = plain(await prisma.beta_chats.findMany({ where: { uid: whereStr(uid), chat_id: whereStr(chatId) } }));
 
     if (chat) {
       const profile = chat.profile_image
         ? { ...JSON.parse(chat.profile_image), profileImage: image }
         : { profileImage: image };
-      await query(
-        `UPDATE beta_chats SET last_message = JSON_SET(COALESCE(last_message, '{}'), '$.profileImage', ?), profile = ? WHERE uid = ? AND chat_id = ?`,
-        [image, JSON.stringify(profile), uid, chatId]
-      );
+      // former JSON_SET(COALESCE(last_message, '{}'), '$.profileImage', ?)
+      let lastMessage = {};
+      try {
+        const parsed = chat.last_message ? JSON.parse(chat.last_message) : {};
+        lastMessage = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+      } catch {}
+      await prisma.beta_chats.updateMany({
+        where: { uid: whereStr(uid), chat_id: whereStr(chatId) },
+        data: {
+          last_message: JSON.stringify({ ...lastMessage, profileImage: image }),
+          profile: JSON.stringify(profile),
+        },
+      });
     }
   } catch (err) {
     console.log("Error updating profile data:", err);
@@ -94,10 +101,11 @@ async function updateChatInMysql({
       sessionData?.authState?.creds?.me || sessionData.user;
 
     // Check if chat exists
-    const [chat] = await query(
-      `SELECT unread_count FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [chatId, uid]
-    );
+    const [chat] = plain(await prisma.beta_chats.findMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+      select: { unread_count: true },
+      take: 1,
+    }));
 
     const last_message = JSON.stringify(actualMsg);
     const sender_name = senderName || "NA";
@@ -111,52 +119,32 @@ async function updateChatInMysql({
     }
 
     if (chat) {
-      await query(
-        `UPDATE beta_chats 
-         SET last_message = ?, 
-             sender_name = ?, 
-             sender_mobile = ?, 
-             origin = ?, 
-             origin_instance_id = ?
-             ${unread_count > 0 ? ", unread_count = ?" : ""}
-         WHERE chat_id = ? AND uid = ?`,
-        unread_count > 0
-          ? [
-              last_message,
-              sender_name,
-              sender_mobile,
-              origin,
-              origin_instance_id,
-              unread_count,
-              chatId,
-              uid,
-            ]
-          : [
-              last_message,
-              sender_name,
-              sender_mobile,
-              origin,
-              origin_instance_id,
-              chatId,
-              uid,
-            ]
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+        data: {
+          last_message: str(last_message),
+          sender_name: str(sender_name),
+          sender_mobile: str(sender_mobile),
+          origin: str(origin),
+          origin_instance_id: str(origin_instance_id),
+          // unread_count only written when > 0 (former conditional SET clause)
+          ...(unread_count > 0 ? { unread_count: BigInt(unread_count) } : {}),
+        },
+      });
     } else {
-      await query(
-        `INSERT INTO beta_chats 
-         (uid, chat_id, last_message, sender_name, sender_mobile, origin, origin_instance_id, unread_count, assigned_agent) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-        [
-          uid,
-          chatId,
-          last_message,
-          sender_name,
-          sender_mobile,
-          origin,
-          origin_instance_id,
-          unread_count,
-        ]
-      );
+      await prisma.beta_chats.create({
+        data: {
+          uid: str(uid),
+          chat_id: str(chatId),
+          last_message: str(last_message),
+          sender_name: str(sender_name),
+          sender_mobile: str(sender_mobile),
+          origin: str(origin),
+          origin_instance_id: str(origin_instance_id),
+          unread_count: bigOrNull(unread_count),
+          assigned_agent: null,
+        },
+      });
     }
   } catch (err) {
     console.log("Error updating chat:", err);
@@ -212,7 +200,7 @@ function getChatId({ instanceNumber, senderMobile, uid }) {
 
 async function saveMessageToConversation({ uid, chatId, messageData }) {
   try {
-    await query(`INSERT INTO beta_conversation SET ?`, {
+    await prisma.beta_conversation.create({ data: toData("beta_conversation", {
       type: messageData.type,
       metaChatId: messageData.metaChatId,
       msgContext: JSON.stringify(messageData.msgContext),
@@ -226,7 +214,7 @@ async function saveMessageToConversation({ uid, chatId, messageData }) {
       origin: messageData.origin,
       uid,
       chat_id: chatId,
-    });
+    }) });
     return true;
   } catch (err) {
     console.log("Error saving message to conversation:", err);
@@ -250,22 +238,21 @@ async function processBaileysMsg({ body, uid, userFromMysql, chatId }) {
 
       if (newStatus) {
         // Monotonic status update: read > delivered > sent
-        await query(
-          `UPDATE beta_conversation 
-           SET status = CASE 
-             WHEN status = 'read' THEN 'read'
-             WHEN status = 'delivered' AND ? = 'sent' THEN 'delivered'
-             ELSE ?
-           END 
-           WHERE metaChatId = ? AND uid = ?`,
-          [newStatus, newStatus, body.key.id, uid]
-        );
+        await prisma.beta_conversation.updateMany({
+          where: {
+            metaChatId: whereStr(body.key.id),
+            uid: whereStr(uid),
+            ...statusAdvanceWhere(newStatus),
+          },
+          data: { status: String(newStatus) },
+        });
 
         // Update beta_chats last_message if it matches this message
-        const [chatRow] = await query(
-          `SELECT last_message FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-          [chatId, uid]
-        );
+        const [chatRow] = plain(await prisma.beta_chats.findMany({
+          where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+          select: { last_message: true },
+          take: 1,
+        }));
         if (chatRow?.last_message) {
           try {
             const parsedLast =
@@ -274,10 +261,10 @@ async function processBaileysMsg({ body, uid, userFromMysql, chatId }) {
                 : chatRow.last_message;
             if (parsedLast && parsedLast.metaChatId === body.key.id) {
               parsedLast.status = newStatus;
-              await query(
-                `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-                [JSON.stringify(parsedLast), chatId, uid]
-              );
+              await prisma.beta_chats.updateMany({
+                where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+                data: { last_message: str(JSON.stringify(parsedLast)) },
+              });
             }
           } catch (e) {}
         }
@@ -315,17 +302,14 @@ async function processBaileysMsg({ body, uid, userFromMysql, chatId }) {
       const reaction = body.message.reactionMessage;
 
       // Find the original message that was reacted to
-      const [originalMessage] = await query(
-        `SELECT * FROM beta_conversation WHERE metaChatId = ? AND uid = ?`,
-        [reaction.key.id, uid]
-      );
+      const [originalMessage] = plain(await prisma.beta_conversation.findMany({ where: { metaChatId: whereStr(reaction.key.id), uid: whereStr(uid) } }));
 
       if (originalMessage) {
         // Update the reaction field in the original message
-        await query(
-          `UPDATE beta_conversation SET reaction = ? WHERE metaChatId = ? AND uid = ?`,
-          [reaction.text, reaction.key.id, uid]
-        );
+        await prisma.beta_conversation.updateMany({
+          where: { metaChatId: whereStr(reaction.key.id), uid: whereStr(uid) },
+          data: { reaction: str(reaction.text) },
+        });
 
         // Return null as we don't need to create a new message for reactions
         return { newMessage: null, chatId };
@@ -448,10 +432,9 @@ async function processBaileysMsg({ body, uid, userFromMysql, chatId }) {
     // Determine context from quoted message if available
     let contextData = "";
     if (referencedMessageData?.stanzaId) {
-      const [foundMsg] = await query(
-        `SELECT * FROM beta_conversation WHERE metaChatId = ? AND uid = ?`,
-        [referencedMessageData.stanzaId, uid]
-      );
+      const [foundMsg] = plain(await prisma.beta_conversation.findMany({
+        where: { metaChatId: whereStr(referencedMessageData.stanzaId), uid: whereStr(uid) },
+      }));
       contextData = foundMsg || referencedMessageData;
     } else if (referencedMessageData) {
       contextData = referencedMessageData;
@@ -494,19 +477,11 @@ async function processBaileysMsg({ body, uid, userFromMysql, chatId }) {
 async function getUserDetails(sessionId, userData) {
   try {
     // Only get instance data, user data is already provided
-    const [instance] = await query(
-      `SELECT 
-        id,
-        uid,
-        number,
-        uniqueId,
-        data,
-        other
-      FROM instance
-      WHERE uniqueId = ?
-      LIMIT 1`,
-      [sessionId]
-    );
+    const [instance] = plain(await prisma.instance.findMany({
+      where: { uniqueId: whereStr(sessionId) },
+      select: { id: true, uid: true, number: true, uniqueId: true, data: true, other: true },
+      take: 1,
+    }));
 
     if (!instance) return null;
 

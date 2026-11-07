@@ -1,5 +1,6 @@
 // loops/qrCampaignLoop.js
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { idParam, intOrNull, plain, str, whereStr } = require("../database/prismaHelpers");
 const { getSession } = require("../helper/addon/qr/index.js");
 const logger = require("../utils/logger.js");
 
@@ -74,31 +75,25 @@ async function processCampaign(campaign) {
     const session = getSession(campaign.instance_id);
     if (!session) {
       logger.log(`[QR Campaign] Session not found for ${campaign.id}, pausing`);
-      await query(`UPDATE qr_campaigns SET status = 'paused' WHERE id = ?`, [
-        campaign.id,
-      ]);
+      await prisma.qr_campaigns.updateMany({ where: { id: idParam(campaign.id) }, data: { status: "paused" } });
       return;
     }
 
     // Get already-sent mobiles
-    const sentLogs = await query(
-      `SELECT contact_mobile FROM qr_campaign_logs WHERE campaign_id = ?`,
-      [campaign.id],
-    );
+    const sentLogs = plain(await prisma.qr_campaign_logs.findMany({ where: { campaign_id: idParam(campaign.id) }, select: { contact_mobile: true } }));
     const sentMobiles = new Set(sentLogs.map((l) => String(l.contact_mobile)));
 
     // Get pending contacts
-    const contacts = await query(
-      `SELECT * FROM contact WHERE uid = ? AND phonebook_id = ?`,
-      [campaign.uid, campaign.phonebook_id],
-    );
+    const contacts = plain(await prisma.contact.findMany({
+      where: { uid: whereStr(campaign.uid), phonebook_id: whereStr(campaign.phonebook_id) },
+    }));
     const pending = contacts.filter((c) => !sentMobiles.has(String(c.mobile)));
 
     if (pending.length === 0) {
-      await query(
-        `UPDATE qr_campaigns SET status = 'completed', completed_at = NOW() WHERE id = ?`,
-        [campaign.id],
-      );
+      await prisma.qr_campaigns.updateMany({
+        where: { id: idParam(campaign.id) },
+        data: { status: "completed", completed_at: new Date() },
+      });
       logger.log(`[QR Campaign] Campaign ${campaign.id} completed`);
       return;
     }
@@ -125,33 +120,30 @@ async function processCampaign(campaign) {
     }
 
     // ── Log with message_id for delivery tracking ──────────────
-    await query(
-      `INSERT INTO qr_campaign_logs 
-        (campaign_id, uid, contact_name, contact_mobile, status, error_msg, message_id, delivery_status) 
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [
-        campaign.id,
-        campaign.uid,
-        contact.name || "",
-        contact.mobile,
-        status,
-        errorMsg,
-        messageId,
-        status === "sent" ? "sent" : "failed",
-      ],
-    );
+    await prisma.qr_campaign_logs.create({
+      data: {
+        campaign_id: intOrNull(campaign.id),
+        uid: str(campaign.uid),
+        contact_name: str(contact.name || ""),
+        contact_mobile: str(contact.mobile),
+        status: str(status),
+        error_msg: str(errorMsg),
+        message_id: str(messageId),
+        delivery_status: str(status === "sent" ? "sent" : "failed"),
+      },
+    });
 
     // ── Update counters ────────────────────────────────────────
     if (status === "sent") {
-      await query(
-        `UPDATE qr_campaigns SET sent_count = sent_count + 1 WHERE id = ?`,
-        [campaign.id],
-      );
+      await prisma.qr_campaigns.update({
+        where: { id: campaign.id },
+        data: { sent_count: { increment: 1 } },
+      });
     } else {
-      await query(
-        `UPDATE qr_campaigns SET failed_count = failed_count + 1 WHERE id = ?`,
-        [campaign.id],
-      );
+      await prisma.qr_campaigns.update({
+        where: { id: campaign.id },
+        data: { failed_count: { increment: 1 } },
+      });
     }
 
     // ── Delay before next message ──────────────────────────────
@@ -167,15 +159,12 @@ async function processCampaign(campaign) {
 // ── Check scheduled campaigns ────────────────────────────────────
 async function checkScheduledCampaigns() {
   try {
-    const scheduled = await query(
-      `SELECT * FROM qr_campaigns WHERE status = 'scheduled' AND scheduled_at <= NOW()`,
-      [],
-    );
+    const scheduled = plain(await prisma.qr_campaigns.findMany({ where: { status: "scheduled", scheduled_at: { lte: new Date() } } }));
     for (const c of scheduled) {
-      await query(
-        `UPDATE qr_campaigns SET status = 'running', started_at = NOW() WHERE id = ?`,
-        [c.id],
-      );
+      await prisma.qr_campaigns.updateMany({
+        where: { id: idParam(c.id) },
+        data: { status: "running", started_at: new Date() },
+      });
     }
   } catch (err) {
     logger.error("[QR Campaign] Scheduled check error:", err);
@@ -187,16 +176,10 @@ async function qrCampaignLoop() {
   try {
     await checkScheduledCampaigns();
 
-    const running = await query(
-      `SELECT * FROM qr_campaigns WHERE status = 'running' LIMIT 5`,
-      [],
-    );
+    const running = plain(await prisma.qr_campaigns.findMany({ where: { status: "running" }, take: 5 }));
 
     for (const campaign of running) {
-      const [fresh] = await query(
-        `SELECT status FROM qr_campaigns WHERE id = ?`,
-        [campaign.id],
-      );
+      const [fresh] = plain(await prisma.qr_campaigns.findMany({ where: { id: idParam(campaign.id) }, select: { status: true } }));
       if (fresh?.status === "running") {
         await processCampaign(campaign);
       }

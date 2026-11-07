@@ -1,4 +1,6 @@
 const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { bigOrNull, idParam, plain, str, whereStr } = require("../../database/prismaHelpers");
 const {
   mergeArraysWithPhonebook,
   deleteMediaFromConversation,
@@ -208,10 +210,7 @@ function processSocketEvent({
           }
           const chatData = mergeArraysWithPhonebook(chats, contacts);
 
-          const agentData = await query(
-            `SELECT * FROM agents WHERE owner_uid = ?`,
-            [uid],
-          );
+          const agentData = plain(await prisma.agents.findMany({ where: { owner_uid: whereStr(uid) } }));
 
           socket.emit("chat_list", {
             chats: chatData,
@@ -239,15 +238,11 @@ function processSocketEvent({
             );
           } else {
             // Export ALL chats
-            chats = await query(`SELECT * FROM beta_chats WHERE uid = ?`, [
-              ownerUid,
-            ]);
+            chats = plain(await prisma.beta_chats.findMany({ where: { uid: whereStr(ownerUid) } }));
           }
 
           // Enrich with phonebook contact names
-          const contacts = await query(`SELECT * FROM contact WHERE uid = ?`, [
-            ownerUid,
-          ]);
+          const contacts = plain(await prisma.contact.findMany({ where: { uid: whereStr(ownerUid) } }));
 
           const enriched = chats.map((chat) => {
             const contact = contacts.find(
@@ -329,15 +324,12 @@ function processSocketEvent({
 
           const ownerUid = isAgent ? socket?.userData?.owner_uid : uid;
 
-          const [chatRow] = await query(
-            `SELECT * FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-            [exportChatId, ownerUid],
-          );
+          const [chatRow] = plain(await prisma.beta_chats.findMany({ where: { chat_id: whereStr(exportChatId), uid: whereStr(ownerUid) } }));
 
-          const messages = await query(
-            `SELECT * FROM beta_conversation WHERE chat_id = ? AND uid = ? ORDER BY timestamp ASC`,
-            [exportChatId, ownerUid],
-          );
+          const messages = plain(await prisma.beta_conversation.findMany({
+            where: { chat_id: whereStr(exportChatId), uid: whereStr(ownerUid) },
+            orderBy: { timestamp: "asc" },
+          }));
 
           const parsed = messages.map((m) => {
             let ctx = null;
@@ -411,11 +403,10 @@ function processSocketEvent({
 
           // unreading the message count with tenant isolation
           const unreadTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
-          await query(`UPDATE beta_chats SET unread_count = ? WHERE id = ? AND uid = ?`, [
-            0,
-            chat?.id,
-            unreadTenantUid,
-          ]);
+          await prisma.beta_chats.updateMany({
+            where: { id: idParam(chat?.id), uid: whereStr(unreadTenantUid) },
+            data: { unread_count: bigOrNull(0) },
+          });
 
           // Build query for conversations with filters
           let conversationQueryStr = `FROM beta_conversation WHERE chat_id = ? AND uid = ?`;
@@ -460,32 +451,19 @@ function processSocketEvent({
             context: row.context ? JSON.parse(row.context) : null,
           }));
 
-          const labelAdded = await query(
-            `SELECT * FROM chat_tags WHERE uid = ?`,
-            [isAgent ? socket?.userData?.owner_uid : uid],
-          );
+          const labelAdded = plain(await prisma.chat_tags.findMany({ where: { uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid) } }));
 
-          let [updatedChat] = await query(
-            `SELECT * FROM beta_chats WHERE id = ?`,
-            [chat?.id],
-          );
-          const agents = await query(
-            `SELECT * FROM agents WHERE owner_uid = ?`,
-            [uid],
-          );
+          let [updatedChat] = plain(await prisma.beta_chats.findMany({ where: { id: idParam(chat?.id) } }));
+          const agents = plain(await prisma.agents.findMany({ where: { owner_uid: whereStr(uid) } }));
 
-          const [getContact] = await query(
-            `SELECT * FROM contact WHERE uid = ? AND mobile = ?`,
-            [
-              isAgent ? socket?.userData?.owner_uid : uid,
-              updatedChat?.sender_mobile,
-            ],
-          );
+          const [getContact] = plain(await prisma.contact.findMany({
+            where: {
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+              mobile: whereStr(updatedChat?.sender_mobile),
+            },
+          }));
 
-          const phonebookData = await query(
-            `SELECT * FROM phonebook WHERE uid = ?`,
-            [isAgent ? socket?.userData?.owner_uid : uid],
-          );
+          const phonebookData = plain(await prisma.phonebook.findMany({ where: { uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid) } }));
 
           updatedChat = { ...updatedChat, contactData: getContact || null };
           updatedChat.chat_note = updatedChat?.chat_note
@@ -498,23 +476,23 @@ function processSocketEvent({
             );
           }
 
-          const chatBots = await query(
-            `SELECT * FROM beta_chatbot WHERE uid = ? AND active = ? AND source = ?`,
-            [isAgent ? socket?.userData?.owner_uid : uid, 1, "wa_chatbot"],
-          );
+          const chatBots = plain(await prisma.beta_chatbot.findMany({
+            where: {
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+              active: idParam(1),
+              source: whereStr("wa_chatbot"),
+            },
+          }));
 
-          const [lastSenderMsg] = await query(
-            `SELECT * 
-                FROM beta_conversation 
-                WHERE chat_id = ? AND route = ? AND uid = ?
-                ORDER BY timestamp DESC 
-                LIMIT 1`,
-            [
-              chat.chat_id,
-              "INCOMING",
-              isAgent ? socket?.userData?.owner_uid : uid,
-            ],
-          );
+          const [lastSenderMsg] = plain(await prisma.beta_conversation.findMany({
+            where: {
+              chat_id: whereStr(chat.chat_id),
+              route: whereStr("INCOMING"),
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+            },
+            orderBy: { timestamp: "desc" },
+            take: 1,
+          }));
 
           socket.emit("load_conversation", {
             conversation: parsedChatList,
@@ -540,10 +518,7 @@ function processSocketEvent({
             });
           }
 
-          const labelsData = await query(
-            `SELECT * FROM chat_tags WHERE uid = ?`,
-            [uid],
-          );
+          const labelsData = plain(await prisma.chat_tags.findMany({ where: { uid: whereStr(uid) } }));
           const allLablesTitles = labelsData?.map((x) => x.title);
           if (allLablesTitles?.includes(label)) {
             return socket.emit("error", {
@@ -551,27 +526,18 @@ function processSocketEvent({
             });
           }
 
-          await query(
-            `INSERT INTO chat_tags (uid, hex, title) VALUES (?,?,?)`,
-            [uid, hex, label],
-          );
+          await prisma.chat_tags.create({ data: { uid: str(uid), hex: str(hex), title: str(label) } });
 
-          const labelsDataNew = await query(
-            `SELECT * FROM chat_tags WHERE uid = ?`,
-            [uid],
-          );
+          const labelsDataNew = plain(await prisma.chat_tags.findMany({ where: { uid: whereStr(uid) } }));
 
           socket.emit("update_labels", labelsDataNew);
           break;
 
         case "on_label_delete":
           const { labelId } = payload;
-          await query(`DELETE FROM chat_tags WHERE id = ?`, [labelId]);
+          await prisma.chat_tags.deleteMany({ where: { id: idParam(labelId) } });
 
-          const labelNew = await query(
-            `SELECT * FROM chat_tags WHERE uid = ?`,
-            [uid],
-          );
+          const labelNew = plain(await prisma.chat_tags.findMany({ where: { uid: whereStr(uid) } }));
 
           socket.emit("update_labels", labelNew);
           break;
@@ -586,10 +552,10 @@ function processSocketEvent({
 
           const setLabelTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
           // Get existing labels first (Tenant Isolated)
-          const [existingLabelsRow] = await query(
-            `SELECT chat_label FROM beta_chats WHERE id = ? AND uid = ?`,
-            [chatIdRow, setLabelTenantUid],
-          );
+          const [existingLabelsRow] = plain(await prisma.beta_chats.findMany({
+            where: { id: idParam(chatIdRow), uid: whereStr(setLabelTenantUid) },
+            select: { chat_label: true },
+          }));
           if (!existingLabelsRow) {
             return socket.emit("error", { msg: "Chat not found or unauthorized" });
           }
@@ -614,11 +580,10 @@ function processSocketEvent({
           }
 
           // Update with the new labels array (Tenant Isolated)
-          await query(`UPDATE beta_chats SET chat_label = ? WHERE id = ? AND uid = ?`, [
-            JSON.stringify(existingLabels),
-            chatIdRow,
-            setLabelTenantUid,
-          ]);
+          await prisma.beta_chats.updateMany({
+            where: { id: idParam(chatIdRow), uid: whereStr(setLabelTenantUid) },
+            data: { chat_label: str(JSON.stringify(existingLabels)) },
+          });
 
           socket.emit("request_update_opened_chat", {});
           socket.emit("request_update_chat_list", {});
@@ -633,10 +598,10 @@ function processSocketEvent({
           }
 
           const rmLabelTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
-          const [labelsRow] = await query(
-            `SELECT chat_label FROM beta_chats WHERE id = ? AND uid = ?`,
-            [chatIdd, rmLabelTenantUid],
-          );
+          const [labelsRow] = plain(await prisma.beta_chats.findMany({
+            where: { id: idParam(chatIdd), uid: whereStr(rmLabelTenantUid) },
+            select: { chat_label: true },
+          }));
           if (!labelsRow) {
             return socket.emit("error", { msg: "Chat not found or unauthorized" });
           }
@@ -652,11 +617,10 @@ function processSocketEvent({
                 (label) => label.id !== labelIdd,
               );
 
-              await query(`UPDATE beta_chats SET chat_label = ? WHERE id = ? AND uid = ?`, [
-                JSON.stringify(updatedLabels),
-                chatIdd,
-                rmLabelTenantUid,
-              ]);
+              await prisma.beta_chats.updateMany({
+                where: { id: idParam(chatIdd), uid: whereStr(rmLabelTenantUid) },
+                data: { chat_label: str(JSON.stringify(updatedLabels)) },
+              });
             } catch (err) {
               logger.error("Error parsing labels:", err);
             }
@@ -671,10 +635,7 @@ function processSocketEvent({
 
           if (chatNoteId && chatRealId) {
             const delNoteTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
-            const [getFirst] = await query(
-              `SELECT * FROM beta_chats WHERE id = ? AND uid = ?`,
-              [chatRealId, delNoteTenantUid],
-            );
+            const [getFirst] = plain(await prisma.beta_chats.findMany({ where: { id: idParam(chatRealId), uid: whereStr(delNoteTenantUid) } }));
             if (!getFirst) {
               return socket.emit("error", { msg: "Chat not found or unauthorized" });
             }
@@ -682,11 +643,10 @@ function processSocketEvent({
             const oldNotes = JSON.parse(getFirst?.chat_note || "[]");
             const newNotes = oldNotes.filter((note) => note.id !== chatNoteId);
 
-            await query(`UPDATE beta_chats SET chat_note = ? WHERE id = ? AND uid = ?`, [
-              JSON.stringify(newNotes),
-              chatRealId,
-              delNoteTenantUid,
-            ]);
+            await prisma.beta_chats.updateMany({
+              where: { id: idParam(chatRealId), uid: whereStr(delNoteTenantUid) },
+              data: { chat_note: str(JSON.stringify(newNotes)) },
+            });
           }
 
           socket.emit("request_update_opened_chat", {});
@@ -697,10 +657,7 @@ function processSocketEvent({
 
           if (saveNoteChatId) {
             const saveNoteTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
-            const [getFirst] = await query(
-              `SELECT * FROM beta_chats WHERE id = ? AND uid = ?`,
-              [saveNoteChatId, saveNoteTenantUid],
-            );
+            const [getFirst] = plain(await prisma.beta_chats.findMany({ where: { id: idParam(saveNoteChatId), uid: whereStr(saveNoteTenantUid) } }));
             if (!getFirst) {
               return socket.emit("error", { msg: "Chat not found or unauthorized" });
             }
@@ -708,9 +665,7 @@ function processSocketEvent({
             const oldNotes = JSON.parse(getFirst?.chat_note || "[]");
             const { email: userEmail, name: userName } = socket?.userData;
 
-            const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [
-              saveNoteTenantUid,
-            ]);
+            const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(saveNoteTenantUid) } }));
 
             const userTimezone = getCurrentTimestampInTimeZone(
               user?.timezone || "Asia/Kolkata",
@@ -728,11 +683,10 @@ function processSocketEvent({
               },
             ];
 
-            await query(`UPDATE beta_chats SET chat_note = ? WHERE id = ? AND uid = ?`, [
-              JSON.stringify(newArr),
-              saveNoteChatId,
-              saveNoteTenantUid,
-            ]);
+            await prisma.beta_chats.updateMany({
+              where: { id: idParam(saveNoteChatId), uid: whereStr(saveNoteTenantUid) },
+              data: { chat_note: str(JSON.stringify(newArr)) },
+            });
           }
           socket.emit("request_update_opened_chat", {});
           break;
@@ -751,10 +705,11 @@ function processSocketEvent({
           }
 
           const targetOwnerUid = isAgent ? socket?.userData?.owner_uid : uid;
-          const [verifiedChat] = await query(
-            `SELECT id, origin FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-            [chatInfo.chat_id, targetOwnerUid],
-          );
+          const [verifiedChat] = plain(await prisma.beta_chats.findMany({
+            where: { chat_id: whereStr(chatInfo.chat_id), uid: whereStr(targetOwnerUid) },
+            select: { id: true, origin: true },
+            take: 1,
+          }));
           if (!verifiedChat) {
             return socket.emit("error", { msg: "Conversation not found or unauthorized." });
           }
@@ -766,9 +721,7 @@ function processSocketEvent({
             return socket.emit("error", { msg: "Please refresh the page" });
           }
 
-          const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [
-            isAgent ? socket?.userData?.owner_uid : uid,
-          ]);
+          const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid) } }));
 
           const userTimezone = getCurrentTimestampInTimeZone(
             user?.timezone || "Asia/Kolkata",
@@ -866,14 +819,10 @@ function processSocketEvent({
               messageData,
             });
 
-            await query(
-              `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE chat_id = ? AND uid = ?`,
-              [
-                JSON.stringify(messageData),
-                chatInfo.chat_id,
-                targetOwnerUid,
-              ],
-            );
+            await prisma.beta_chats.updateMany({
+              where: { chat_id: whereStr(chatInfo.chat_id), uid: whereStr(targetOwnerUid) },
+              data: { last_message: str(JSON.stringify(messageData)), updatedAt: new Date() },
+            });
 
             // Lazy require sendToUid
             const { sendToUid } = require("../../socket");
@@ -945,19 +894,33 @@ function processSocketEvent({
 
           // 1a. Direct lookup by row primary key id if present
           if (tplChatInfo?.id && !isNaN(tplChatInfo.id)) {
-            const [chatById] = await query(
-              `SELECT id, chat_id, origin, sender_mobile, sender_name FROM beta_chats WHERE id = ? AND uid = ? LIMIT 1`,
-              [Number(tplChatInfo.id), targetOwnerUid],
-            );
+            const [chatById] = plain(await prisma.beta_chats.findMany({
+              where: { id: idParam(Number(tplChatInfo.id)), uid: whereStr(targetOwnerUid) },
+              select: {
+                id: true,
+                chat_id: true,
+                origin: true,
+                sender_mobile: true,
+                sender_name: true,
+              },
+              take: 1,
+            }));
             if (chatById) dbTplChat = chatById;
           }
 
           // 1b. Direct lookup by canonical chat_id
           if (!dbTplChat && tplChatInfo?.chat_id) {
-            const [chatByChatId] = await query(
-              `SELECT id, chat_id, origin, sender_mobile, sender_name FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-              [tplChatInfo.chat_id, targetOwnerUid],
-            );
+            const [chatByChatId] = plain(await prisma.beta_chats.findMany({
+              where: { chat_id: whereStr(tplChatInfo.chat_id), uid: whereStr(targetOwnerUid) },
+              select: {
+                id: true,
+                chat_id: true,
+                origin: true,
+                sender_mobile: true,
+                sender_name: true,
+              },
+              take: 1,
+            }));
             if (chatByChatId) dbTplChat = chatByChatId;
           }
 
@@ -1120,10 +1083,11 @@ function processSocketEvent({
 
           // Perform database logging & UI refresh broadcasts asynchronously without blocking ack
           try {
-            const [tplUser] = await query(
-              `SELECT timezone FROM user WHERE uid = ? LIMIT 1`,
-              [targetOwnerUid],
-            );
+            const [tplUser] = plain(await prisma.user.findMany({
+              where: { uid: whereStr(targetOwnerUid) },
+              select: { timezone: true },
+              take: 1,
+            }));
 
             const tplTimestamp = getCurrentTimestampInTimeZone(
               tplUser?.timezone || "Asia/Kolkata",
@@ -1162,32 +1126,27 @@ function processSocketEvent({
             });
 
             if (dbTplChat) {
-              await query(
-                `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE id = ? AND uid = ?`,
-                [
-                  JSON.stringify(templateMsgData),
-                  dbTplChat.id,
-                  targetOwnerUid,
-                ],
-              );
+              await prisma.beta_chats.updateMany({
+                where: { id: idParam(dbTplChat.id), uid: whereStr(targetOwnerUid) },
+                data: {
+                  last_message: str(JSON.stringify(templateMsgData)),
+                  updatedAt: new Date(),
+                },
+              });
             } else {
-              await query(
-                `INSERT INTO beta_chats 
-                  (uid, chat_id, last_message, sender_name, sender_mobile, 
-                    origin, origin_instance_id, unread_count, assigned_agent) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                  targetOwnerUid,
-                  canonicalChatId,
-                  JSON.stringify(templateMsgData),
-                  tplChatInfo?.sender_name || recipientMobile,
-                  recipientMobile,
-                  "meta",
-                  JSON.stringify({ id: recipientMobile }),
-                  0,
-                  isAgent ? JSON.stringify([socket?.userData]) : null,
-                ],
-              );
+              await prisma.beta_chats.create({
+                data: {
+                  uid: str(targetOwnerUid),
+                  chat_id: str(canonicalChatId),
+                  last_message: str(JSON.stringify(templateMsgData)),
+                  sender_name: str(tplChatInfo?.sender_name || recipientMobile),
+                  sender_mobile: str(recipientMobile),
+                  origin: str("meta"),
+                  origin_instance_id: str(JSON.stringify({ id: recipientMobile })),
+                  unread_count: bigOrNull(0),
+                  assigned_agent: str(isAgent ? JSON.stringify([socket?.userData]) : null),
+                },
+              });
             }
 
             // Broadcast to conversation tabs
@@ -1229,10 +1188,13 @@ function processSocketEvent({
           const { cId, aUid } = payload;
 
           // Get current chat data
-          const [chatDataoo] = await query(
-            `SELECT assigned_agent FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-            [cId, isAgent ? socket?.userData?.owner_uid : uid],
-          );
+          const [chatDataoo] = plain(await prisma.beta_chats.findMany({
+            where: {
+              chat_id: whereStr(cId),
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+            },
+            select: { assigned_agent: true },
+          }));
 
           let currentAgentss = [];
           try {
@@ -1257,16 +1219,13 @@ function processSocketEvent({
             JSON.stringify(updatedAgents),
           );
 
-          await query(
-            `UPDATE beta_chats
-              SET assigned_agent = ?
-              WHERE chat_id = ? AND uid = ?`,
-            [
-              JSON.stringify(updatedAgents),
-              cId,
-              isAgent ? socket?.userData?.owner_uid : uid,
-            ],
-          );
+          await prisma.beta_chats.updateMany({
+            where: {
+              chat_id: whereStr(cId),
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+            },
+            data: { assigned_agent: str(JSON.stringify(updatedAgents)) },
+          });
 
           socket.emit("request_update_chat_list", {});
           break;
@@ -1275,10 +1234,10 @@ function processSocketEvent({
           const { chatId, agentUid, unAssign } = payload;
 
           // Get current chat data
-          const [chatDatao] = await query(
-            `SELECT assigned_agent FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-            [chatId, uid],
-          );
+          const [chatDatao] = plain(await prisma.beta_chats.findMany({
+            where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+            select: { assigned_agent: true },
+          }));
 
           let currentAgents = [];
           try {
@@ -1299,12 +1258,10 @@ function processSocketEvent({
               (agent) => agent.uid !== agentUid,
             );
 
-            await query(
-              `UPDATE beta_chats
-                  SET assigned_agent = ?
-                  WHERE chat_id = ? AND uid = ?`,
-              [JSON.stringify(updatedAgents), chatId, uid],
-            );
+            await prisma.beta_chats.updateMany({
+              where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+              data: { assigned_agent: str(JSON.stringify(updatedAgents)) },
+            });
           } else {
             if (chatId && agentUid) {
               // Check if agent already exists
@@ -1314,19 +1271,16 @@ function processSocketEvent({
 
               if (!agentExists) {
                 // Get agent data
-                const [agentData] = await query(
-                  `SELECT * FROM agents WHERE uid = ? AND owner_uid = ?`,
-                  [agentUid, uid],
-                );
+                const [agentData] = plain(await prisma.agents.findMany({ where: { uid: whereStr(agentUid), owner_uid: whereStr(uid) } }));
 
                 if (agentData) {
                   // Add new agent to the array
                   const updatedAgents = [...currentAgents, agentData];
 
-                  await query(
-                    `UPDATE beta_chats SET assigned_agent = ? WHERE chat_id = ? AND uid = ?`,
-                    [JSON.stringify(updatedAgents), chatId, uid],
-                  );
+                  await prisma.beta_chats.updateMany({
+                    where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+                    data: { assigned_agent: str(JSON.stringify(updatedAgents)) },
+                  });
                 }
               }
             }
@@ -1349,10 +1303,7 @@ function processSocketEvent({
           const chatid = `${instance?.number}_${cleanRecipient}_${ownerUid}`;
 
           // checking if chat already existed
-          const [checkChat] = await query(
-            `SELECT * FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-            [chatid, ownerUid],
-          );
+          const [checkChat] = plain(await prisma.beta_chats.findMany({ where: { chat_id: whereStr(chatid), uid: whereStr(ownerUid) }, take: 1 }));
 
           const sendNewMsg = await sendNewMessage({
             sessionId: instance?.uniqueId,
@@ -1406,28 +1357,30 @@ function processSocketEvent({
             });
 
             if (checkChat) {
-              await query(
-                `UPDATE beta_chats SET last_message = ?, updatedAt = NOW() WHERE chat_id = ? AND uid = ?`,
-                [JSON.stringify(messageData), chatid, ownerUid],
-              );
+              await prisma.beta_chats.updateMany({
+                where: { chat_id: whereStr(chatid), uid: whereStr(ownerUid) },
+                data: {
+                  last_message: str(JSON.stringify(messageData)),
+                  updatedAt: new Date(),
+                },
+              });
             } else {
               const originInstanceId =
                 sendNewMsg?.sessionData?.authState?.creds?.me ||
                 sendNewMsg?.sessionData.user;
 
-              await query(
-                `INSERT INTO beta_chats (uid, origin_instance_id, chat_id, last_message, sender_name, sender_mobile, origin, assigned_agent) VALUES (?,?,?,?,?,?,?,?)`,
-                [
-                  ownerUid,
-                  JSON.stringify(originInstanceId),
-                  chatid,
-                  JSON.stringify(messageData),
-                  recName || cleanRecipient,
-                  cleanRecipient,
-                  "qr",
-                  isAgent ? JSON.stringify([socket?.userData]) : null,
-                ],
-              );
+              await prisma.beta_chats.create({
+                data: {
+                  uid: str(ownerUid),
+                  origin_instance_id: str(JSON.stringify(originInstanceId)),
+                  chat_id: str(chatid),
+                  last_message: str(JSON.stringify(messageData)),
+                  sender_name: str(recName || cleanRecipient),
+                  sender_mobile: str(cleanRecipient),
+                  origin: str("qr"),
+                  assigned_agent: str(isAgent ? JSON.stringify([socket?.userData]) : null),
+                },
+              });
             }
 
             const { sendToUid } = require("../../socket");
@@ -1481,10 +1434,7 @@ function processSocketEvent({
           const ownerUid = isAgent ? socket?.userData?.owner_uid : uid;
 
           // 1. Get meta API keys
-          const [metaApi] = await query(
-            `SELECT * FROM meta_api WHERE uid = ? LIMIT 1`,
-            [ownerUid],
-          );
+          const [metaApi] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(ownerUid) }, take: 1 }));
 
           if (!metaApi?.access_token || !metaApi?.business_phone_number_id) {
             return socket.emit("error", {
@@ -1541,9 +1491,7 @@ function processSocketEvent({
           const metaMsgId = sendResult?.messages?.[0]?.id || "";
 
           // 3. Get user timezone
-          const [userRow] = await query(`SELECT * FROM user WHERE uid = ?`, [
-            ownerUid,
-          ]);
+          const [userRow] = plain(await prisma.user.findMany({ where: { uid: whereStr(ownerUid) } }));
 
           const timestamp = getCurrentTimestampInTimeZone(
             userRow?.timezone || "Asia/Kolkata",
@@ -1576,46 +1524,39 @@ function processSocketEvent({
           };
 
           // 6. Upsert beta_chats
-          const [existingChat] = await query(
-            `SELECT id FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-            [chatId, ownerUid],
-          );
+          const [existingChat] = plain(await prisma.beta_chats.findMany({
+            where: { chat_id: whereStr(chatId), uid: whereStr(ownerUid) },
+            select: { id: true },
+            take: 1,
+          }));
 
           if (existingChat) {
             // Chat already exists — just update last_message
-            await query(
-              `UPDATE beta_chats 
-                SET last_message = ?, sender_mobile = ?, origin = ?
-                WHERE chat_id = ? AND uid = ?`,
-              [
-                JSON.stringify(messageData),
-                formattedPhone,
-                "meta",
-                chatId,
-                ownerUid,
-              ],
-            );
+            await prisma.beta_chats.updateMany({
+              where: { chat_id: whereStr(chatId), uid: whereStr(ownerUid) },
+              data: {
+                last_message: str(JSON.stringify(messageData)),
+                sender_mobile: str(formattedPhone),
+                origin: str("meta"),
+              },
+            });
           } else {
             // Create new chat row
-            await query(
-              `INSERT INTO beta_chats 
-                (uid, chat_id, last_message, sender_name, sender_mobile, 
-                  origin, origin_instance_id, unread_count, assigned_agent) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-              [
-                ownerUid,
-                chatId,
-                JSON.stringify(messageData),
-                "",
-                formattedPhone,
-                "meta",
-                JSON.stringify({
+            await prisma.beta_chats.create({
+              data: {
+                uid: str(ownerUid),
+                chat_id: str(chatId),
+                last_message: str(JSON.stringify(messageData)),
+                sender_name: str(""),
+                sender_mobile: str(formattedPhone),
+                origin: str("meta"),
+                origin_instance_id: str(JSON.stringify({
                   id: metaApi.business_phone_number_id,
-                }),
-                0,
-                isAgent ? JSON.stringify([socket?.userData]) : null,
-              ],
-            );
+                })),
+                unread_count: bigOrNull(0),
+                assigned_agent: str(isAgent ? JSON.stringify([socket?.userData]) : null),
+              },
+            });
           }
 
           await saveMessageToConversation({
@@ -1639,15 +1580,19 @@ function processSocketEvent({
         case "delete_chat":
           const { chatId: delChatId, type: deleteType } = payload;
           if (delChatId && deleteType) {
-            await query(
-              `DELETE FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-              [delChatId, isAgent ? socket?.userData?.owner_uid : uid],
-            );
+            await prisma.beta_chats.deleteMany({
+              where: {
+                chat_id: whereStr(delChatId),
+                uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+              },
+            });
             const metaMediaFolder = `${__dirname}/../../client/public/meta-media`;
-            const conversationData = await query(
-              `SELECT * FROM beta_conversation WHERE chat_id = ? AND uid = ?`,
-              [delChatId, isAgent ? socket?.userData?.owner_uid : uid],
-            );
+            const conversationData = plain(await prisma.beta_conversation.findMany({
+              where: {
+                chat_id: whereStr(delChatId),
+                uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+              },
+            }));
             await deleteMediaFromConversation({
               mediaFolderPath: metaMediaFolder,
               type: deleteType,
@@ -1657,10 +1602,12 @@ function processSocketEvent({
             });
 
             if (deleteType === "delete") {
-              await query(
-                `DELETE FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-                [delChatId, isAgent ? socket?.userData?.owner_uid : uid],
-              );
+              await prisma.beta_chats.deleteMany({
+                where: {
+                  chat_id: whereStr(delChatId),
+                  uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+                },
+              });
             }
 
             socket.emit("request_update_chat_list", {});
@@ -1685,10 +1632,12 @@ function processSocketEvent({
             });
           }
 
-          const checkExisted = await query(
-            `SELECT * FROM contact WHERE uid = ? AND mobile = ?`,
-            [isAgent ? socket?.userData?.owner_uid : uid, Number(conMob)],
-          );
+          const checkExisted = plain(await prisma.contact.findMany({
+            where: {
+              uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+              mobile: whereStr(Number(conMob)),
+            },
+          }));
 
           if (checkExisted?.length > 0) {
             return socket.emit("error", {
@@ -1700,21 +1649,20 @@ function processSocketEvent({
             return socket.emit("error", { msg: "Please select a phonebook" });
           }
 
-          await query(
-            `INSERT INTO contact (uid, phonebook_id, phonebook_name, name, mobile, var1, var2, var3, var4, var5) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-            [
-              isAgent ? socket?.userData?.owner_uid : uid,
-              phonebookDataa?.id,
-              phonebookDataa?.name,
-              conName,
-              conMob,
-              var1,
-              var2,
-              var3,
-              var4,
-              var5,
-            ],
-          );
+          await prisma.contact.create({
+            data: {
+              uid: str(isAgent ? socket?.userData?.owner_uid : uid),
+              phonebook_id: str(phonebookDataa?.id),
+              phonebook_name: str(phonebookDataa?.name),
+              name: str(conName),
+              mobile: str(conMob),
+              var1: str(var1),
+              var2: str(var2),
+              var3: str(var3),
+              var4: str(var4),
+              var5: str(var5),
+            },
+          });
 
           socket.emit("request_update_chat_list");
           socket.emit("request_update_opened_chat");
@@ -1724,7 +1672,7 @@ function processSocketEvent({
         case "del_contact":
           const { contactId } = payload;
           const contactTenantUid = isAgent ? socket?.userData?.owner_uid : uid;
-          await query(`DELETE FROM contact WHERE id = ? AND uid = ?`, [contactId, contactTenantUid]);
+          await prisma.contact.deleteMany({ where: { id: idParam(contactId), uid: whereStr(contactTenantUid) } });
           socket.emit("request_update_chat_list");
           socket.emit("request_update_opened_chat");
           break;
@@ -1740,10 +1688,7 @@ function processSocketEvent({
           const today = moment().format("YYYY-MM-DD");
 
           // Get existing logs
-          const [agentDataa] = await query(
-            `SELECT logs FROM agents WHERE uid = ?`,
-            [agentUidd],
-          );
+          const [agentDataa] = plain(await prisma.agents.findMany({ where: { uid: whereStr(agentUidd) }, select: { logs: true } }));
 
           let logs = {};
           try {
@@ -1762,10 +1707,10 @@ function processSocketEvent({
           logs.spendTime[today] = (logs.spendTime[today] || 0) + timeSpent;
 
           // Save updated logs
-          await query(`UPDATE agents SET logs = ? WHERE uid = ?`, [
-            JSON.stringify(logs),
-            agentUidd,
-          ]);
+          await prisma.agents.updateMany({
+            where: { uid: whereStr(agentUidd) },
+            data: { logs: str(JSON.stringify(logs)) },
+          });
 
           break;
 

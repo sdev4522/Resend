@@ -1,0 +1,18 @@
+[2026-11-07T15:41:04.862Z]
+STANDARD TEMPLATE CALL
+{
+  "apiVersion": "v21.0",
+  "bodyVariables": [],
+  "headerVariable": null,
+  "buttonVariables": []
+}
+============================================================
+[2026-11-07T15:41:50.963Z]
+STANDARD TEMPLATE CALL
+{
+  "apiVersion": "v21.0",
+  "bodyVariables": [],
+  "headerVariable": null,
+  "buttonVariables": []
+}
+============================================================

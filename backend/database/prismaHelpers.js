@@ -180,3 +180,72 @@ function jsonHasString(value) {
 
 module.exports.monthRange = monthRange;
 module.exports.jsonHasString = jsonHasString;
+
+/**
+ * Coerce a plain JS object to Prisma `data` for `model`, using the schema field types.
+ * Replaces mysql2 `INSERT INTO t SET ?` / `UPDATE t SET ?`, where MySQL coerced values silently.
+ * Unknown keys are kept so Prisma rejects them (MySQL rejected unknown columns too);
+ * undefined values are dropped (mysql2 skipped them in SET ?).
+ */
+let fieldTypes = null;
+function modelFieldTypes(model) {
+  if (!fieldTypes) {
+    const { Prisma } = require("@prisma/client");
+    fieldTypes = new Map(
+      Prisma.dmmf.datamodel.models.map((m) => [
+        m.name,
+        new Map(m.fields.filter((f) => f.kind !== "object").map((f) => [f.name, f])),
+      ]),
+    );
+  }
+  const fields = fieldTypes.get(model);
+  if (!fields) throw new Error(`toData: unknown Prisma model "${model}"`);
+  return fields;
+}
+function toData(model, obj) {
+  const fields = modelFieldTypes(model);
+  const out = {};
+  for (const [key, value] of Object.entries(obj || {})) {
+    if (value === undefined) continue;
+    const f = fields.get(key);
+    if (!f || value === null) {
+      out[key] = value;
+      continue;
+    }
+    if (f.kind === "enum") out[key] = String(value);
+    else if (f.type === "Int") out[key] = intOrNull(value);
+    else if (f.type === "BigInt") out[key] = bigOrNull(value);
+    else if (f.type === "Boolean") out[key] = bool(value) || value === "TRUE";
+    else if (f.type === "DateTime") out[key] = dateOrNull(value);
+    else if (f.type === "Float") out[key] = Number(value);
+    else if (f.type === "Decimal") out[key] = String(value);
+    else if (f.type === "Json") out[key] = value;
+    else out[key] = str(value);
+  }
+  return out;
+}
+
+module.exports.toData = toData;
+
+/**
+ * WHERE fragment for a monotonic message-status update (former SQL CASE):
+ * 'read' is never overwritten, and 'delivered' is not downgraded to 'sent'.
+ * Usage: updateMany({ where: { ...key, ...statusAdvanceWhere(newStatus) }, data: { status } })
+ */
+function statusAdvanceWhere(newStatus) {
+  const keep = newStatus === "sent" ? ["read", "delivered"] : ["read"];
+  return { OR: [{ status: null }, { status: { notIn: keep } }] };
+}
+
+module.exports.statusAdvanceWhere = statusAdvanceWhere;
+
+/** What MySQL NOW() wrote into a VARCHAR column: local 'YYYY-MM-DD HH:MM:SS'. */
+function nowSqlString(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+  );
+}
+
+module.exports.nowSqlString = nowSqlString;

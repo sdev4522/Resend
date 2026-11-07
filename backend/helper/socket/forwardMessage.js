@@ -1,6 +1,7 @@
 // helper/inbox/forwardMessage.js
 
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { plain, str, toData, whereStr } = require("../../database/prismaHelpers");
 const { getSession, sendMessage } = require("../addon/qr/index");
 const randomstring = require("randomstring");
 const logger = require("../../utils/logger");
@@ -47,10 +48,11 @@ async function handleForwardMessage({ payload, uid, socket }) {
 
       if (!instanceId) {
         // Fallback: find any active instance for this uid
-        const [inst] = await query(
-          `SELECT uniqueId FROM instance WHERE uid = ? AND status = 'ACTIVE' LIMIT 1`,
-          [uid],
-        );
+        const [inst] = plain(await prisma.instance.findMany({
+          where: { uid: whereStr(uid), status: "ACTIVE" },
+          select: { uniqueId: true },
+          take: 1,
+        }));
         if (!inst) {
           socket.emit("error", { msg: "No active QR instance found" });
           return;
@@ -61,10 +63,11 @@ async function handleForwardMessage({ payload, uid, socket }) {
         const phoneNum = instanceId
           .replace("@s.whatsapp.net", "")
           .replace("@c.us", "");
-        const [inst] = await query(
-          `SELECT uniqueId FROM instance WHERE uid = ? AND number = ? LIMIT 1`,
-          [uid, phoneNum],
-        );
+        const [inst] = plain(await prisma.instance.findMany({
+          where: { uid: whereStr(uid), number: whereStr(phoneNum) },
+          select: { uniqueId: true },
+          take: 1,
+        }));
         if (inst) instanceId = inst.uniqueId;
       }
 
@@ -148,13 +151,13 @@ async function handleForwardMessage({ payload, uid, socket }) {
         status: "sent",
       };
 
-      await query(`INSERT INTO beta_conversation SET ?`, forwardedMsg);
+      await prisma.beta_conversation.create({ data: toData("beta_conversation", forwardedMsg) });
 
       // Update chat last message
-      await query(
-        `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify({ ...forwardedMsg, msgContext }), targetChatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(targetChatId), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify({ ...forwardedMsg, msgContext })) },
+      });
 
       socket.emit("forward_message_done", { success: true });
 
@@ -164,10 +167,7 @@ async function handleForwardMessage({ payload, uid, socket }) {
 
     // ── Meta Forward ─────────────────────────────────────────────────────────
     if (targetOrigin === "meta") {
-      const [metaKeys] = await query(
-        `SELECT * FROM meta_api WHERE uid = ? LIMIT 1`,
-        [uid],
-      );
+      const [metaKeys] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
       if (!metaKeys?.access_token || !metaKeys?.business_phone_number_id) {
         socket.emit("error", { msg: "Meta API keys not configured" });
@@ -262,12 +262,12 @@ async function handleForwardMessage({ payload, uid, socket }) {
         status: "sent",
       };
 
-      await query(`INSERT INTO beta_conversation SET ?`, forwardedMsg);
+      await prisma.beta_conversation.create({ data: toData("beta_conversation", forwardedMsg) });
 
-      await query(
-        `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify({ ...forwardedMsg, msgContext }), targetChatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(targetChatId), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify({ ...forwardedMsg, msgContext })) },
+      });
 
       socket.emit("forward_message_done", { success: true });
       socket.emit("request_update_chat_list", { chatId: targetChatId });

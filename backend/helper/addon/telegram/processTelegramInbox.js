@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs").promises;
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { plain, str, whereStr } = require("../../../database/prismaHelpers");
 const randomstring = require("randomstring");
 const { CustomFile } = require("telegram/client/uploads");
 const logger = require("../../../utils/logger");
@@ -558,29 +559,25 @@ async function saveMessageToDatabase(message, chatId, uid) {
   try {
     const messageId = message.metaChatId || generateMessageId();
 
-    await query(
-      `INSERT INTO beta_conversation 
-       (type, chat_id, uid, status, metaChatId, msgContext, reaction, 
-        timestamp, senderName, senderMobile, star, route, context, origin, sentBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        message.type,
-        chatId,
-        uid,
-        message.status || null,
-        messageId,
-        JSON.stringify(message.msgContext),
-        message.reaction || "",
-        message.timestamp,
-        message.senderName,
-        message.senderMobile,
-        message.star ? 1 : 0,
-        message.route,
-        message.context || null,
-        message.origin,
-        message.sentBy || null,
-      ],
-    );
+    await prisma.beta_conversation.create({
+      data: {
+        type: str(message.type),
+        chat_id: str(chatId),
+        uid: str(uid),
+        status: str(message.status || null),
+        metaChatId: str(messageId),
+        msgContext: str(JSON.stringify(message.msgContext)),
+        reaction: str(message.reaction || ""),
+        timestamp: str(message.timestamp),
+        senderName: str(message.senderName),
+        senderMobile: str(message.senderMobile),
+        star: str(message.star ? 1 : 0),
+        route: str(message.route),
+        context: str(message.context || null),
+        origin: str(message.origin),
+        sentBy: str(message.sentBy || null),
+      },
+    });
 
     return messageId;
   } catch (error) {
@@ -595,10 +592,7 @@ async function saveMessageToDatabase(message, chatId, uid) {
 async function updateChatInDatabase(message, uid, chatName) {
   try {
     // Check if chat exists
-    const [existingChat] = await query(
-      `SELECT * FROM beta_chats WHERE chat_id = ? AND uid = ?`,
-      [message.chatId, uid],
-    );
+    const [existingChat] = plain(await prisma.beta_chats.findMany({ where: { chat_id: whereStr(message.chatId), uid: whereStr(uid) } }));
 
     // Create last_message object
     const lastMessageObj = {
@@ -642,38 +636,31 @@ async function updateChatInDatabase(message, uid, chatName) {
 
     if (existingChat) {
       // Update existing chat
-      await query(
-        `UPDATE beta_chats 
-         SET last_message = ?, 
-             unread_count = unread_count + ?,
-             updatedAt = NOW()
-         WHERE chat_id = ? AND uid = ?`,
-        [
-          JSON.stringify(lastMessageObj),
-          message.route === "INCOMING" ? 1 : 0,
-          message.chatId,
-          uid,
-        ],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(message.chatId), uid: whereStr(uid) },
+        data: {
+          last_message: JSON.stringify(lastMessageObj),
+          unread_count: { increment: BigInt(message.route === "INCOMING" ? 1 : 0) },
+          updatedAt: new Date(),
+        },
+      });
     } else {
       //  Create new chat with RECIPIENT info
-      await query(
-        `INSERT INTO beta_chats 
-         (uid, chat_id, last_message, sender_name, sender_mobile, 
-          unread_count, origin, profile, origin_instance_id, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [
-          uid,
-          message.chatId,
-          JSON.stringify(lastMessageObj),
-          finalChatName, //  Recipient name
-          finalChatMobile, //  Recipient ID
-          message.route === "INCOMING" ? 1 : 0,
-          message.origin,
-          profileObj ? JSON.stringify(profileObj) : null,
-          JSON.stringify(originInstanceObj), //  Recipient info
-        ],
-      );
+      await prisma.beta_chats.create({
+        data: {
+          uid: str(uid),
+          chat_id: str(message.chatId),
+          last_message: JSON.stringify(lastMessageObj),
+          sender_name: str(finalChatName), //  Recipient name
+          sender_mobile: str(finalChatMobile), //  Recipient ID
+          unread_count: BigInt(message.route === "INCOMING" ? 1 : 0),
+          origin: str(message.origin),
+          profile: profileObj ? JSON.stringify(profileObj) : null,
+          origin_instance_id: JSON.stringify(originInstanceObj), //  Recipient info
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      });
     }
 
     return message.chatId;
@@ -985,10 +972,7 @@ function extractTelegramChatId(chatId) {
 async function getTelegramSessionFromChat(chatInfo, uid) {
   try {
     // Get all Telegram sessions for this user
-    const sessions = await query(
-      `SELECT session_id FROM telegram_session WHERE uid = ? AND status = 'active'`,
-      [uid],
-    );
+    const sessions = plain(await prisma.telegram_session.findMany({ where: { uid: whereStr(uid), status: "active" }, select: { session_id: true } }));
 
     if (!sessions || sessions.length === 0) {
       return null;
@@ -1002,12 +986,11 @@ async function getTelegramSessionFromChat(chatInfo, uid) {
     // If multiple sessions, try to match by checking recent messages
     // This is a fallback - ideally you should store session_id in beta_chats
     for (const session of sessions) {
-      const [recentMsg] = await query(
-        `SELECT * FROM beta_conversation 
-         WHERE chat_id = ? AND uid = ? AND origin = 'telegram' 
-         ORDER BY timestamp DESC LIMIT 1`,
-        [chatInfo.chat_id, uid],
-      );
+      const [recentMsg] = plain(await prisma.beta_conversation.findMany({
+        where: { chat_id: whereStr(chatInfo.chat_id), uid: whereStr(uid), origin: "telegram" },
+        orderBy: { timestamp: "desc" },
+        take: 1,
+      }));
 
       if (recentMsg) {
         // Extract session from message metadata if stored

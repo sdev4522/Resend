@@ -1,7 +1,8 @@
 // calls/wacall.js
 const wrtc = require("@roamhq/wrtc");
 const WebSocket = require("ws");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { idParam, insertResult, okPacket, plain, str, whereStr } = require("../../../database/prismaHelpers");
 const logger = require("../../../utils/logger");
 
 // Import shared modules
@@ -64,10 +65,16 @@ async function handleIncomingWhatsAppCall(
       errorMessage = "No flow data found for UID";
       logger.error(`[${callId}] ${errorMessage}`);
 
-      await query(
-        `INSERT INTO wa_call_logs (uid, call_id, status, error_message, created_at, ended_at) VALUES (?,?,?,?,NOW(),NOW())`,
-        [uid, callId, "failed", errorMessage],
-      ).catch(logger.error);
+      insertResult(await prisma.wa_call_logs.create({
+        data: {
+          uid: str(uid),
+          call_id: str(callId),
+          status: str("failed"),
+          error_message: str(errorMessage),
+          created_at: new Date(),
+          ended_at: new Date(),
+        },
+      })).catch(logger.error);
 
       return;
     }
@@ -76,10 +83,16 @@ async function handleIncomingWhatsAppCall(
       errorMessage = "No Meta API credentials found";
       logger.error(`[${callId}] ${errorMessage}`);
 
-      await query(
-        `INSERT INTO wa_call_logs (uid, call_id, status, error_message, created_at, ended_at) VALUES (?,?,?,?,NOW(),NOW())`,
-        [uid, callId, "failed", errorMessage],
-      ).catch(logger.error);
+      insertResult(await prisma.wa_call_logs.create({
+        data: {
+          uid: str(uid),
+          call_id: str(callId),
+          status: str("failed"),
+          error_message: str(errorMessage),
+          created_at: new Date(),
+          ended_at: new Date(),
+        },
+      })).catch(logger.error);
 
       return;
     }
@@ -92,10 +105,17 @@ async function handleIncomingWhatsAppCall(
       errorMessage = "No AI Start node found in flow";
       logger.error(`[${callId}] ${errorMessage}`);
 
-      await query(
-        `INSERT INTO wa_call_logs (uid, call_id, flow_id, status, error_message, created_at, ended_at) VALUES (?,?,?,?,?,NOW(),NOW())`,
-        [uid, callId, flowData.flow_id, "failed", errorMessage],
-      ).catch(logger.error);
+      insertResult(await prisma.wa_call_logs.create({
+        data: {
+          uid: str(uid),
+          call_id: str(callId),
+          flow_id: str(flowData.flow_id),
+          status: str("failed"),
+          error_message: str(errorMessage),
+          created_at: new Date(),
+          ended_at: new Date(),
+        },
+      })).catch(logger.error);
 
       return;
     }
@@ -106,10 +126,17 @@ async function handleIncomingWhatsAppCall(
       errorMessage = "No OpenAI API key configured";
       logger.error(`[${callId}] ${errorMessage}`);
 
-      await query(
-        `INSERT INTO wa_call_logs (uid, call_id, flow_id, status, error_message, created_at, ended_at) VALUES (?,?,?,?,?,NOW(),NOW())`,
-        [uid, callId, flowData.flow_id, "failed", errorMessage],
-      ).catch(logger.error);
+      insertResult(await prisma.wa_call_logs.create({
+        data: {
+          uid: str(uid),
+          call_id: str(callId),
+          flow_id: str(flowData.flow_id),
+          status: str("failed"),
+          error_message: str(errorMessage),
+          created_at: new Date(),
+          ended_at: new Date(),
+        },
+      })).catch(logger.error);
 
       return;
     }
@@ -225,24 +252,30 @@ async function handleIncomingWhatsAppCall(
     logger.log(`[${callId}] Call setup successful, connecting to OpenAI...`);
     await connectToOpenAI(callId, callState);
 
-    await query(
-      `INSERT INTO wa_call_logs (uid, call_id, flow_id, status, meta_data, created_at) VALUES (?,?,?,?,?,NOW())`,
-      [
-        uid,
-        callId,
-        flowData.flow_id,
-        "connected",
-        JSON.stringify(callMetadata),
-      ],
-    );
+    await prisma.wa_call_logs.create({
+      data: {
+        uid: str(uid),
+        call_id: str(callId),
+        flow_id: str(flowData.flow_id),
+        status: str("connected"),
+        meta_data: str(JSON.stringify(callMetadata)),
+        created_at: new Date(),
+      },
+    });
   } catch (err) {
     errorMessage = errorMessage || err.message;
     logger.error(`[${callId}] Setup failed: ${errorMessage}`);
 
-    await query(
-      `INSERT INTO wa_call_logs (uid, call_id, status, error_message, created_at, ended_at) VALUES (?,?,?,?,NOW(),NOW())`,
-      [uid, callId, "failed", errorMessage],
-    ).catch((dbErr) => {
+    insertResult(await prisma.wa_call_logs.create({
+      data: {
+        uid: str(uid),
+        call_id: str(callId),
+        status: str("failed"),
+        error_message: str(errorMessage),
+        created_at: new Date(),
+        ended_at: new Date(),
+      },
+    })).catch((dbErr) => {
       logger.error(`[${callId}] Database error: ${dbErr.message}`);
     });
 
@@ -480,48 +513,34 @@ async function cleanupWhatsAppCall(callId) {
 
   const errorMessage = errorLog.length > 0 ? JSON.stringify(errorLog) : null;
 
-  await query(
-    `UPDATE wa_call_logs 
-     SET status = 'ended', 
-         ended_at = NOW(), 
-         transcription_json = ?,
-         recording_user = ?,
-         recording_assistant = ?,
-         recording_stereo = ?,
-         error_message = ?,
-         meta_data = ?
-     WHERE call_id = ?`,
-    [
-      transcriptionJson,
-      userRecordingFile,
-      assistantRecordingFile,
-      stereoRecordingFile,
-      errorMessage,
-      JSON.stringify(callMetadata),
-      callId,
-    ],
-  ).catch((err) => logger.error(`[${callId}] Error updating call log:`, err));
+  okPacket(await prisma.wa_call_logs.updateMany({
+    where: { call_id: whereStr(callId) },
+    data: {
+      status: "ended",
+      ended_at: new Date(),
+      transcription_json: str(transcriptionJson),
+      recording_user: str(userRecordingFile),
+      recording_assistant: str(assistantRecordingFile),
+      recording_stereo: str(stereoRecordingFile),
+      error_message: str(errorMessage),
+      meta_data: str(JSON.stringify(callMetadata)),
+    },
+  })).catch((err) => logger.error(`[${callId}] Error updating call log:`, err));
 
   logger.log(`[${callId}] Cleanup completed successfully`);
 }
 
 async function returnFlow(uid) {
-  const [checkBot] = await query(
-    `SELECT * FROM wa_call_bot WHERE uid = ? AND active = ?`,
-    [uid, 1],
-  );
+  const [checkBot] = plain(await prisma.wa_call_bot.findMany({ where: { uid: whereStr(uid), active: idParam(1) } }));
   if (!checkBot) return null;
 
-  const [flow] = await query(
-    `SELECT * FROM wa_call_flows WHERE uid = ? AND flow_id = ?`,
-    [uid, checkBot?.flow_id],
-  );
+  const [flow] = plain(await prisma.wa_call_flows.findMany({ where: { uid: whereStr(uid), flow_id: whereStr(checkBot?.flow_id) } }));
   if (!flow) return null;
   return flow;
 }
 
 async function getMetaAPI(uid) {
-  const [res] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [uid]);
+  const [res] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
   return res;
 }
 

@@ -212,7 +212,10 @@ class Gen:
     def lit_val(self, f, lit, for_where):
         kind, v = lit
         t = f['type']
-        if kind == 'now': return 'new Date()'
+        if kind == 'now':
+            if t == 'DateTime': return 'new Date()'
+            if t == 'String': return f'{self.h("nowSqlString")}()'
+            return None
         if kind == 'null': return 'null'
         if kind == 'num':
             if t in ('Int', 'Float', 'Decimal'): return v if t != 'Decimal' else json.dumps(v)

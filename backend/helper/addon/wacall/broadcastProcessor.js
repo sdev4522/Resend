@@ -1,5 +1,6 @@
 // calls/broadcastProcessor.js
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { dateOrNull, plain, str, toData, whereStr } = require("../../../database/prismaHelpers");
 const fetch = require("node-fetch");
 const wrtc = require("@roamhq/wrtc");
 const WebSocket = require("ws");
@@ -33,10 +34,7 @@ async function processPermissionRequests(campaignId, uid) {
   try {
     logger.log(`[${campaignId}] Starting permission request process...`);
 
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, uid],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(uid) } }));
 
     if (!broadcast) {
       logger.error(`[${campaignId}] Broadcast not found`);
@@ -60,10 +58,7 @@ async function processPermissionRequests(campaignId, uid) {
     let processedCount = 0;
 
     for (const contact of contacts) {
-      const [currentBroadcast] = await query(
-        `SELECT status FROM wa_call_broadcasts WHERE campaign_id = ?`,
-        [campaignId],
-      );
+      const [currentBroadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) }, select: { status: true } }));
 
       if (currentBroadcast.status === "paused") {
         logger.log(
@@ -154,10 +149,7 @@ async function processPermissionRequests(campaignId, uid) {
       }
     }
 
-    const [updatedBroadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    const [updatedBroadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
 
     const updatedContacts = JSON.parse(updatedBroadcast.contacts || "[]");
 
@@ -203,10 +195,7 @@ async function processBroadcastCalls(campaignId, uid) {
   try {
     logger.log(`📞 [${campaignId}] Starting calling process...`);
 
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, uid],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(uid) } }));
 
     if (!broadcast) {
       logger.error(`[${campaignId}] Broadcast not found`);
@@ -255,10 +244,7 @@ async function processBroadcastCalls(campaignId, uid) {
     }
 
     for (const contact of contactsToCall) {
-      const [currentBroadcast] = await query(
-        `SELECT status FROM wa_call_broadcasts WHERE campaign_id = ?`,
-        [campaignId],
-      );
+      const [currentBroadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) }, select: { status: true } }));
 
       if (currentBroadcast.status === "paused") {
         logger.log(`⏸️ [${campaignId}] Broadcast paused, stopping calls`);
@@ -618,10 +604,7 @@ async function handleBroadcastCallTerminate(
       broadcastState.currentCallCount--;
     }
 
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
 
     if (broadcast) {
       const contacts = JSON.parse(broadcast.contacts || "[]");
@@ -772,31 +755,23 @@ async function cleanupBroadcastCall(callId, shouldTerminate = true) {
   };
 
   try {
-    await query(
-      `INSERT INTO wa_call_logs (uid, call_id, flow_id, status, meta_data, transcription_json, recording_user, recording_assistant, recording_stereo, created_at, ended_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE 
-       status = VALUES(status),
-       meta_data = VALUES(meta_data),
-       transcription_json = VALUES(transcription_json),
-       recording_user = VALUES(recording_user),
-       recording_assistant = VALUES(recording_assistant),
-       recording_stereo = VALUES(recording_stereo),
-       ended_at = VALUES(ended_at)`,
-      [
-        uid,
-        callId,
-        flowId,
-        "ended",
-        JSON.stringify(callMetadata),
-        transcriptionJson,
-        userRecordingFile,
-        assistantRecordingFile,
-        stereoRecordingFile,
-        new Date(audioStartTime),
-        new Date(callEndTime),
-      ],
-    );
+    // wa_call_logs has no unique key besides `id`, so the former ON DUPLICATE KEY
+    // UPDATE never fired: this was always a plain insert.
+    await prisma.wa_call_logs.create({
+      data: {
+        uid: String(uid),
+        call_id: String(callId),
+        flow_id: str(flowId),
+        status: "ended",
+        meta_data: JSON.stringify(callMetadata),
+        transcription_json: transcriptionJson,
+        recording_user: str(userRecordingFile),
+        recording_assistant: str(assistantRecordingFile),
+        recording_stereo: str(stereoRecordingFile),
+        created_at: dateOrNull(audioStartTime),
+        ended_at: dateOrNull(callEndTime),
+      },
+    });
 
     logger.log(`[${callId}] Call log saved to database`);
   } catch (err) {
@@ -942,10 +917,7 @@ async function sendCallPermissionRequest(toPhoneNumber, name, metaData) {
 
 async function updateContactInBroadcast(campaignId, mobile, updates) {
   try {
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
 
     if (!broadcast) return;
 
@@ -1000,18 +972,10 @@ async function updateContactInBroadcast(campaignId, mobile, updates) {
       statsUpdate.calls_failed = (broadcast.calls_failed || 0) + 1;
     }
 
-    let updateQuery = `UPDATE wa_call_broadcasts SET contacts = ?`;
-    let updateParams = [JSON.stringify(contacts)];
-
-    Object.keys(statsUpdate).forEach((key) => {
-      updateQuery += `, ${key} = ?`;
-      updateParams.push(statsUpdate[key]);
+    await prisma.wa_call_broadcasts.updateMany({
+      where: { campaign_id: whereStr(campaignId) },
+      data: toData("wa_call_broadcasts", { contacts: JSON.stringify(contacts), ...statsUpdate }),
     });
-
-    updateQuery += ` WHERE campaign_id = ?`;
-    updateParams.push(campaignId);
-
-    await query(updateQuery, updateParams);
   } catch (err) {
     logger.error(`Error updating contact ${mobile}:`, err);
   }
@@ -1019,10 +983,7 @@ async function updateContactInBroadcast(campaignId, mobile, updates) {
 
 async function updateBroadcastStatus(campaignId, status, message) {
   try {
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
 
     if (!broadcast) return;
 
@@ -1034,25 +995,22 @@ async function updateBroadcastStatus(campaignId, status, message) {
       message: message,
     });
 
-    await query(
-      `UPDATE wa_call_broadcasts SET status = ?, logs = ? WHERE campaign_id = ?`,
-      [status, JSON.stringify(logs), campaignId],
-    );
+    await prisma.wa_call_broadcasts.updateMany({
+      where: { campaign_id: whereStr(campaignId) },
+      data: { status: str(status), logs: str(JSON.stringify(logs)) },
+    });
   } catch (err) {
     logger.error(`Error updating broadcast status:`, err);
   }
 }
 
 async function getMetaAPI(uid) {
-  const [res] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [uid]);
+  const [res] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
   return res;
 }
 
 async function getFlowData(flowId, uid) {
-  const [flow] = await query(
-    `SELECT * FROM wa_call_flows WHERE flow_id = ? AND uid = ?`,
-    [flowId, uid],
-  );
+  const [flow] = plain(await prisma.wa_call_flows.findMany({ where: { flow_id: whereStr(flowId), uid: whereStr(uid) } }));
   return flow;
 }
 

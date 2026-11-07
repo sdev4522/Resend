@@ -1,4 +1,5 @@
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { idParam, nowSqlString, plain, str, whereStr } = require("../database/prismaHelpers");
 const { sendTemplateMessage } = require("../functions/function");
 const moment = require("moment-timezone");
 const logger = require("../utils/logger");
@@ -146,22 +147,28 @@ async function initCampaign() {
 
 async function handleLegacyCampaigns() {
   try {
-    const legacyCampaigns = await query(
-      `SELECT c.campaign_id, c.title, c.schedule, c.timezone
-       FROM beta_campaign c
-       LEFT JOIN beta_campaign_logs l ON c.campaign_id = l.campaign_id
-       WHERE c.status IN ('PENDING', 'IN_PROGRESS')
-       AND l.campaign_id IS NULL
-       AND (c.schedule IS NULL OR CAST(c.schedule AS CHAR) = '')`,
-      [],
-    );
+    // former LEFT JOIN beta_campaign_logs ... WHERE l.campaign_id IS NULL (campaigns without logs)
+    const candidates = await prisma.beta_campaign.findMany({
+      where: { status: { in: ["PENDING", "IN_PROGRESS"] }, schedule: null },
+      select: { campaign_id: true, title: true, schedule: true, timezone: true },
+    });
+    const candidateIds = candidates.map((c) => c.campaign_id).filter(Boolean);
+    const withLogs = candidateIds.length
+      ? await prisma.beta_campaign_logs.findMany({
+          where: { campaign_id: { in: candidateIds } },
+          select: { campaign_id: true },
+          distinct: ["campaign_id"],
+        })
+      : [];
+    const hasLogs = new Set(withLogs.map((l) => l.campaign_id));
+    const legacyCampaigns = plain(candidates.filter((c) => !hasLogs.has(c.campaign_id)));
 
     if (legacyCampaigns.length > 0) {
       for (const campaign of legacyCampaigns) {
-        await query(
-          `UPDATE beta_campaign SET status = 'COMPLETED' WHERE campaign_id = ?`,
-          [campaign.campaign_id],
-        );
+        await prisma.beta_campaign.updateMany({
+          where: { campaign_id: whereStr(campaign.campaign_id) },
+          data: { status: "COMPLETED" },
+        });
       }
     }
   } catch (error) {
@@ -171,12 +178,12 @@ async function handleLegacyCampaigns() {
 
 async function processPendingCampaigns() {
   try {
-    const campaigns = await query(
-      `SELECT * FROM beta_campaign 
-       WHERE (status = 'PENDING' OR status = 'IN_PROGRESS')
-       ORDER BY createdAt ASC
-       LIMIT 10`,
-      [],
+    const campaigns = plain(
+      await prisma.beta_campaign.findMany({
+        where: { status: { in: ["PENDING", "IN_PROGRESS"] } },
+        orderBy: { createdAt: "asc" },
+        take: 10,
+      }),
     );
 
     if (!campaigns || campaigns.length === 0) return;
@@ -370,36 +377,30 @@ async function sendCatalogTemplateMessage(
 
 async function processSingleCampaign(campaign) {
   if (campaign.status === "PENDING") {
-    await query(
-      "UPDATE beta_campaign SET status = 'IN_PROGRESS' WHERE campaign_id = ?",
-      [campaign.campaign_id],
-    );
+    await prisma.beta_campaign.updateMany({
+      where: { campaign_id: whereStr(campaign.campaign_id) },
+      data: { status: "IN_PROGRESS" },
+    });
   }
 
-  const pendingLogs = await query(
-    `SELECT * FROM beta_campaign_logs 
-     WHERE campaign_id = ? AND status = 'PENDING'
-     ORDER BY id ASC LIMIT ?`,
-    [campaign.campaign_id, CONFIG.batchSize],
-  );
+  const pendingLogs = plain(await prisma.beta_campaign_logs.findMany({
+    where: { campaign_id: whereStr(campaign.campaign_id), status: "PENDING" },
+    orderBy: { id: "asc" },
+    take: Math.max(0, parseInt(CONFIG.batchSize, 10) || 0),
+  }));
 
   if (!pendingLogs || pendingLogs.length === 0) {
     await checkAndMarkCampaignComplete(campaign);
     return;
   }
 
-  const metaCredentials = await query(
-    "SELECT * FROM meta_api WHERE uid = ? LIMIT 1",
-    [campaign.uid],
-  );
+  const metaCredentials = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(campaign.uid) }, take: 1 }));
 
   if (!metaCredentials || metaCredentials.length === 0) {
-    await query(
-      `UPDATE beta_campaign_logs 
-       SET status = 'FAILED', error_message = 'Meta API credentials not found'
-       WHERE campaign_id = ? AND status = 'PENDING'`,
-      [campaign.campaign_id],
-    );
+    await prisma.beta_campaign_logs.updateMany({
+      where: { campaign_id: whereStr(campaign.campaign_id), status: "PENDING" },
+      data: { status: "FAILED", error_message: "Meta API credentials not found" },
+    });
     await updateCampaignCounts(campaign.campaign_id);
     await checkAndMarkCampaignComplete(campaign);
     return;
@@ -541,21 +542,17 @@ async function processSingleCampaign(campaign) {
   }
 
   for (const success of successfulIds) {
-    await query(
-      `UPDATE beta_campaign_logs 
-       SET status = 'SENT', meta_msg_id = ?, delivery_time = NOW()
-       WHERE id = ?`,
-      [success.messageId, success.id],
-    );
+    await prisma.beta_campaign_logs.updateMany({
+      where: { id: idParam(success.id) },
+      data: { status: "SENT", meta_msg_id: str(success.messageId), delivery_time: nowSqlString() },
+    });
   }
 
   for (const failed of failedUpdates) {
-    await query(
-      `UPDATE beta_campaign_logs 
-       SET status = 'FAILED', error_message = ?
-       WHERE id = ?`,
-      [failed.error, failed.id],
-    );
+    await prisma.beta_campaign_logs.updateMany({
+      where: { id: idParam(failed.id) },
+      data: { status: "FAILED", error_message: str(failed.error) },
+    });
   }
 
   await updateCampaignCounts(campaign.campaign_id);
@@ -563,12 +560,14 @@ async function processSingleCampaign(campaign) {
 }
 
 async function getContactForLog(log, campaign) {
-  const contacts = await query(
-    `SELECT * FROM contact 
-     WHERE mobile = ? AND uid = ? AND phonebook_id = ?
-     LIMIT 1`,
-    [log.contact_mobile, campaign.uid, campaign.phonebook_id],
-  );
+  const contacts = plain(await prisma.contact.findMany({
+    where: {
+      mobile: whereStr(log.contact_mobile),
+      uid: whereStr(campaign.uid),
+      phonebook_id: whereStr(campaign.phonebook_id),
+    },
+    take: 1,
+  }));
 
   if (contacts && contacts.length > 0) return contacts[0];
 
@@ -585,38 +584,32 @@ async function getContactForLog(log, campaign) {
 
 async function updateCampaignCounts(campaignId) {
   try {
-    await query(
-      `UPDATE beta_campaign SET
-        sent_count = (SELECT COUNT(*) FROM beta_campaign_logs WHERE campaign_id = ? AND status = 'SENT'),
-        failed_count = (SELECT COUNT(*) FROM beta_campaign_logs WHERE campaign_id = ? AND status = 'FAILED'),
-        delivered_count = (SELECT COUNT(*) FROM beta_campaign_logs WHERE campaign_id = ? AND delivery_status = 'delivered'),
-        read_count = (SELECT COUNT(*) FROM beta_campaign_logs WHERE campaign_id = ? AND delivery_status = 'read')
-       WHERE campaign_id = ?`,
-      [campaignId, campaignId, campaignId, campaignId, campaignId],
-    );
+    const id = whereStr(campaignId);
+    const [sent, failed, delivered, read] = await Promise.all([
+      prisma.beta_campaign_logs.count({ where: { campaign_id: id, status: "SENT" } }),
+      prisma.beta_campaign_logs.count({ where: { campaign_id: id, status: "FAILED" } }),
+      prisma.beta_campaign_logs.count({ where: { campaign_id: id, delivery_status: "delivered" } }),
+      prisma.beta_campaign_logs.count({ where: { campaign_id: id, delivery_status: "read" } }),
+    ]);
+    await prisma.beta_campaign.updateMany({
+      where: { campaign_id: id },
+      data: { sent_count: sent, failed_count: failed, delivered_count: delivered, read_count: read },
+    });
   } catch (error) {
     logger.error(`Error updating campaign counts for ${campaignId}:`, error);
   }
 }
 
 async function checkAndMarkCampaignComplete(campaign) {
-  const [pendingCount] = await query(
-    `SELECT COUNT(*) as count FROM beta_campaign_logs 
-     WHERE campaign_id = ? AND status = 'PENDING'`,
-    [campaign.campaign_id],
-  );
+  const [pendingCount] = [{ count: await prisma.beta_campaign_logs.count({ where: { campaign_id: whereStr(campaign.campaign_id), status: "PENDING" } }) }];
 
-  const [totalLogsCount] = await query(
-    `SELECT COUNT(*) as count FROM beta_campaign_logs 
-     WHERE campaign_id = ?`,
-    [campaign.campaign_id],
-  );
+  const [totalLogsCount] = [{ count: await prisma.beta_campaign_logs.count({ where: { campaign_id: whereStr(campaign.campaign_id) } }) }];
 
   if (pendingCount.count === 0 || totalLogsCount.count === 0) {
-    await query(
-      "UPDATE beta_campaign SET status = 'COMPLETED' WHERE campaign_id = ?",
-      [campaign.campaign_id],
-    );
+    await prisma.beta_campaign.updateMany({
+      where: { campaign_id: whereStr(campaign.campaign_id) },
+      data: { status: "COMPLETED" },
+    });
   }
 }
 
@@ -643,10 +636,7 @@ async function updateMessageStatus(metaMsgId, status, errorMessage = null) {
   try {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    const logs = await query(
-      "SELECT * FROM beta_campaign_logs WHERE meta_msg_id = ? LIMIT 1",
-      [metaMsgId],
-    );
+    const logs = plain(await prisma.beta_campaign_logs.findMany({ where: { meta_msg_id: whereStr(metaMsgId) }, take: 1 }));
 
     if (!logs || logs.length === 0) return;
 
@@ -654,12 +644,14 @@ async function updateMessageStatus(metaMsgId, status, errorMessage = null) {
 
     if (log.delivery_status === "read" && status === "delivered") return;
 
-    await query(
-      `UPDATE beta_campaign_logs 
-       SET delivery_status = ?, delivery_time = NOW(), error_message = ?
-       WHERE meta_msg_id = ?`,
-      [status, errorMessage, metaMsgId],
-    );
+    await prisma.beta_campaign_logs.updateMany({
+      where: { meta_msg_id: whereStr(metaMsgId) },
+      data: {
+        delivery_status: str(status),
+        delivery_time: nowSqlString(),
+        error_message: str(errorMessage),
+      },
+    });
 
     await updateCampaignCounts(log.campaign_id);
   } catch (error) {

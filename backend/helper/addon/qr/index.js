@@ -1,6 +1,7 @@
 const { toDataURL } = require("qrcode");
 const pino = require("pino");
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { plain, str, whereStr } = require("../../../database/prismaHelpers");
 const { processMessage } = require("../../inbox/inbox");
 const newLogger = require("../../../utils/logger");
 
@@ -78,7 +79,7 @@ async function loadConfigFromDatabase() {
   if (configLoaded) return;
 
   try {
-    const [config] = await query(`SELECT * FROM web_private`, []);
+    const [config] = plain(await prisma.web_private.findMany());
 
     if (config) {
       // Load MongoDB connection string from database
@@ -144,7 +145,7 @@ async function resolveUidForSession(sessionId) {
   let uid = extractUidFromSessionId(sessionId);
   if (!uid || uid === sessionId) {
     try {
-      const [inst] = await query("SELECT uid FROM instance WHERE uniqueId = ? LIMIT 1", [sessionId]);
+      const [inst] = plain(await prisma.instance.findMany({ where: { uniqueId: whereStr(sessionId) }, select: { uid: true }, take: 1 }));
       if (inst?.uid) uid = inst.uid;
     } catch (e) {
       newLogger.error("Failed to resolve UID for session:", e);
@@ -446,10 +447,16 @@ const createSession = async (
 
             // Duplicate Phone Number Check: prevent two active instances for same phone
             if (phoneNumber && uid) {
-              const duplicate = await query(
-                "SELECT uniqueId, title FROM instance WHERE uid = ? AND number = ? AND status = 'ACTIVE' AND uniqueId != ? LIMIT 1",
-                [uid, phoneNumber, sessionId]
-              );
+              const duplicate = plain(await prisma.instance.findMany({
+                where: {
+                  uid: whereStr(uid),
+                  number: whereStr(phoneNumber),
+                  status: "ACTIVE",
+                  uniqueId: { not: whereStr(sessionId) },
+                },
+                select: { uniqueId: true, title: true },
+                take: 1,
+              }));
               if (duplicate.length > 0) {
                 newLogger.warn(
                   `Duplicate WhatsApp account (+${phoneNumber}) detected on session ${sessionId}. Already connected in ${duplicate[0].uniqueId}`
@@ -465,20 +472,20 @@ const createSession = async (
                   await sock.logout();
                 } catch (_) {}
                 await deleteSessionData(sessionId);
-                await query("DELETE FROM instance WHERE uniqueId = ? AND status = 'PENDING'", [sessionId]);
+                await prisma.instance.deleteMany({ where: { uniqueId: whereStr(sessionId), status: "PENDING" } });
                 return;
               }
             }
 
-            await query(
-              "UPDATE instance SET status = ?, number = ?, data = ?, qr = NULL WHERE uniqueId = ?",
-              [
-                "ACTIVE",
-                phoneNumber,
-                userData?.id ? JSON.stringify(userData) : null,
-                sessionId,
-              ],
-            );
+            await prisma.instance.updateMany({
+              where: { uniqueId: whereStr(sessionId) },
+              data: {
+                status: str("ACTIVE"),
+                number: str(phoneNumber),
+                data: str(userData?.id ? JSON.stringify(userData) : null),
+                qr: null,
+              },
+            });
 
             await emitSocketToUser(sessionId, "qr_connected", {
               uniqueId: sessionId,
@@ -542,9 +549,12 @@ const createSession = async (
             // Clean up DB row
             try {
               if (pending?.isReconnect) {
-                await query("UPDATE instance SET status = 'INACTIVE', qr = NULL WHERE uniqueId = ?", [sessionId]);
+                await prisma.instance.updateMany({
+                  where: { uniqueId: whereStr(sessionId) },
+                  data: { status: "INACTIVE", qr: null },
+                });
               } else {
-                await query("DELETE FROM instance WHERE uniqueId = ? AND status = 'PENDING'", [sessionId]);
+                await prisma.instance.deleteMany({ where: { uniqueId: whereStr(sessionId), status: "PENDING" } });
               }
             } catch (dbErr) {
               newLogger.error("DB cleanup error on pending close:", dbErr);
@@ -579,17 +589,21 @@ const createSession = async (
             await deleteSessionData(sessionId);
 
             try {
-              await query("UPDATE instance SET status = ?, qr = NULL WHERE uniqueId = ?", [
-                "INACTIVE",
-                sessionId,
-              ]);
+              await prisma.instance.updateMany({
+                where: { uniqueId: whereStr(sessionId) },
+                data: { status: str("INACTIVE"), qr: null },
+              });
             } catch (error) {
               newLogger.error("Database update error (logout):", error);
             }
           } else {
             // Only reconnect if this instance is still marked ACTIVE in MySQL
             try {
-              const inst = await query("SELECT status FROM instance WHERE uniqueId = ? LIMIT 1", [sessionId]);
+              const inst = plain(await prisma.instance.findMany({
+                where: { uniqueId: whereStr(sessionId) },
+                select: { status: true },
+                take: 1,
+              }));
               if (inst.length && inst[0].status === "ACTIVE") {
                 newLogger.log(
                   `Active session ${sessionId} disconnected (code: ${statusCode}), reconnecting...`,
@@ -609,10 +623,10 @@ const createSession = async (
           try {
             const qrCodeImage = await toDataURL(qr);
             try {
-              await query("UPDATE instance SET qr = ? WHERE uniqueId = ?", [
-                qrCodeImage,
-                sessionId,
-              ]);
+              await prisma.instance.updateMany({
+                where: { uniqueId: whereStr(sessionId) },
+                data: { qr: str(qrCodeImage) },
+              });
             } catch (error) {
               newLogger.error("Database update error (qr):", error);
             }
@@ -666,9 +680,12 @@ const expirePendingSession = async (sessionId) => {
 
     try {
       if (pending?.isReconnect) {
-        await query("UPDATE instance SET status = 'INACTIVE', qr = NULL WHERE uniqueId = ?", [sessionId]);
+        await prisma.instance.updateMany({
+          where: { uniqueId: whereStr(sessionId) },
+          data: { status: "INACTIVE", qr: null },
+        });
       } else {
-        await query("DELETE FROM instance WHERE uniqueId = ? AND status = 'PENDING'", [sessionId]);
+        await prisma.instance.deleteMany({ where: { uniqueId: whereStr(sessionId), status: "PENDING" } });
       }
     } catch (err) {
       newLogger.error("DB error on expirePendingSession:", err);
@@ -712,9 +729,12 @@ const cancelPendingSession = async (sessionId) => {
 
     try {
       if (pending?.isReconnect) {
-        await query("UPDATE instance SET status = 'INACTIVE', qr = NULL WHERE uniqueId = ?", [sessionId]);
+        await prisma.instance.updateMany({
+          where: { uniqueId: whereStr(sessionId) },
+          data: { status: "INACTIVE", qr: null },
+        });
       } else {
-        await query("DELETE FROM instance WHERE uniqueId = ? AND status = 'PENDING'", [sessionId]);
+        await prisma.instance.deleteMany({ where: { uniqueId: whereStr(sessionId), status: "PENDING" } });
       }
     } catch (err) {
       newLogger.error("DB error on cancelPendingSession:", err);
@@ -760,10 +780,7 @@ const deleteSession = async (sessionId) => {
     await deleteSessionData(sessionId);
 
     try {
-      await query("UPDATE instance SET status = ? WHERE uniqueId = ?", [
-        "INACTIVE",
-        sessionId,
-      ]);
+      await prisma.instance.updateMany({ where: { uniqueId: whereStr(sessionId) }, data: { status: str("INACTIVE") } });
     } catch (error) {
       newLogger.error("Database update error (deleteSession):", error);
     }
@@ -885,13 +902,15 @@ const init = async () => {
     await loadConfigFromDatabase();
 
     // Clean up any stale pending or unfinalized sessions in DB on startup
-    await query("DELETE FROM instance WHERE status IN ('PENDING', 'GENERATING') OR status IS NULL", []);
+    await prisma.instance.deleteMany({
+      where: { OR: [{ status: { in: ["PENDING", "GENERATING"] } }, { status: null }] },
+    });
 
     // Read all known instances in database (ACTIVE and INACTIVE) to prevent deleting credentials of disconnected instances
-    const allKnownInstances = await query(
-      "SELECT uniqueId, title, status FROM instance WHERE status IN ('ACTIVE', 'INACTIVE')",
-      [],
-    );
+    const allKnownInstances = await prisma.instance.findMany({
+      where: { status: { in: ["ACTIVE", "INACTIVE"] } },
+      select: { uniqueId: true, title: true, status: true },
+    });
 
     const knownInstanceSet = new Set(allKnownInstances.map((i) => i.uniqueId));
 

@@ -1,4 +1,5 @@
-const { query } = require("../../../database/dbpromise");
+const { prisma } = require("../../../database/prisma");
+const { plain, str, toData, whereStr } = require("../../../database/prismaHelpers");
 const axios = require("axios");
 const randomstring = require("randomstring");
 const mime = require("mime-types");
@@ -71,10 +72,17 @@ async function updateChatInMysql({
     const cleanSenderMobile = extractPhoneNumber(senderMobile) || senderMobile || "NA";
 
     // Check if chat exists by chatId or sender_mobile
-    const [chat] = await query(
-      `SELECT * FROM beta_chats 
-       WHERE uid = ? AND (chat_id = ? OR (sender_mobile = ? AND origin = 'meta')) LIMIT 1`,
-      [uid, chatId, cleanSenderMobile],
+    const [chat] = plain(
+      await prisma.beta_chats.findMany({
+        where: {
+          uid: whereStr(uid),
+          OR: [
+            { chat_id: whereStr(chatId) },
+            { sender_mobile: whereStr(cleanSenderMobile), origin: "meta" },
+          ],
+        },
+        take: 1,
+      }),
     );
 
     const updateFields = {
@@ -107,12 +115,12 @@ async function updateChatInMysql({
       if (phoneNumId && (!chat.origin_instance_id || !chat.origin_instance_id.includes(phoneNumId))) {
         updateFields.origin_instance_id = JSON.stringify(originInstanceData);
       }
-      await query(`UPDATE beta_chats SET ? WHERE id = ?`, [
-        updateFields,
-        chat.id,
-      ]);
+      await prisma.beta_chats.update({
+        where: { id: chat.id },
+        data: toData("beta_chats", updateFields),
+      });
     } else {
-      await query(`INSERT INTO beta_chats SET ?`, {
+      await prisma.beta_chats.create({ data: toData("beta_chats", {
         ...updateFields,
         uid,
         origin_instance_id: JSON.stringify(originInstanceData),
@@ -120,7 +128,7 @@ async function updateChatInMysql({
         unread_count: isIncoming ? 1 : 0,
         assigned_agent: null,
         createdAt: new Date(),
-      });
+      }) });
     }
 
     return true;
@@ -132,7 +140,7 @@ async function updateChatInMysql({
 
 async function saveMessageToConversation({ uid, chatId, messageData }) {
   try {
-    await query(`INSERT INTO beta_conversation SET ?`, {
+    await prisma.beta_conversation.create({ data: toData("beta_conversation", {
       type: messageData.type,
       metaChatId: messageData.metaChatId,
       msgContext: JSON.stringify(messageData.msgContext),
@@ -148,7 +156,7 @@ async function saveMessageToConversation({ uid, chatId, messageData }) {
       chat_id: chatId,
       status: messageData.status || "",
       createdAt: new Date(),
-    });
+    }) });
     return true;
   } catch (err) {
     logger.error("Message save error:", err);
@@ -159,10 +167,7 @@ async function saveMessageToConversation({ uid, chatId, messageData }) {
 // Message Processing
 async function processMediaMessage(type, message, uid) {
   try {
-    const [{ access_token: token }] = await query(
-      `SELECT access_token FROM meta_api WHERE uid = ?`,
-      [uid],
-    );
+    const [{ access_token: token }] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) }, select: { access_token: true } }));
     if (!token) return null;
 
     const mediaId = message[type]?.id;
@@ -211,18 +216,17 @@ async function processMetaMsg({ body, uid, origin }) {
     // Enhanced context processing
     if (message?.context?.id) {
       try {
-        const [foundMsg] = await query(
-          `SELECT 
-            metaChatId, 
-            msgContext, 
-            timestamp, 
-            senderMobile, 
-            senderName,
-            type
-           FROM beta_conversation 
-           WHERE metaChatId = ? AND uid = ?`,
-          [message.context.id, uid],
-        );
+        const [foundMsg] = plain(await prisma.beta_conversation.findMany({
+          where: { metaChatId: whereStr(message.context.id), uid: whereStr(uid) },
+          select: {
+            metaChatId: true,
+            msgContext: true,
+            timestamp: true,
+            senderMobile: true,
+            senderName: true,
+            type: true,
+          },
+        }));
 
         if (foundMsg) {
           const parsedContext = foundMsg.msgContext
@@ -278,23 +282,22 @@ async function processMetaMsg({ body, uid, origin }) {
 
       if (statusType) {
         if (statusType === "failed") {
-          await query(
-            `UPDATE beta_conversation SET status = ?, err = ? 
-           WHERE metaChatId = ? AND uid = ?`,
-            [statusType, JSON.stringify(body), status.id, uid],
-          );
+          await prisma.beta_conversation.updateMany({
+            where: { metaChatId: whereStr(status.id), uid: whereStr(uid) },
+            data: { status: str(statusType), err: str(JSON.stringify(body)) },
+          });
         } else {
-          await query(
-            `UPDATE beta_conversation SET status = ? 
-           WHERE metaChatId = ? AND uid = ?`,
-            [statusType, status.id, uid],
-          );
+          await prisma.beta_conversation.updateMany({
+            where: { metaChatId: whereStr(status.id), uid: whereStr(uid) },
+            data: { status: str(statusType) },
+          });
         }
 
-        const [foundConv] = await query(
-          `SELECT chat_id FROM beta_conversation WHERE metaChatId = ? AND uid = ? LIMIT 1`,
-          [status.id, uid],
-        );
+        const [foundConv] = plain(await prisma.beta_conversation.findMany({
+          where: { metaChatId: whereStr(status.id), uid: whereStr(uid) },
+          select: { chat_id: true },
+          take: 1,
+        }));
 
         statusUpdate = {
           chatId: foundConv?.chat_id || (extractPhoneNumber(value?.contacts?.[0]?.wa_id) ? `meta_${extractPhoneNumber(value?.contacts?.[0]?.wa_id)}` : ""),
