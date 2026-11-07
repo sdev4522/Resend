@@ -248,7 +248,7 @@ async function exerciseRouter(relFile) {
   const express = backendRequire("express");
   const app = express();
   app.use(express.json({ verify: (req, res, buf) => { req.rawBody = buf; } }));
-  app.use((req, res, next) => { req.files = { file: { name: "a.csv", size: 10, data: Buffer.from("name,mobile\na,919999999999\n"), mv: async () => {} } }; next(); });
+  app.use((req, res, next) => { req.files = { file: { name: "a.csv", size: 10, data: Buffer.from("name,mobile\na,919999999999\n"), mv: (p, cb) => { if (typeof cb === "function") cb(null); return Promise.resolve(); } } }; next(); });
   app.use("/", router);
   app.use((err, req, res, next) => { report.serverErrors.push({ where: `${req.method} ${req.path}`, msg: err.message }); res.status(500).json({ error: err.message }); });
   const server = app.listen(0);
@@ -263,12 +263,16 @@ async function exerciseRouter(relFile) {
       const opts = { method: method.toUpperCase(), headers: { "Content-Type": "application/json", Authorization: "Bearer x" } };
       if (!["get", "head"].includes(method)) opts.body = JSON.stringify(values);
       try {
-        const res = await fetch(`${base}${urlPath}?${qs}`, opts);
+        const res = await fetch(`${base}${urlPath}?${qs}`, { ...opts, signal: AbortSignal.timeout(15000) });
         const text = await res.text();
         statuses.push(`${method.toUpperCase()} ${r.path} ${res.status}`);
         if (res.status >= 500) report.serverErrors.push({ where: `${method.toUpperCase()} ${r.path}`, msg: text.slice(0, 160) });
       } catch (e) {
-        report.serverErrors.push({ where: `${method.toUpperCase()} ${r.path}`, msg: e.message });
+        if (e.name === "TimeoutError") {
+          statuses.push(`${method.toUpperCase()} ${r.path} TIMEOUT (external I/O, not DB)`);
+        } else {
+          report.serverErrors.push({ where: `${method.toUpperCase()} ${r.path}`, msg: `${e.message} ${e.cause?.code || ""}` });
+        }
       }
     }
   }

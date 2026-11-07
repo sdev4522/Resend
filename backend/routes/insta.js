@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { prisma } = require("../database/prisma");
-const { plain, idParam, str, intOrNull } = require("../database/prismaHelpers");
+const { plain, idParam, str, intOrNull, whereStr } = require("../database/prismaHelpers");
 
 async function getInstaKeys() {
   return prisma.web_private.findFirst({
@@ -80,7 +80,7 @@ router.get("/callback", async (req, res) => {
   try {
     const apiKeys = await getInstaKeys();
 
-    const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
+    const user = await prisma.user.findFirst({ where: { uid: whereStr(uid) } });
     const plan = user?.plan ? JSON.parse(user.plan) : null;
     if (!plan) {
       return res.send(`<html><body style="${pageStyle}">
@@ -142,7 +142,7 @@ router.get("/callback", async (req, res) => {
     // ── Fresh insert for current uid (atomic with the delete) ─────────────
     const expiresIn = intOrNull(longData.expires_in);
     await prisma.$transaction([
-      prisma.instagram_accounts.deleteMany({ where: { webhook_id: str(igBusinessId) } }),
+      prisma.instagram_accounts.deleteMany({ where: { webhook_id: whereStr(igBusinessId) } }),
       prisma.instagram_accounts.create({
         data: {
           uid: str(uid),
@@ -305,7 +305,7 @@ router.post("/webhook/:uid", async (req, res) => {
       } = require("../functions/function");
       const randomstring = require("randomstring");
 
-      const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
+      const user = await prisma.user.findFirst({ where: { uid: whereStr(uid) } });
       if (!user) return;
 
       for (const change of commentChanges) {
@@ -326,7 +326,7 @@ router.post("/webhook/:uid", async (req, res) => {
 
         // ── Find or create chat ──────────────────────────────────────────
         const existingChat = await prisma.beta_chats.findFirst({
-          where: { uid: str(uid), sender_mobile: str(senderMobile), origin: "instagram_comment" },
+          where: { uid: whereStr(uid), sender_mobile: whereStr(senderMobile), origin: "instagram_comment" },
         });
 
         let chatId;
@@ -381,7 +381,7 @@ router.post("/webhook/:uid", async (req, res) => {
 
         // ── Update last_message on chat ──────────────────────────────────
         await prisma.beta_chats.updateMany({
-          where: { chat_id: str(chatId), uid: str(uid) },
+          where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
           data: { last_message: JSON.stringify(messageData), sender_name: str(commenterName) },
         });
 
@@ -418,7 +418,7 @@ router.post("/webhook/:uid", async (req, res) => {
 
 // Helper at top of file or in a utils
 async function getUserByUid(uid) {
-  const user = await prisma.user.findFirst({ where: { uid: str(uid) } });
+  const user = await prisma.user.findFirst({ where: { uid: whereStr(uid) } });
   return user ? plain(user) : undefined;
 }
 

@@ -1,7 +1,7 @@
 // routes/qrCampaign.js
 const router = require("express").Router();
 const { prisma } = require("../database/prisma");
-const { plain, idParam, str } = require("../database/prismaHelpers");
+const { plain, idParam, str, whereStr } = require("../database/prismaHelpers");
 
 function toDateOrNull(value) {
   if (!value) return null;
@@ -65,7 +65,7 @@ router.post("/create", validateUser, checkPlan, async (req, res) => {
 
     // Validate instance belongs to user
     const instance = await prisma.instance.findFirst({
-      where: { uniqueId: str(instance_id), uid: req.decode.uid },
+      where: { uniqueId: whereStr(instance_id), uid: req.decode.uid },
       select: { id: true },
     });
     if (!instance) {
@@ -74,7 +74,7 @@ router.post("/create", validateUser, checkPlan, async (req, res) => {
 
     // Count contacts in phonebook
     const total = await prisma.contact.count({
-      where: { uid: req.decode.uid, phonebook_id: str(phonebook_id) },
+      where: { uid: req.decode.uid, phonebook_id: whereStr(phonebook_id) },
     });
 
     if (total === 0) {

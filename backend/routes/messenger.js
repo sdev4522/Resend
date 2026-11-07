@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { prisma } = require("../database/prisma");
-const { idParam, str } = require("../database/prismaHelpers");
+const { idParam, str, whereStr } = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user.js");
 const adminValidator = require("../middlewares/admin.js");
 const { checkPlan } = require("../middlewares/plan.js");
@@ -156,7 +156,7 @@ router.get("/callback", async (req, res) => {
 
       // Remove existing entry for this page
       await prisma.$transaction([
-        prisma.messenger_accounts.deleteMany({ where: { page_id: str(pageId) } }),
+        prisma.messenger_accounts.deleteMany({ where: { page_id: whereStr(pageId) } }),
         // Insert fresh
         prisma.messenger_accounts.create({
           data: {
@@ -268,7 +268,7 @@ router.post("/webhook/:uid", async (req, res) => {
     const pageId = String(entry.id);
 
     const account = await prisma.messenger_accounts.findFirst({
-      where: { page_id: str(pageId) },
+      where: { page_id: whereStr(pageId) },
     });
     if (!account) return;
 

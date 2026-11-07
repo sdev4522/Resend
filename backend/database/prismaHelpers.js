@@ -104,3 +104,25 @@ module.exports.dayRange = dayRange;
 module.exports.dateBetween = dateBetween;
 module.exports.lastDays = lastDays;
 module.exports.thisMonth = thisMonth;
+
+/**
+ * String value for a WHERE equality. SQL `col = NULL` matched nothing, but in Prisma
+ * `{ col: null }` means IS NULL and `{ col: undefined }` DROPS the filter (matches all rows!).
+ * Missing input therefore maps to a value no row can have.
+ */
+const NO_MATCH = "\u0000__no_match__";
+function whereStr(value) {
+  if (value === null || value === undefined) return NO_MATCH;
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
+/** DateTime for writes; invalid/missing -> null. */
+function dateOrNull(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+module.exports.whereStr = whereStr;
+module.exports.dateOrNull = dateOrNull;
+module.exports.NO_MATCH = NO_MATCH;

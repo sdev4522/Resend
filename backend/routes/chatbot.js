@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { prisma } = require("../database/prisma");
-const { idParam, str } = require("../database/prismaHelpers");
+const { idParam, str, whereStr } = require("../database/prismaHelpers");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -26,7 +26,7 @@ router.post("/add_beta_chatbot", validateUser, checkPlan, checkChatbot, async (r
 
     const { flow_id } = flow;
     const getFlow = await prisma.beta_flows.findFirst({
-      where: { flow_id: str(flow_id), uid: req.decode.uid },
+      where: { flow_id: whereStr(flow_id), uid: req.decode.uid },
     });
     if (!getFlow) {
       return res.json({ msg: "This flow is not existed" });

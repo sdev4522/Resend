@@ -1,5 +1,21 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, idParam, str, whereStr } = require("../database/prismaHelpers");
+
+// Agent rows must never leave the server with their password hash
+function withoutPassword(agent) {
+  if (!agent) return agent;
+  const { password, ...rest } = plain(agent);
+  return rest;
+}
+
+// Owner-scoped toggle of an agent flag (was: any user could toggle any agent by uid)
+async function setOwnedAgentFlag(ownerUid, agentUid, field, activeness) {
+  return prisma.agents.updateMany({
+    where: { uid: whereStr(agentUid), owner_uid: ownerUid },
+    data: { [field]: activeness ? 1 : 0 },
+  });
+}
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -55,11 +71,12 @@ router.post("/add_agent", validateUser, checkPlan, async (req, res) => {
     }
 
     // check if already
-    const getUser = await query(`SELECT * FROM agents WHERE email = ?`, [
-      email?.toLowerCase(),
-    ]);
+    const getUser = await prisma.agents.findFirst({
+      where: { email: email?.toLowerCase() },
+      select: { id: true },
+    });
 
-    if (getUser.length > 0) {
+    if (getUser) {
       return res.json({
         msg: "This email is already used by you or someone else on the platform, Please choose another email",
       });
@@ -69,20 +86,17 @@ router.post("/add_agent", validateUser, checkPlan, async (req, res) => {
 
     const uid = randomstring.generate();
 
-    await query(
-      `INSERT INTO agents (owner_uid, uid, email, password, name, mobile, comments) VALUES (
-            ?,?,?,?,?,?,?
-        )`,
-      [
-        req.decode.uid,
+    await prisma.agents.create({
+      data: {
+        owner_uid: req.decode.uid,
         uid,
-        email?.toLowerCase(),
-        hashPass,
-        name,
-        mobile,
-        comments,
-      ],
-    );
+        email: email?.toLowerCase(),
+        password: hashPass,
+        name: str(name),
+        mobile: str(mobile),
+        comments: str(comments),
+      },
+    });
 
     res.json({
       msg: "Agent account was created",
@@ -97,11 +111,11 @@ router.post("/add_agent", validateUser, checkPlan, async (req, res) => {
 // get all agents
 router.get("/get_my_agents", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM agents WHERE owner_uid = ?`, [
-      req.decode.uid,
-    ]);
+    const agents = await prisma.agents.findMany({
+      where: { owner_uid: req.decode.uid },
+    });
 
-    res.json({ data, success: true });
+    res.json({ data: agents.map(withoutPassword), success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong", err });
     logger.log(err);
@@ -113,10 +127,7 @@ router.post("/change_status_mask", validateUser, async (req, res) => {
   try {
     const { agentUid, activeness } = req.body;
 
-    await query(`UPDATE agents SET mask_number = ? WHERE uid = ?`, [
-      activeness ? 1 : 0,
-      agentUid,
-    ]);
+    await setOwnedAgentFlag(req.decode.uid, agentUid, "mask_number", activeness);
 
     res.json({
       success: true,
@@ -133,10 +144,7 @@ router.post("/change_status_allow_send", validateUser, async (req, res) => {
   try {
     const { agentUid, activeness } = req.body;
 
-    await query(`UPDATE agents SET allow_send_new_qr = ? WHERE uid = ?`, [
-      activeness ? 1 : 0,
-      agentUid,
-    ]);
+    await setOwnedAgentFlag(req.decode.uid, agentUid, "allow_send_new_qr", activeness);
 
     res.json({
       success: true,
@@ -153,10 +161,7 @@ router.post("/change_agent_activeness", validateUser, async (req, res) => {
   try {
     const { agentUid, activeness } = req.body;
 
-    await query(`UPDATE agents SET is_active = ? WHERE uid = ?`, [
-      activeness ? 1 : 0,
-      agentUid,
-    ]);
+    await setOwnedAgentFlag(req.decode.uid, agentUid, "is_active", activeness);
 
     res.json({
       success: true,
@@ -172,10 +177,9 @@ router.post("/change_agent_activeness", validateUser, async (req, res) => {
 router.post("/del_agent", validateUser, async (req, res) => {
   try {
     const { uid } = req.body;
-    await query(`DELETE FROM agents WHERE uid = ? AND owner_uid = ?`, [
-      uid,
-      req.decode.uid,
-    ]);
+    await prisma.agents.deleteMany({
+      where: { uid: whereStr(uid), owner_uid: req.decode.uid },
+    });
 
     res.json({
       success: true,
@@ -192,17 +196,26 @@ router.post("/get_agent_chats_owner", validateUser, async (req, res) => {
   try {
     const { uid } = req.body;
 
-    const data = await query(
-      `
-        SELECT * 
-        FROM agent_chats 
-        JOIN chats  
-        ON agent_chats.chat_id = chats.chat_id 
-        WHERE agent_chats.owner_uid = ? 
-        AND chats.uid = ?        
-        `,
-      [req.decode.uid, req.decode.uid, uid],
-    );
+    // former `agent_chats JOIN chats ON chat_id`; on duplicate column names mysql2 kept
+    // the chats value, so chats fields are spread last
+    const assignments = await prisma.agent_chats.findMany({
+      where: { owner_uid: req.decode.uid },
+    });
+    const chatIds = [...new Set(assignments.map((a) => a.chat_id).filter(Boolean))];
+    const chatRows = chatIds.length
+      ? await prisma.chats.findMany({
+          where: { chat_id: { in: chatIds }, uid: req.decode.uid },
+        })
+      : [];
+    const chatsById = new Map();
+    chatRows.forEach((c) => {
+      if (!chatsById.has(c.chat_id)) chatsById.set(c.chat_id, []);
+      chatsById.get(c.chat_id).push(c);
+    });
+    const data = [];
+    assignments.forEach((a) => {
+      (chatsById.get(a.chat_id) || []).forEach((c) => data.push({ ...plain(a), ...plain(c) }));
+    });
 
     res.json({ data, success: true });
   } catch (err) {
@@ -218,17 +231,18 @@ router.post("/get_assigned_chat_agent", validateUser, async (req, res) => {
 
     let data;
 
-    data = await query(
-      `SELECT * FROM agent_chats WHERE chat_id = ? AND owner_uid = ?`,
-      [chatId, req.decode.uid],
+    data = plain(
+      await prisma.agent_chats.findMany({
+        where: { chat_id: whereStr(chatId), owner_uid: req.decode.uid },
+      }),
     );
 
     if (data.length > 0) {
-      const agent = await query(`SELECT * FROM agents WHERE uid = ?`, [
-        data[0]?.uid,
-      ]);
+      const agent = await prisma.agents.findFirst({
+        where: { uid: whereStr(data[0]?.uid), owner_uid: req.decode.uid },
+      });
       data[0] = {
-        ...agent[0],
+        ...withoutPassword(agent),
         chat_id: data[0].chat_id,
         owner_uid: data[0].owner_uid,
       };
@@ -250,21 +264,19 @@ router.post("/update_agent_in_chat", validateUser, async (req, res) => {
   try {
     const { assignAgent, chatId, agentUid } = req.body;
 
-    if (assignAgent?.email) {
-      await query(
-        `DELETE FROM agent_chats WHERE owner_uid = ? AND chat_id = ?`,
-        [req.decode?.uid, chatId],
-      );
+    const removeAssignment = prisma.agent_chats.deleteMany({
+      where: { owner_uid: req.decode.uid, chat_id: whereStr(chatId) },
+    });
 
-      await query(
-        `INSERT INTO agent_chats (owner_uid, uid, chat_id) VALUES (?,?,?)`,
-        [req.decode.uid, assignAgent?.uid, chatId],
-      );
+    if (assignAgent?.email) {
+      await prisma.$transaction([
+        removeAssignment,
+        prisma.agent_chats.create({
+          data: { owner_uid: req.decode.uid, uid: str(assignAgent?.uid), chat_id: str(chatId) },
+        }),
+      ]);
     } else {
-      await query(
-        `DELETE FROM agent_chats WHERE owner_uid = ? AND chat_id = ?`,
-        [req.decode?.uid, chatId],
-      );
+      await removeAssignment;
     }
 
     res.json({ msg: "Updated", success: true });
@@ -281,10 +293,9 @@ router.post("/del_assign_chat_by_owner", validateUser, async (req, res) => {
 
     logger.log(req.body);
 
-    await query(
-      `DELETE FROM agent_chats WHERE owner_uid = ? AND uid = ? AND chat_id = ?`,
-      [req.decode.uid, uid, chat_id],
-    );
+    await prisma.agent_chats.deleteMany({
+      where: { owner_uid: req.decode.uid, uid: whereStr(uid), chat_id: whereStr(chat_id) },
+    });
 
     res.json({ msg: "Chat was removed from the agent", success: true });
   } catch (err) {
@@ -304,9 +315,9 @@ router.post("/login", authRateLimiter({ limit: 15, prefix: "agent_login" }), asy
       });
     }
 
-    const agentFind = await query(`SELECT * FROM agents WHERE email = ?`, [
-      email,
-    ]);
+    const agentFind = plain(
+      await prisma.agents.findMany({ where: { email: String(email) }, take: 1 }),
+    );
     if (agentFind.length < 1) {
       return res.status(401).json({ success: false, msg: "Invalid credentials" });
     }
@@ -350,10 +361,10 @@ router.post("/login", authRateLimiter({ limit: 15, prefix: "agent_login" }), asy
     existingLogs.dateTracking[currentDate].logins++;
     existingLogs.dateTracking[currentDate].lastLogin = loginTime;
 
-    await query(`UPDATE agents SET logs = ? WHERE uid = ?`, [
-      JSON.stringify(existingLogs),
-      agentFind[0].uid,
-    ]);
+    await prisma.agents.updateMany({
+      where: { uid: agentFind[0].uid },
+      data: { logs: JSON.stringify(existingLogs) },
+    });
 
     res.json({
       success: true,
@@ -379,7 +390,7 @@ router.get("/logout", validateAgent, async (req, res) => {
     }
 
     // Get agent data
-    const agentFind = await query(`SELECT * FROM agents WHERE uid = ?`, [uid]);
+    const agentFind = plain(await prisma.agents.findMany({ where: { uid }, take: 1 }));
     if (agentFind.length < 1) {
       return res.json({ success: false, msg: "Agent not found" });
     }
@@ -411,10 +422,13 @@ router.get("/logout", validateAgent, async (req, res) => {
     }
 
     // Update database and increment tokenVersion to revoke active token
-    await query(
-      `UPDATE agents SET logs = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 WHERE uid = ?`,
-      [JSON.stringify(existingLogs), uid],
-    );
+    await prisma.agents.updateMany({
+      where: { uid },
+      data: {
+        logs: JSON.stringify(existingLogs),
+        tokenVersion: (Number(agentFind[0].tokenVersion) || 0) + 1,
+      },
+    });
 
     res.json({
       success: true,
@@ -430,10 +444,11 @@ router.get("/logout", validateAgent, async (req, res) => {
 router.post("/logout", validateAgent, async (req, res) => {
   try {
     const uid = req.decode.uid;
-    await query(
-      `UPDATE agents SET tokenVersion = COALESCE(tokenVersion, 0) + 1 WHERE uid = ?`,
-      [uid],
-    );
+    // { increment } on NULL stays NULL in SQL, so treat NULL as 0 explicitly
+    await prisma.$transaction([
+      prisma.agents.updateMany({ where: { uid, tokenVersion: null }, data: { tokenVersion: 0 } }),
+      prisma.agents.updateMany({ where: { uid }, data: { tokenVersion: { increment: 1 } } }),
+    ]);
     res.json({ success: true, msg: "Logged out successfully" });
   } catch (err) {
     logger.error("[Agent Logout Error]", err);
@@ -444,10 +459,8 @@ router.post("/logout", validateAgent, async (req, res) => {
 // get me agent
 router.get("/get_me", validateAgent, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM agents WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
-    res.json({ data: data[0], success: true });
+    const agent = await prisma.agents.findFirst({ where: { uid: req.decode.uid } });
+    res.json({ data: agent ? withoutPassword(agent) : undefined, success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong", err });
     logger.log(err);
@@ -459,10 +472,9 @@ router.get("/get_my_assigned_chats", validateAgent, async (req, res) => {
   try {
     let data = [];
 
-    const getMyChatsId = await query(
-      `SELECT * FROM agent_chats WHERE uid = ?`,
-      [req.decode.uid],
-    );
+    const getMyChatsId = await prisma.agent_chats.findMany({
+      where: { uid: req.decode.uid },
+    });
 
     logger.log({
       getMyChatsId,
@@ -479,18 +491,19 @@ router.get("/get_my_assigned_chats", validateAgent, async (req, res) => {
     });
 
     // Using IN clause to match against multiple IDs
-    data = await query(`SELECT * FROM chats WHERE chat_id IN (?) AND uid = ?`, [
-      chatIds,
-      req.owner?.uid,
-    ]);
+    data = plain(
+      await prisma.chats.findMany({
+        where: { chat_id: { in: chatIds.filter(Boolean) }, uid: req.owner?.uid },
+      }),
+    );
 
     logger.log({
       data,
     });
 
-    const getContacts = await query(`SELECT * FROM contact WHERE uid = ?`, [
-      req.owner.uid,
-    ]);
+    const getContacts = plain(
+      await prisma.contact.findMany({ where: { uid: req.owner.uid } }),
+    );
 
     if (data.length > 0 && getContacts.length > 0) {
       data = mergeArrays(getContacts, data);
@@ -891,10 +904,10 @@ router.post("/convert_audio", validateAgent, async (req, res) => {
     }
 
     // Update database with new URL
-    const [getMsg] = await query(
-      `SELECT * FROM beta_conversation WHERE id = ?`,
-      [msgId],
-    );
+    // scoped to the agent's workspace (was: any message id)
+    const getMsg = await prisma.beta_conversation.findFirst({
+      where: { id: idParam(msgId), uid: whereStr(req.owner?.uid) },
+    });
 
     if (getMsg) {
       const msgCon = getMsg?.msgContext ? JSON.parse(getMsg.msgContext) : {};
@@ -909,10 +922,10 @@ router.post("/convert_audio", validateAgent, async (req, res) => {
         },
       };
 
-      await query(`UPDATE beta_conversation SET msgContext = ? WHERE id = ?`, [
-        JSON.stringify(updatedMsgCon),
-        msgId,
-      ]);
+      await prisma.beta_conversation.update({
+        where: { id: getMsg.id },
+        data: { msgContext: JSON.stringify(updatedMsgCon) },
+      });
 
       logger.log("Database updated with new MP3 URL");
     }
@@ -1099,9 +1112,9 @@ router.post("/send_image", validateAgent, checkPlan, async (req, res) => {
 // get my tasks
 router.get("/get_my_task", validateAgent, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM agent_task WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = await prisma.agent_task.findMany({
+      where: { uid: req.decode.uid },
+    });
 
     res.json({ data, success: true });
   } catch (err) {
@@ -1119,10 +1132,11 @@ router.post("/mark_task_complete", validateAgent, async (req, res) => {
       return res.json({ msg: "Please type your comments." });
     }
 
-    await query(
-      `UPDATE agent_task SET status = ?, agent_comments = ? WHERE id = ?`,
-      ["COMPLETED", comment, id],
-    );
+    // only the assigned agent can complete the task (was: any task id)
+    await prisma.agent_task.updateMany({
+      where: { id: idParam(id), uid: req.decode.uid },
+      data: { status: "COMPLETED", agent_comments: str(comment) },
+    });
 
     res.json({ msg: "Task updated", success: true });
   } catch (err) {
@@ -1140,10 +1154,11 @@ router.post("/change_chat_ticket_status", validateAgent, async (req, res) => {
       return res.json({ msg: "invalid request" });
     }
 
-    await query(`UPDATE chats SET chat_status = ? WHERE chat_id = ?`, [
-      status,
-      chatId,
-    ]);
+    // scoped to the agent's workspace (was: any tenant's chat)
+    await prisma.chats.updateMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(req.owner?.uid) },
+      data: { chat_status: str(status) },
+    });
 
     res.json({
       success: true,
@@ -1158,9 +1173,9 @@ router.post("/change_chat_ticket_status", validateAgent, async (req, res) => {
 // get all quick reply
 router.get("/get_all_quick_reply", validateAgent, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM quick_reply WHERE uid = ?`, [
-      req.owner.uid,
-    ]);
+    const data = await prisma.quick_reply.findMany({
+      where: { uid: req.owner.uid },
+    });
     res.json({ data, success: true });
   } catch (err) {
     logger.log(err);
@@ -1177,10 +1192,7 @@ router.post("/save_contact_agent", validateUser, async (req, res) => {
   try {
     const { agentUid, activeness } = req.body;
 
-    await query(`UPDATE agents SET allow_save_contact = ? WHERE uid = ?`, [
-      activeness ? 1 : 0,
-      agentUid,
-    ]);
+    await setOwnedAgentFlag(req.decode.uid, agentUid, "allow_save_contact", activeness);
 
     res.json({
       success: true,
@@ -1227,10 +1239,10 @@ router.post("/update_fcm_token", validateAgent, async (req, res) => {
     };
 
     // 4️⃣ Save final data
-    await query(`UPDATE agents SET fcm_data = ? WHERE uid = ?`, [
-      JSON.stringify(newUpdated),
-      req.decode.uid,
-    ]);
+    await prisma.agents.updateMany({
+      where: { uid: req.decode.uid },
+      data: { fcm_data: JSON.stringify(newUpdated) },
+    });
 
     res.json({ success: true, fcm_data: newUpdated });
   } catch (err) {
@@ -1257,25 +1269,29 @@ router.get("/get_phonebook_for_inbox", validateAgent, async (req, res) => {
       return res.json({ success: false, msg: "Owner not found" });
     }
 
-    const [countResult] = await query(
-      `SELECT COUNT(*) as total FROM contact 
-       WHERE uid = ? AND (name LIKE ? OR mobile LIKE ?)`,
-      [ownerUid, searchTerm, searchTerm],
-    );
+    const term = String(search);
+    const where = {
+      uid: ownerUid,
+      OR: [{ name: { contains: term } }, { mobile: { contains: term } }],
+    };
+    const take = Math.max(1, parseInt(limit) || 20);
 
-    const data = await query(
-      `SELECT id, name, mobile, phonebook_name, var1, var2 
-       FROM contact 
-       WHERE uid = ? AND (name LIKE ? OR mobile LIKE ?)
-       ORDER BY name ASC
-       LIMIT ? OFFSET ?`,
-      [ownerUid, searchTerm, searchTerm, parseInt(limit), offset],
-    );
+    const [total, data] = await Promise.all([
+      prisma.contact.count({ where }),
+      prisma.contact.findMany({
+        where,
+        select: { id: true, name: true, mobile: true, phonebook_name: true, var1: true, var2: true },
+        orderBy: { name: "asc" },
+        take,
+        skip: Math.max(0, offset || 0),
+      }),
+    ]);
+    const countResult = { total };
 
     res.json({
       success: true,
       data,
-      total: countResult.total,
+      total,
       page: parseInt(page),
       limit: parseInt(limit),
       hasMore: offset + data.length < countResult.total,

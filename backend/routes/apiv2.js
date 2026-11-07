@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { prisma } = require("../database/prisma");
-const { plain, str, idList } = require("../database/prismaHelpers");
+const { plain, str, idList, whereStr } = require("../database/prismaHelpers");
 
 // Positional args kept identical to the former INSERT INTO beta_api_logs statement
 async function insertApiLog([uid, msgId, request, response, status]) {
@@ -48,7 +48,7 @@ function decodeToken(token) {
         });
       }
       const getUser = plain(
-        await prisma.user.findMany({ where: { uid: str(decode?.uid) }, take: 1 }),
+        await prisma.user.findMany({ where: { uid: whereStr(decode?.uid) }, take: 1 }),
       );
       if (getUser.length < 1) {
         return resolve({
@@ -122,7 +122,7 @@ router.post("/send-message", async (req, res) => {
     }
 
     const getMetaApi = plain(
-      await prisma.meta_api.findMany({ where: { uid: str(user?.uid) }, take: 1 }),
+      await prisma.meta_api.findMany({ where: { uid: whereStr(user?.uid) }, take: 1 }),
     );
     if (getMetaApi.length < 1) {
       return res.json({
@@ -213,7 +213,7 @@ router.post("/send_templet", async (req, res) => {
 
     // getting user meta keys
     const getMetaApi = plain(
-      await prisma.meta_api.findMany({ where: { uid: str(user?.uid) }, take: 1 }),
+      await prisma.meta_api.findMany({ where: { uid: whereStr(user?.uid) }, take: 1 }),
     );
     if (getMetaApi.length < 1) {
       return res.json({
