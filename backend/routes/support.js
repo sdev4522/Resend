@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { plain, idParam } = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user");
 const adminValidator = require("../middlewares/admin");
 const { authRateLimiter } = require("../middlewares/rateLimiter");
@@ -18,6 +19,73 @@ const VALID_CATEGORIES = [
 const VALID_PRIORITIES = ["low", "normal", "high", "urgent"];
 const VALID_STATUSES = ["open", "in_progress", "waiting_user", "resolved", "closed"];
 
+// Adds message_count + last_message_at (former correlated sub-queries) to ticket rows
+async function withMessageStats(tickets) {
+  if (!tickets.length) return [];
+  const ids = tickets.map((t) => t.id);
+  const stats = await prisma.support_messages.groupBy({
+    by: ["ticket_id"],
+    where: { ticket_id: { in: ids } },
+    _count: { id: true },
+    _max: { created_at: true },
+  });
+  const byTicket = new Map(stats.map((r) => [r.ticket_id, r]));
+  return tickets.map((t) => ({
+    ...plain(t),
+    message_count: byTicket.get(t.id)?._count.id || 0,
+    last_message_at: byTicket.get(t.id)?._max.created_at || null,
+  }));
+}
+
+// Former `LEFT JOIN user u ON t.uid = u.uid` (no Prisma relation between the tables)
+async function usersByUid(uids, select) {
+  const unique = [...new Set(uids.filter(Boolean))];
+  if (!unique.length) return new Map();
+  const users = await prisma.user.findMany({
+    where: { uid: { in: unique } },
+    select: { uid: true, ...select },
+  });
+  return new Map(users.map((u) => [u.uid, u]));
+}
+
+async function listMessages(ticketId) {
+  const messages = await prisma.support_messages.findMany({
+    where: { ticket_id: ticketId },
+    orderBy: { created_at: "asc" },
+  });
+  return messages.map((m) => {
+    let parsedAttachments = [];
+    if (m.attachments) {
+      try {
+        parsedAttachments = JSON.parse(m.attachments);
+      } catch (e) {}
+    }
+    return {
+      ...plain(m),
+      attachments: parsedAttachments,
+    };
+  });
+}
+
+async function addMessage({ ticketId, senderType, senderId, senderName, message, attachments }) {
+  return prisma.support_messages.create({
+    data: {
+      ticket_id: ticketId,
+      sender_type: senderType,
+      sender_id: String(senderId),
+      sender_name: String(senderName).slice(0, 100),
+      message,
+      attachments,
+    },
+  });
+}
+
+async function notify(uid, title, message, actionUrl) {
+  return prisma.in_app_notifications.create({
+    data: { uid, title, message, type: "SUPPORT", action_url: actionUrl },
+  });
+}
+
 // ═══════════════════════════════════════════════════════════════════
 // USER SUPPORT ROUTES (Authenticated Workspace Owner)
 // ═══════════════════════════════════════════════════════════════════
@@ -30,14 +98,11 @@ router.get("/tickets", validateUser, async (req, res) => {
   try {
     const uid = req.decode.uid;
 
-    const tickets = await query(
-      `SELECT t.*, 
-        (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id) as message_count,
-        (SELECT m.created_at FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at
-       FROM support_tickets t
-       WHERE t.uid = ?
-       ORDER BY t.updated_at DESC`,
-      [uid]
+    const tickets = await withMessageStats(
+      await prisma.support_tickets.findMany({
+        where: { uid },
+        orderBy: { updated_at: "desc" },
+      }),
     );
 
     const counts = {
@@ -103,21 +168,30 @@ router.post(
       }
 
       // Insert ticket
-      const ticketResult = await query(
-        `INSERT INTO support_tickets (ticket_number, uid, subject, category, priority, status)
-         VALUES (?, ?, ?, ?, ?, 'open')`,
-        [ticketNumber, uid, cleanSubject, cleanCategory, cleanPriority]
-      );
-
-      const ticketId = ticketResult.insertId;
-
-      // Insert first message
+      // Ticket + first message are created together (nested write = one transaction)
       const senderName = req.decode.userData?.name || req.decode.email || "Workspace User";
-      await query(
-        `INSERT INTO support_messages (ticket_id, sender_type, sender_id, sender_name, message, attachments)
-         VALUES (?, 'user', ?, ?, ?, ?)`,
-        [ticketId, uid, senderName, cleanMessage, attachmentsJson]
-      );
+      const created = await prisma.support_tickets.create({
+        data: {
+          ticket_number: ticketNumber,
+          uid,
+          subject: cleanSubject,
+          category: cleanCategory,
+          priority: cleanPriority,
+          status: "open",
+          support_messages: {
+            create: {
+              sender_type: "user",
+              sender_id: String(uid),
+              sender_name: String(senderName).slice(0, 100),
+              message: cleanMessage,
+              attachments: attachmentsJson,
+            },
+          },
+        },
+        select: { id: true },
+      });
+
+      const ticketId = created.id;
 
       res.json({
         success: true,
@@ -147,36 +221,19 @@ router.get("/tickets/:id", validateUser, async (req, res) => {
     const uid = req.decode.uid;
     const ticketId = parseInt(req.params.id, 10);
 
-    const [ticket] = await query(
-      `SELECT * FROM support_tickets WHERE id = ? AND uid = ? LIMIT 1`,
-      [ticketId, uid]
-    );
+    const ticket = await prisma.support_tickets.findFirst({
+      where: { id: idParam(ticketId), uid },
+    });
 
     if (!ticket) {
       return res.status(404).json({ success: false, msg: "Support ticket not found" });
     }
 
-    const messages = await query(
-      `SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY created_at ASC`,
-      [ticketId]
-    );
-
-    const formattedMessages = messages.map((m) => {
-      let parsedAttachments = [];
-      if (m.attachments) {
-        try {
-          parsedAttachments = JSON.parse(m.attachments);
-        } catch (e) {}
-      }
-      return {
-        ...m,
-        attachments: parsedAttachments,
-      };
-    });
+    const formattedMessages = await listMessages(ticket.id);
 
     res.json({
       success: true,
-      ticket,
+      ticket: plain(ticket),
       messages: formattedMessages,
     });
   } catch (err) {
@@ -204,10 +261,9 @@ router.post(
         return res.status(400).json({ success: false, msg: "Reply message cannot be empty" });
       }
 
-      const [ticket] = await query(
-        `SELECT * FROM support_tickets WHERE id = ? AND uid = ? LIMIT 1`,
-        [ticketId, uid]
-      );
+      const ticket = await prisma.support_tickets.findFirst({
+        where: { id: idParam(ticketId), uid },
+      });
 
       if (!ticket) {
         return res.status(404).json({ success: false, msg: "Support ticket not found" });
@@ -226,17 +282,20 @@ router.post(
       }
 
       const senderName = req.decode.userData?.name || req.decode.email || "Workspace User";
-      await query(
-        `INSERT INTO support_messages (ticket_id, sender_type, sender_id, sender_name, message, attachments)
-         VALUES (?, 'user', ?, ?, ?, ?)`,
-        [ticketId, uid, senderName, cleanMessage, attachmentsJson]
-      );
+      await addMessage({
+        ticketId: ticket.id,
+        senderType: "user",
+        senderId: uid,
+        senderName,
+        message: cleanMessage,
+        attachments: attachmentsJson,
+      });
 
       // Re-open ticket if it was resolved or waiting_user
-      await query(
-        `UPDATE support_tickets SET status = 'open', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [ticketId]
-      );
+      await prisma.support_tickets.update({
+        where: { id: ticket.id },
+        data: { status: "open", updated_at: new Date() },
+      });
 
       res.json({
         success: true,
@@ -258,19 +317,19 @@ router.post("/tickets/:id/close", validateUser, async (req, res) => {
     const uid = req.decode.uid;
     const ticketId = parseInt(req.params.id, 10);
 
-    const [ticket] = await query(
-      `SELECT * FROM support_tickets WHERE id = ? AND uid = ? LIMIT 1`,
-      [ticketId, uid]
-    );
+    const ticket = await prisma.support_tickets.findFirst({
+      where: { id: idParam(ticketId), uid },
+      select: { id: true },
+    });
 
     if (!ticket) {
       return res.status(404).json({ success: false, msg: "Support ticket not found" });
     }
 
-    await query(
-      `UPDATE support_tickets SET status = 'closed', updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [ticketId]
-    );
+    await prisma.support_tickets.update({
+      where: { id: ticket.id },
+      data: { status: "closed", updated_at: new Date() },
+    });
 
     res.json({
       success: true,
@@ -297,55 +356,48 @@ router.get("/admin/tickets", adminValidator, async (req, res) => {
     const offset = (Math.max(1, parseInt(page, 10)) - 1) * parseInt(limit, 10);
     const pageLimit = Math.min(100, Math.max(1, parseInt(limit, 10)));
 
-    let sql = `
-      SELECT t.*, u.name as user_name, u.email as user_email,
-        (SELECT COUNT(*) FROM support_messages m WHERE m.ticket_id = t.id) as message_count,
-        (SELECT m.created_at FROM support_messages m WHERE m.ticket_id = t.id ORDER BY m.created_at DESC LIMIT 1) as last_message_at
-      FROM support_tickets t
-      LEFT JOIN user u ON t.uid = u.uid
-      WHERE 1=1
-    `;
-    const params = [];
-
-    if (status && status !== "all") {
-      sql += ` AND t.status = ?`;
-      params.push(status);
-    }
-
-    if (category && category !== "all") {
-      sql += ` AND t.category = ?`;
-      params.push(category);
-    }
-
-    if (priority && priority !== "all") {
-      sql += ` AND t.priority = ?`;
-      params.push(priority);
-    }
+    const where = {};
+    if (status && status !== "all") where.status = String(status);
+    if (category && category !== "all") where.category = String(category);
+    if (priority && priority !== "all") where.priority = String(priority);
 
     if (search && search.trim()) {
-      const q = `%${search.trim()}%`;
-      sql += ` AND (t.ticket_number LIKE ? OR t.subject LIKE ? OR u.email LIKE ? OR u.name LIKE ?)`;
-      params.push(q, q, q, q);
+      const q = search.trim();
+      // former `u.email LIKE ? OR u.name LIKE ?` on the joined user table
+      const matchedUsers = await prisma.user.findMany({
+        where: { OR: [{ email: { contains: q } }, { name: { contains: q } }] },
+        select: { uid: true },
+      });
+      where.OR = [
+        { ticket_number: { contains: q } },
+        { subject: { contains: q } },
+        { uid: { in: matchedUsers.map((u) => u.uid).filter(Boolean) } },
+      ];
     }
 
-    // Get total count
-    const countSql = `SELECT COUNT(*) as total FROM (${sql}) as sub`;
-    const [countRow] = await query(countSql, params);
-    const total = countRow?.total || 0;
+    const [total, rows, statusCounts] = await Promise.all([
+      prisma.support_tickets.count({ where }),
+      prisma.support_tickets.findMany({
+        where,
+        orderBy: { updated_at: "desc" },
+        take: pageLimit,
+        skip: Math.max(0, offset || 0),
+      }),
+      // Global counts
+      prisma.support_tickets.groupBy({ by: ["status"], _count: { id: true } }),
+    ]);
 
-    sql += ` ORDER BY t.updated_at DESC LIMIT ? OFFSET ?`;
-    params.push(pageLimit, offset);
+    const userMap = await usersByUid(rows.map((t) => t.uid), { name: true, email: true });
+    const tickets = (await withMessageStats(rows)).map((t) => ({
+      ...t,
+      user_name: userMap.get(t.uid)?.name ?? null,
+      user_email: userMap.get(t.uid)?.email ?? null,
+    }));
 
-    const tickets = await query(sql, params);
-
-    // Global counts
-    const statusCounts = await query(`
-      SELECT status, COUNT(*) as count FROM support_tickets GROUP BY status
-    `);
     const countsMap = { all: 0, open: 0, in_progress: 0, waiting_user: 0, resolved: 0, closed: 0 };
     for (const row of statusCounts) {
-      countsMap[row.status] = row.count;
-      countsMap.all += row.count;
+      countsMap[row.status] = row._count.id;
+      countsMap.all += row._count.id;
     }
 
     res.json({
@@ -370,36 +422,31 @@ router.get("/admin/tickets/:id", adminValidator, async (req, res) => {
   try {
     const ticketId = parseInt(req.params.id, 10);
 
-    const [ticket] = await query(
-      `SELECT t.*, u.name as user_name, u.email as user_email,
-        u.mobile_with_country_code as user_mobile, u.createdAt as user_created_at
-       FROM support_tickets t
-       LEFT JOIN user u ON t.uid = u.uid
-       WHERE t.id = ? LIMIT 1`,
-      [ticketId]
-    );
+    const row = await prisma.support_tickets.findFirst({
+      where: { id: idParam(ticketId) },
+    });
 
-    if (!ticket) {
+    if (!row) {
       return res.status(404).json({ success: false, msg: "Ticket not found" });
     }
 
-    const messages = await query(
-      `SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY created_at ASC`,
-      [ticketId]
-    );
+    const owner = (
+      await usersByUid([row.uid], {
+        name: true,
+        email: true,
+        mobile_with_country_code: true,
+        createdAt: true,
+      })
+    ).get(row.uid);
+    const ticket = {
+      ...plain(row),
+      user_name: owner?.name ?? null,
+      user_email: owner?.email ?? null,
+      user_mobile: owner?.mobile_with_country_code ?? null,
+      user_created_at: owner?.createdAt ?? null,
+    };
 
-    const formattedMessages = messages.map((m) => {
-      let parsedAttachments = [];
-      if (m.attachments) {
-        try {
-          parsedAttachments = JSON.parse(m.attachments);
-        } catch (e) {}
-      }
-      return {
-        ...m,
-        attachments: parsedAttachments,
-      };
-    });
+    const formattedMessages = await listMessages(row.id);
 
     res.json({
       success: true,
@@ -426,10 +473,9 @@ router.post("/admin/tickets/:id/reply", adminValidator, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Reply message cannot be empty" });
     }
 
-    const [ticket] = await query(
-      `SELECT * FROM support_tickets WHERE id = ? LIMIT 1`,
-      [ticketId]
-    );
+    const ticket = await prisma.support_tickets.findFirst({
+      where: { id: idParam(ticketId) },
+    });
 
     if (!ticket) {
       return res.status(404).json({ success: false, msg: "Ticket not found" });
@@ -441,29 +487,28 @@ router.post("/admin/tickets/:id/reply", adminValidator, async (req, res) => {
     }
 
     const adminName = "Resend Support Team";
-    await query(
-      `INSERT INTO support_messages (ticket_id, sender_type, sender_id, sender_name, message, attachments)
-       VALUES (?, 'admin', ?, ?, ?, ?)`,
-      [ticketId, String(req.decode.uid || "admin"), adminName, cleanMessage, attachmentsJson]
-    );
+    await addMessage({
+      ticketId: ticket.id,
+      senderType: "admin",
+      senderId: req.decode.uid || "admin",
+      senderName: adminName,
+      message: cleanMessage,
+      attachments: attachmentsJson,
+    });
 
     const targetStatus = VALID_STATUSES.includes(status) ? status : "in_progress";
-    await query(
-      `UPDATE support_tickets SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-      [targetStatus, ticketId]
-    );
+    await prisma.support_tickets.update({
+      where: { id: ticket.id },
+      data: { status: targetStatus, updated_at: new Date() },
+    });
 
     // Notify user in-app
     try {
-      await query(
-        `INSERT INTO in_app_notifications (uid, title, message, type, action_url)
-         VALUES (?, ?, ?, 'SUPPORT', ?)`,
-        [
-          ticket.uid,
-          `New reply on Support Request #${ticket.ticket_number}`,
-          cleanMessage.slice(0, 150) + (cleanMessage.length > 150 ? "..." : ""),
-          `/dashboard/support?ticket=${ticket.id}`,
-        ]
+      await notify(
+        ticket.uid,
+        `New reply on Support Request #${ticket.ticket_number}`,
+        cleanMessage.slice(0, 150) + (cleanMessage.length > 150 ? "..." : ""),
+        `/dashboard/support?ticket=${ticket.id}`,
       );
     } catch (notifErr) {
       logger.error("[Support Admin] Notification creation failed:", notifErr);
@@ -488,49 +533,40 @@ router.post("/admin/tickets/:id/status", adminValidator, async (req, res) => {
     const ticketId = parseInt(req.params.id, 10);
     const { status, priority } = req.body;
 
-    const [ticket] = await query(
-      `SELECT * FROM support_tickets WHERE id = ? LIMIT 1`,
-      [ticketId]
-    );
+    const ticket = await prisma.support_tickets.findFirst({
+      where: { id: idParam(ticketId) },
+    });
 
     if (!ticket) {
       return res.status(404).json({ success: false, msg: "Ticket not found" });
     }
 
-    const updates = [];
-    const params = [];
+    const data = {};
 
     if (status && VALID_STATUSES.includes(status)) {
-      updates.push("status = ?");
-      params.push(status);
+      data.status = status;
     }
 
     if (priority && VALID_PRIORITIES.includes(priority)) {
-      updates.push("priority = ?");
-      params.push(priority);
+      data.priority = priority;
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(data).length === 0) {
       return res.status(400).json({ success: false, msg: "No valid status or priority provided" });
     }
 
-    updates.push("updated_at = CURRENT_TIMESTAMP");
-    params.push(ticketId);
+    data.updated_at = new Date();
 
-    await query(`UPDATE support_tickets SET ${updates.join(", ")} WHERE id = ?`, params);
+    await prisma.support_tickets.update({ where: { id: ticket.id }, data });
 
     // Notify user if ticket is marked resolved
     if (status === "resolved") {
       try {
-        await query(
-          `INSERT INTO in_app_notifications (uid, title, message, type, action_url)
-           VALUES (?, ?, ?, 'SUPPORT', ?)`,
-          [
-            ticket.uid,
-            `Support Ticket #${ticket.ticket_number} marked as Resolved`,
-            `Your support request "${ticket.subject}" has been marked as resolved by our team.`,
-            `/dashboard/support?ticket=${ticket.id}`,
-          ]
+        await notify(
+          ticket.uid,
+          `Support Ticket #${ticket.ticket_number} marked as Resolved`,
+          `Your support request "${ticket.subject}" has been marked as resolved by our team.`,
+          `/dashboard/support?ticket=${ticket.id}`,
         );
       } catch (notifErr) {
         logger.error("[Support Admin] Notification failed:", notifErr);
