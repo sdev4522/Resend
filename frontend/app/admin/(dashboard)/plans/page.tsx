@@ -545,11 +545,19 @@ export default function AdminPlansPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Plan Management</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Create, configure, and manage subscription plans, resource quotas, and capability entitlements.
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              BILLING TIERS &amp; QUOTAS
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">{plans.length} tiers defined</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            Subscription Plans &amp; Entitlements
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure tiered subscription packages, quotas, connection allowances, and capability flags.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -558,50 +566,50 @@ export default function AdminPlansPage() {
             size="sm"
             onClick={fetchPlans}
             disabled={loading}
-            className="h-9 text-xs"
+            className="h-9 text-xs gap-1.5"
           >
-            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
             Refresh
           </Button>
-          <Button size="sm" onClick={openCreateModal} className="h-9 text-xs">
-            <Plus className="mr-2 h-3.5 w-3.5" />
-            Create Plan
+          <Button size="sm" onClick={openCreateModal} className="h-9 text-xs gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            Create New Plan
           </Button>
         </div>
       </div>
 
       {/* Top Navigation Tabs */}
-      <Tabs value={mainTab} onValueChange={(val: any) => setMainTab(val)} className="space-y-4">
-        <TabsList className="grid grid-cols-2 max-w-md h-10 p-1 bg-muted/60 rounded-xl border">
+      <Tabs value={mainTab} onValueChange={(val: any) => setMainTab(val)} className="space-y-6">
+        <TabsList className="grid grid-cols-2 max-w-md h-10 p-1 bg-muted/60 rounded-xl border border-border/60 shadow-2xs">
           <TabsTrigger
             value="plans"
             className="text-xs font-semibold gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
           >
-            <Layers className="h-3.5 w-3.5" />
-            Plans & Entitlements
+            <Layers className="h-3.5 w-3.5 text-primary" />
+            Plans &amp; Entitlements
           </TabsTrigger>
           <TabsTrigger
             value="matrix"
             className="text-xs font-semibold gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-xs"
           >
-            <Coins className="h-3.5 w-3.5" />
-            Multi-Currency Matrix (Fixed Prices)
+            <Coins className="h-3.5 w-3.5 text-amber-500" />
+            Fixed Currency Matrix
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="plans" className="space-y-4 pt-1">
           {/* Main Table Card */}
-          <Card className="shadow-xs border rounded-2xl overflow-hidden">
-        <CardHeader className="pb-3 border-b bg-card/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold">Configured Subscription Plans</CardTitle>
-              <CardDescription className="text-xs text-muted-foreground">
-                Total {plans.length} plan{plans.length === 1 ? '' : 's'} registered in the database.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+          <Card className="shadow-2xs border border-border/70 rounded-xl overflow-hidden bg-card">
+            <CardHeader className="pb-3.5 border-b bg-card">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold">Configured Subscription Plans</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground mt-0.5">
+                    Total {plans.length} active plan{plans.length === 1 ? '' : 's'} registered in the database
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
 
         <CardContent className="p-0">
           {loading ? (

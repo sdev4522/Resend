@@ -212,12 +212,12 @@ export default function AdminSupportPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-5">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
-            <LifeBuoy className="h-6 w-6 text-red-500" />
+            <LifeBuoy className="h-6 w-6 text-primary" />
             Customer Support Management
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
