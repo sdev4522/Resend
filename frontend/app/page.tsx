@@ -1,18 +1,18 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { MarketingCapabilityMarquee } from '@/components/marketing/capability-marquee';
-import { MarketingBentoFeatures } from '@/components/marketing/bento-features';
 import { MarketingHowItWorks } from '@/components/marketing/how-it-works';
-import { MarketingFeatureComparison } from '@/components/marketing/feature-comparison';
 import { CompetitorComparison } from '@/components/marketing/competitor-comparison';
-import { MarketingUseCases } from '@/components/marketing/use-cases';
 import { MarketingPricing } from '@/components/marketing/pricing';
 import { MarketingFAQ } from '@/components/marketing/faq';
-import { MarketingCTABanner } from '@/components/marketing/cta-banner';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
 import { siteConfig } from '@/config/site';
-import { Hero5 } from '@/components/ui/hero-5';
+import { lpDisplay } from '@/components/marketing/landing/fonts';
+import { SmoothScroll } from '@/components/marketing/landing/smooth-scroll';
+import { LandingNav } from '@/components/marketing/landing/landing-nav';
+import { HeroDesk } from '@/components/marketing/landing/hero-desk';
+import { MessageJourney } from '@/components/marketing/landing/message-journey';
+import { FinalCta } from '@/components/marketing/landing/final-cta';
 
 export const metadata: Metadata = {
   title: {
@@ -67,9 +67,9 @@ export default function HomePage() {
         operatingSystem: 'All',
         offers: {
           '@type': 'AggregateOffer',
-          priceCurrency: 'USD',
+          // Plans are sold in INR; prices come from the live plan table, so only the floor is stated here
+          priceCurrency: 'INR',
           lowPrice: '0',
-          highPrice: '10',
           offerCount: '3',
         },
       },
@@ -118,7 +118,7 @@ export default function HomePage() {
             name: 'Are there additional charges from Meta for WhatsApp conversations?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'If using Meta Cloud API, WhatsApp conversation charges are billed directly by Meta according to their official conversation pricing. Meta provides 1,000 free service conversations per month per business portfolio. QR connections use your regular phone plan without Meta conversation fees.',
+              text: 'With the Meta Cloud API, message fees are billed directly by Meta at its current published rates. QR connections send messages through your own WhatsApp number and do not incur Meta API fees.',
             },
           },
         ],
@@ -127,49 +127,30 @@ export default function HomePage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-background selection:bg-primary/20 selection:text-foreground">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+    <SmoothScroll>
+      <div
+        className={`lp ${lpDisplay.variable} flex min-h-screen flex-col selection:bg-primary/20 selection:text-foreground`}
+      >
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
 
-      <main className="flex-1 pb-16 sm:pb-0">
-        {/* Section 1: Hero */}
-        <Hero5 />
+        <LandingNav />
 
-        {/* Section 2: Capability Marquee */}
-        <MarketingCapabilityMarquee />
+        <main className="flex-1 pb-16 sm:pb-0">
+          <HeroDesk />
+          <MessageJourney />
+          <MarketingHowItWorks />
+          <CompetitorComparison />
+          <MarketingPricing />
+          <MarketingFAQ />
+          <FinalCta />
+        </main>
 
-        {/* Section 3: Feature Bento Grid */}
-        <MarketingBentoFeatures />
-
-        {/* Section 4: How It Works */}
-        <MarketingHowItWorks />
-
-        {/* Section 5: Feature Comparison */}
-        <MarketingFeatureComparison />
-
-        {/* Section 6: Competitor Comparison (Resend vs WATI vs AiSensy) */}
-        <CompetitorComparison />
-
-        {/* Section 7: Use Cases */}
-        <MarketingUseCases />
-
-        {/* Section 8: Pricing Preview */}
-        <MarketingPricing />
-
-        {/* Section 9: FAQ */}
-        <MarketingFAQ />
-
-        {/* Section 10: Final CTA */}
-        <MarketingCTABanner />
-      </main>
-
-      {/* Mobile Sticky CTA Bar */}
-      <StickyMobileCTA />
-
-      {/* Section 11: Footer */}
-      <MarketingFooter />
-    </div>
+        <StickyMobileCTA />
+        <MarketingFooter />
+      </div>
+    </SmoothScroll>
   );
 }

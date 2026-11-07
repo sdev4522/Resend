@@ -178,6 +178,8 @@ export default function BillingPage() {
   // Checkout Modal state
   const [selectedCheckoutPlan, setSelectedCheckoutPlan] = useState<SubscriptionPlan | null>(null);
   const [enableAutopay, setEnableAutopay] = useState<boolean>(true);
+  // Billing term in months: 1 = monthly, 12 = one payment for a year (autopay is monthly-only)
+  const [durationMonths, setDurationMonths] = useState<1 | 12>(1);
   const [couponInput, setCouponInput] = useState<string>('');
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -250,7 +252,7 @@ export default function BillingPage() {
         setIsCalculatingPrice(true);
         const res = await billingApi.calculatePrice({
           planId,
-          durationMonths: 1,
+          durationMonths,
           couponCode: coupon || undefined,
           currency: targetCurrencyOverride || selectedCurrency,
         });
@@ -274,7 +276,7 @@ export default function BillingPage() {
         setIsCalculatingPrice(false);
       }
     },
-    [selectedCurrency]
+    [selectedCurrency, durationMonths]
   );
 
   // Synchronize modal pricing with global header currency selection
@@ -285,15 +287,32 @@ export default function BillingPage() {
   }, [selectedCurrency, selectedCheckoutPlan, appliedCoupon, recalculateCheckoutPrice]);
 
   // Handle opening checkout modal
-  const handleOpenCheckout = (targetPlan: SubscriptionPlan) => {
+  const handleOpenCheckout = (targetPlan: SubscriptionPlan, months: 1 | 12 = 1) => {
+    // Year-long plans are a single term; only monthly plans can be bought for 12 months
+    const term: 1 | 12 = Number(targetPlan.plan_duration_in_days) >= 365 ? 1 : months;
     setSelectedCheckoutPlan(targetPlan);
-    setEnableAutopay(true);
+    setDurationMonths(term);
+    setEnableAutopay(term === 1);
     setCouponInput('');
     setAppliedCoupon(null);
     setCouponError(null);
     setMockOrderPayload(null);
     recalculateCheckoutPrice(targetPlan.id, null, selectedCurrency);
   };
+
+  // Arriving from pricing/onboarding: /dashboard/billing?plan=<id>&months=<1|12> opens that checkout once
+  const checkoutIntentHandledRef = React.useRef(false);
+  useEffect(() => {
+    if (checkoutIntentHandledRef.current || !plans.length) return;
+    const params = new URLSearchParams(window.location.search);
+    const planId = Number(params.get('plan'));
+    if (!planId) return;
+    checkoutIntentHandledRef.current = true;
+    window.history.replaceState(null, '', '/dashboard/billing');
+    const target = plans.find((p) => Number(p.id) === planId && !p.is_trial);
+    if (target) handleOpenCheckout(target, params.get('months') === '12' ? 12 : 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plans]);
 
   // Handle coupon application
   const handleApplyCoupon = async () => {
@@ -309,6 +328,7 @@ export default function BillingPage() {
       const res = await billingApi.validateCoupon({
         code: couponInput.trim(),
         planId: selectedCheckoutPlan.id,
+        durationMonths,
         currency: selectedCurrency,
       });
 
@@ -369,7 +389,8 @@ export default function BillingPage() {
       const orderData = await billingApi.createCheckoutOrder({
         planId: selectedCheckoutPlan.id,
         couponCode: appliedCoupon || undefined,
-        autopay: enableAutopay,
+        autopay: enableAutopay && durationMonths === 1,
+        durationMonths,
         currency: selectedCurrency,
       });
 
@@ -1185,7 +1206,7 @@ export default function BillingPage() {
                             {selectedCheckoutPlan.title} Tier
                           </span>
                           <Badge variant="secondary" className="text-[10px] px-2 py-0 bg-primary/10 text-primary border-primary/20">
-                            {selectedCheckoutPlan.plan_duration_in_days || 30} Days Validity
+                            {(Number(selectedCheckoutPlan.plan_duration_in_days) || 30) * durationMonths} days
                           </Badge>
                         </div>
                         <p className="text-[11px] text-muted-foreground mt-1">
@@ -1245,55 +1266,85 @@ export default function BillingPage() {
                     </div>
                   </div>
 
-                  {/* Billing Mode: Autopay vs One-Time Interactive Cards */}
-                  <div className="space-y-2">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Repeat className="h-3 w-3 text-primary" />
-                      Select Billing Frequency
-                    </Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      <div
-                        onClick={() => setEnableAutopay(true)}
-                        className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                          enableAutopay
-                            ? "border-primary bg-primary/5 shadow-2xs"
-                            : "border-border/60 hover:border-primary/40 bg-card/40"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Repeat className={`h-4 w-4 ${enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
-                            <span className="font-bold text-xs text-foreground">Recurring Autopay</span>
-                          </div>
-                          <Badge className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border-emerald-600/20 text-[9px] px-1.5 py-0 font-semibold">
-                            Recommended
-                          </Badge>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground leading-snug">
-                          Renews automatically every {selectedCheckoutPlan.plan_duration_in_days || 30} days. Cancel anytime in 1-click.
-                        </p>
-                      </div>
+                  {/* Billing term: monthly plans can be paid for a full year at the annual discount */}
+                  {Number(selectedCheckoutPlan.plan_duration_in_days) < 365 && (
+                    <div role="radiogroup" aria-label="Billing term" className="grid grid-cols-2 gap-2">
+                      {([1, 12] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          role="radio"
+                          aria-checked={durationMonths === m}
+                          onClick={() => {
+                            setDurationMonths(m);
+                            if (m === 12) setEnableAutopay(false);
+                            setAppliedCoupon(null);
+                            setCouponInput('');
+                          }}
+                          className={`rounded-xl border p-3 text-left transition-colors ${
+                            durationMonths === m ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/30'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold text-foreground">{m === 1 ? 'Monthly' : 'Yearly'}</span>
+                          <span className="block text-[11px] text-muted-foreground">
+                            {m === 1 ? 'Pay every month, autopay available' : 'One payment for 12 months, discounted'}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
-                      <div
-                        onClick={() => setEnableAutopay(false)}
-                        className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                          !enableAutopay
-                            ? "border-primary bg-primary/5 shadow-2xs"
-                            : "border-border/60 hover:border-primary/40 bg-card/40"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <CreditCard className={`h-4 w-4 ${!enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
-                            <span className="font-bold text-xs text-foreground">One-Time Payment</span>
+                  {/* Billing Mode: Autopay vs One-Time Interactive Cards */}
+                  {durationMonths === 1 && (
+                    <div className="space-y-2">
+                      <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                        <Repeat className="h-3 w-3 text-primary" />
+                        How to pay
+                      </Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div
+                          onClick={() => setEnableAutopay(true)}
+                          className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                            enableAutopay
+                              ? "border-primary bg-primary/5 shadow-2xs"
+                              : "border-border/60 hover:border-primary/40 bg-card/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Repeat className={`h-4 w-4 ${enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
+                              <span className="font-bold text-xs text-foreground">Recurring Autopay</span>
+                            </div>
+                            <Badge className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border-emerald-600/20 text-[9px] px-1.5 py-0 font-semibold">
+                              Recommended
+                            </Badge>
                           </div>
+                          <p className="text-[10px] text-muted-foreground leading-snug">
+                            Renews automatically every {selectedCheckoutPlan.plan_duration_in_days || 30} days. Cancel anytime in 1-click.
+                          </p>
                         </div>
-                        <p className="text-[10px] text-muted-foreground leading-snug">
-                          Pay once for this cycle only. Manually renew before expiry to maintain access.
-                        </p>
+  
+                        <div
+                          onClick={() => setEnableAutopay(false)}
+                          className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
+                            !enableAutopay
+                              ? "border-primary bg-primary/5 shadow-2xs"
+                              : "border-border/60 hover:border-primary/40 bg-card/40"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CreditCard className={`h-4 w-4 ${!enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
+                              <span className="font-bold text-xs text-foreground">One-Time Payment</span>
+                            </div>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-snug">
+                            Pay once for this cycle only. Manually renew before expiry to maintain access.
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Coupon Code Section */}
                   <div className="space-y-1.5">

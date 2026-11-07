@@ -33,7 +33,9 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
       pathname !== '/onboarding'
     ) {
       setIsOnboardingOpen(true);
-    } else {
+    } else if (status !== 'AUTHENTICATED' || !user || user.role !== 'user' || pathname === '/onboarding') {
+      // Do NOT auto-close just because the timezone is now set: step 1 of onboarding saves it,
+      // and the remaining steps (plan, connect WhatsApp) must stay open until the user finishes.
       setIsOnboardingOpen(false);
     }
   }, [status, user, pathname]);

@@ -7,7 +7,6 @@ import {
   AccordionTrigger,
   AccordionContent,
 } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
 import {
   MessageSquare,
   ShieldCheck,
@@ -44,7 +43,7 @@ const FAQ_ITEMS = [
     icon: Receipt,
     question: 'Are there additional charges from Meta for WhatsApp conversations?',
     answer:
-      'Yes, if you use the official Meta Cloud API. Meta charges for WhatsApp conversations based on categories (Marketing, Utility, Authentication, and Service). Service conversations (customer-initiated inquiries) include 1,000 free conversations per month per Meta Business Account. Resend subscription plans cover software access, team seats, and platform tools, while Meta conversation fees are paid directly to Meta via your Meta Business Manager payment method. If you connect via our QR scan engine, messages use your regular mobile plan without Meta conversation charges.',
+      'Yes, if you use the official Meta Cloud API. Meta charges per message by category (marketing, utility, authentication and service) at its current published rates, billed to your Meta Business account. Your Resend plan covers the software: inbox, team seats, contacts and automation. If you connect with a QR scan instead, there are no Meta API fees.',
   },
   {
     icon: FileText,
@@ -82,24 +81,14 @@ export function MarketingFAQ({ isPageHeading = false }: { isPageHeading?: boolea
   return (
     <section id="faq" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-border/50">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-14">
-          <Badge
-            variant="outline"
-            className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3"
-          >
-            Clear Answers
-          </Badge>
+        <div className="mb-14 text-center">
           {isPageHeading ? (
-            <h1 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
-              Frequently Asked Questions
-            </h1>
+            <h1 className="lp-section-title text-4xl text-foreground md:text-5xl">Questions, answered</h1>
           ) : (
-            <h2 className="text-3xl xs:text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">
-              Frequently Asked Questions
-            </h2>
+            <h2 className="lp-section-title text-4xl text-foreground md:text-5xl">Questions, answered</h2>
           )}
-          <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-            Transparent answers regarding WhatsApp connectivity, multi-agent collaboration, and billing.
+          <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
+            Connecting your number, working as a team, and how billing works.
           </p>
         </div>
 

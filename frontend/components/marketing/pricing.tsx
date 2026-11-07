@@ -6,10 +6,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, CircleCheck, RefreshCw, Sparkles, ArrowRight } from 'lucide-react';
+import { AlertCircle, CircleCheck, RefreshCw, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
 import { billingApi } from '@/lib/api/billing';
+import { savePricingChoice, billingCheckoutHref } from '@/lib/billing/pricing-choice';
 import { SubscriptionPlan } from '@/types/billing';
 
 export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: boolean } = {}) {
@@ -72,49 +73,49 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
     const qrCount = Number(p.qr_account || 1);
     features.push(
       qrCount > 1
-        ? `${qrCount} Connected WhatsApp Numbers / Instances`
-        : '1 Connected WhatsApp Number / Instance'
+        ? `${qrCount} WhatsApp numbers`
+        : '1 WhatsApp number'
     );
 
     // Multi-agent Inbox
-    features.push('Collaborative Multi-Agent Team Inbox');
+    features.push('Shared team inbox');
 
     // Contacts
     if (p.contact_limit) {
-      features.push(`${Number(p.contact_limit).toLocaleString()} Contacts Storage Limit`);
+      features.push(`${Number(p.contact_limit).toLocaleString('en-IN')} contacts`);
     } else {
-      features.push('Unlimited Contacts Directory');
+      features.push('Unlimited contacts');
     }
 
     // Chatbot / Automation
     if (Number(p.allow_chatbot) > 0) {
-      features.push('Automated Chatbot Rules & Keywords');
+      features.push('Chatbots and keyword replies');
     }
 
     // Developer API
     if (Number(p.allow_api) > 0 || Number(p.rest_api_qr) > 0) {
-      features.push('Developer REST API & Inbound Webhooks');
+      features.push('REST API and webhooks');
     }
 
     // Tags & Notes
     if (Number(p.allow_tag) > 0 || Number(p.allow_note) > 0) {
-      features.push('Contact Segmentation, Tags & Agent Notes');
+      features.push('Labels and private notes');
     }
 
     // Warmer
     if (Number(p.wa_warmer) > 0) {
-      features.push('Official WhatsApp Account Warmer');
+      features.push('Number warm-up');
     }
 
     // Addons
     if (Number(p.instagram_inbox) > 0) {
-      features.push('Instagram Direct Shared Inbox');
+      features.push('Instagram DMs in the inbox');
     }
     if (Number(p.telegram_inbox) > 0) {
-      features.push('Telegram Bot Messaging Inbox');
+      features.push('Telegram in the inbox');
     }
     if (Number(p.allow_wa_forms) > 0) {
-      features.push('Interactive WhatsApp Form Builder');
+      features.push('WhatsApp forms');
     }
 
     return features;
@@ -123,20 +124,14 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
   return (
     <div id="pricing" className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
       <div className="text-center max-w-3xl mx-auto">
-        <Badge variant="outline" className="text-xs font-semibold py-1 px-3 border-primary/30 text-primary bg-primary/5 mb-3">
-          Simple &amp; Transparent Billing
-        </Badge>
         {isPageHeading ? (
-          <h1 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            Transparent Pricing for Every Stage of Growth
-          </h1>
+          <h1 className="lp-section-title text-4xl md:text-5xl text-foreground">Pricing that grows with your team</h1>
         ) : (
-          <h2 className="text-3xl xs:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            Transparent Pricing for Every Stage of Growth
-          </h2>
+          <h2 className="lp-section-title text-4xl md:text-5xl text-foreground">Pricing that grows with your team</h2>
         )}
         <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-          Platform plans include software access, team seats, contact storage, and automation workflows. Start with a 14-day free trial—no credit card required.
+          Every plan includes the shared inbox, team seats, contacts and automation. Start with 14 days free, no card
+          needed.
         </p>
 
         {/* Toggle */}
@@ -148,10 +143,10 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
           >
             <TabsList className="h-11 px-1.5 rounded-full bg-muted/80 border border-border/60">
               <TabsTrigger value="monthly" className="py-1.5 px-5 rounded-full text-xs sm:text-sm font-medium">
-                Monthly Billing
+                Monthly
               </TabsTrigger>
               <TabsTrigger value="yearly" className="py-1.5 px-5 rounded-full text-xs sm:text-sm font-medium">
-                Annual Billing
+                Yearly
                 {annualDiscountPercent > 0 && (
                   <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary">
                     Save {annualDiscountPercent}%
@@ -219,33 +214,37 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
               const strikePrice = plan.currencyStrikePrices?.[currency] ?? (plan.price_strike ? parseFloat(plan.price_strike) : null);
               const isAnnualPlan = Number(plan.plan_duration_in_days) >= 365;
 
+              // Price shown in the unit the customer actually pays. Year-long plans are always
+              // shown per year; monthly plans show the discounted 12-month total under "Yearly",
+              // which is exactly what checkout charges (durationMonths: 12).
               let displayMonthlyPrice: number;
+              let priceUnit: string;
               let billingSummary: string;
+              let checkoutMonths: 1 | 12 = 1;
 
               if (isTrial) {
                 displayMonthlyPrice = 0;
-                billingSummary = `${plan.plan_duration_in_days || 14}-day free trial · No credit card required`;
+                priceUnit = `/ ${plan.plan_duration_in_days || 14} days`;
+                billingSummary = 'No card needed';
+              } else if (isAnnualPlan) {
+                displayMonthlyPrice = basePrice;
+                priceUnit = '/ year';
+                billingSummary = `Works out to ${formatPrice(basePrice / 12)} a month, paid once a year`;
               } else if (billingPeriod === 'yearly') {
-                if (isAnnualPlan) {
-                  // Plan is natively annual
-                  displayMonthlyPrice = Math.round((basePrice / 12) * 100) / 100;
-                  billingSummary = `Billed annually (${formatPrice(basePrice)}/yr)`;
-                } else {
-                  // Plan is monthly, apply backend duration discount
-                  const discountRate = durationDiscounts['12'] || 0.15;
-                  const discountedAnnual = basePrice * 12 * (1 - discountRate);
-                  displayMonthlyPrice = Math.round((discountedAnnual / 12) * 100) / 100;
-                  billingSummary = `Billed annually (${formatPrice(Math.round(discountedAnnual))}/yr)`;
-                }
+                const discountRate = durationDiscounts['12'] || 0.15;
+                const discountedAnnual = Math.round(basePrice * 12 * (1 - discountRate));
+                displayMonthlyPrice = discountedAnnual;
+                priceUnit = '/ year';
+                billingSummary = `${formatPrice(discountedAnnual / 12)} a month, paid once a year`;
+                checkoutMonths = 12;
               } else {
-                if (isAnnualPlan) {
-                  displayMonthlyPrice = Math.round((basePrice / 12) * 100) / 100;
-                  billingSummary = `Annual commitment (${formatPrice(basePrice)}/yr)`;
-                } else {
-                  displayMonthlyPrice = basePrice;
-                  billingSummary = 'Billed monthly, cancel anytime';
-                }
+                displayMonthlyPrice = basePrice;
+                priceUnit = '/ month';
+                billingSummary = 'Billed monthly, cancel anytime';
               }
+              // Strike price is stored per plan term; scale it to the unit shown
+              const shownStrike =
+                strikePrice && !isAnnualPlan && checkoutMonths === 12 ? strikePrice * 12 : strikePrice;
 
               const features = getPlanFeatureList(plan);
               const isHighlighted = Boolean(plan.is_popular || (!isTrial && (plans.length > 2 ? index === 1 : index === plans.length - 1)));
@@ -279,7 +278,7 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
                           : ""
                           }`}
                       >
-                        {isTrial ? `${plan.plan_duration_in_days || 14}-Day Trial` : isAnnualPlan ? 'Annual' : 'Standard'}
+                        {isTrial ? `${plan.plan_duration_in_days || 14}-day trial` : isAnnualPlan ? 'Yearly plan' : 'Monthly plan'}
                       </Badge>
                     </div>
 
@@ -294,17 +293,16 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
 
                     {/* Price Block */}
                     <div className="mt-6 flex items-baseline gap-2">
-                      {strikePrice && strikePrice > displayMonthlyPrice && !isTrial && (
-                        <span className="line-through text-muted-foreground/50 text-xl font-mono mr-1">
-                          {formatPrice(strikePrice)}
+                      {shownStrike && shownStrike > displayMonthlyPrice && !isTrial && (
+                        <span className="mr-1 text-xl text-muted-foreground/60 line-through">
+                          <span className="sr-only">Was </span>
+                          {formatPrice(shownStrike)}
                         </span>
                       )}
-                      <span className="text-4xl sm:text-5xl font-extrabold tracking-tight text-foreground font-mono">
+                      <span className="lp-section-title text-4xl sm:text-5xl text-foreground">
                         {isTrial ? 'Free' : formatPrice(displayMonthlyPrice)}
                       </span>
-                      <span className="text-xs sm:text-sm text-muted-foreground">
-                        {isTrial ? `/ ${plan.plan_duration_in_days || 14} days` : '/ month'}
-                      </span>
+                      <span className="text-sm text-muted-foreground">{priceUnit}</span>
                     </div>
 
                     <p className="mt-1 text-xs text-muted-foreground font-medium">
@@ -313,9 +311,7 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
 
                     {/* Features List */}
                     <div className="mt-8 border-t border-border/40 pt-6">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-foreground/80">
-                        Included Capabilities
-                      </span>
+                      <span className="text-sm font-medium text-foreground/80">What&apos;s included</span>
                       <ul className="mt-4 space-y-3">
                         {features.map((feat, idx) => (
                           <li key={idx} className="flex items-start gap-2.5 text-xs sm:text-sm text-foreground/90">
@@ -336,15 +332,15 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
                           className="w-full rounded-xl h-11 text-sm font-semibold gap-2 border-border/80 hover:border-foreground/40"
                           render={<Link href="/dashboard" />}
                         >
-                          Go to Dashboard <ArrowRight className="h-4 w-4" />
+                          Open dashboard
                         </Button>
                       ) : (
                         <Button
                           variant={isHighlighted ? 'default' : 'outline'}
                           className="w-full rounded-xl h-11 text-sm font-semibold gap-2"
-                          render={<Link href="/dashboard/billing" />}
+                          render={<Link href={billingCheckoutHref({ planId: Number(plan.id), durationMonths: checkoutMonths })} />}
                         >
-                          Manage & Upgrade Plan <ArrowRight className="h-4 w-4" />
+                          Choose {plan.title}
                         </Button>
                       )
                     ) : (
@@ -352,9 +348,13 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
                         variant={isHighlighted ? 'default' : 'outline'}
                         className={`w-full rounded-xl h-11 text-sm font-semibold gap-2 ${isTrial ? 'border-primary/50 text-foreground hover:bg-primary/10' : ''
                           }`}
-                        onClick={openRegister}
+                        onClick={() => {
+                          // remember the pick so onboarding preselects this plan and term
+                          if (!isTrial) savePricingChoice({ planId: Number(plan.id), durationMonths: checkoutMonths });
+                          openRegister();
+                        }}
                       >
-                        {isTrial ? 'Start Free Trial' : 'Get Started'} <ArrowRight className="h-4 w-4" />
+                        {isTrial ? 'Start free trial' : `Start with ${plan.title}`}
                       </Button>
                     )}
                   </div>
@@ -368,13 +368,17 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
       {/* WhatsApp Messaging Transparency Callout */}
       <div className="mt-12 w-full max-w-4xl mx-auto rounded-2xl border border-border/70 bg-card p-6 sm:p-7 text-xs text-muted-foreground leading-relaxed space-y-2.5">
         <h4 className="text-sm font-semibold text-foreground">
-          Understanding WhatsApp Messaging Charges
+          What you pay Resend, and what you pay Meta
         </h4>
         <p>
           <strong className="text-foreground">Resend Platform Subscription:</strong> Covers your software license, shared team inbox seats, contact CRM, broadcast manager, automation flow builder, and developer API tools.
         </p>
         <p>
-          <strong className="text-foreground">Meta Cloud API Conversations:</strong> When connecting through the official Meta WhatsApp Cloud API, messaging conversation fees are paid directly to Meta via your Meta Business Manager payment method based on standard per-conversation rates. Meta provides 1,000 free Service (customer-initiated) conversations each month per Meta Business Account.
+          <strong className="text-foreground">Meta Cloud API messages:</strong> When you connect through the official Cloud API, Meta bills message fees directly to your Meta Business account at{' '}
+          <a href="https://developers.facebook.com/docs/whatsapp/pricing" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2 hover:text-foreground">
+            Meta&apos;s current rates
+          </a>
+          .
         </p>
         <p>
           <strong className="text-foreground">QR Device Connections:</strong> When connecting through our instant QR scan engine, messages are sent over your phone carrier or data plan without Meta conversation fees.

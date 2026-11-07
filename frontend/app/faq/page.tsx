@@ -101,7 +101,7 @@ export default function FAQPage() {
             name: 'Are there additional charges from Meta for WhatsApp conversations?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'If using Meta Cloud API, WhatsApp conversation charges are billed directly by Meta according to official conversation rates. Meta includes 1,000 free service conversations per month per business portfolio. QR connections use your regular phone plan without Meta conversation fees.',
+              text: 'With the Meta Cloud API, message fees are billed directly by Meta at its current published rates. QR connections send messages through your own WhatsApp number and do not incur Meta API fees.',
             },
           },
           {

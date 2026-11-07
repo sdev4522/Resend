@@ -526,6 +526,29 @@ export default function IntegrationsPage() {
   const planQrLimit = Number((user?.plan as any)?.qr_account || 1);
   const isLimitReached = instances.length >= planQrLimit;
 
+  // Arriving from onboarding: /dashboard/integrations?connect=qr|cloud
+  // QR starts automatically. Cloud API opens Meta's popup, which browsers only allow
+  // from a click, so we point the user at the button instead.
+  const [connectIntent, setConnectIntent] = useState<'qr' | 'cloud' | null>(null);
+  const intentHandledRef = useRef(false);
+  useEffect(() => {
+    const intent = new URLSearchParams(window.location.search).get('connect');
+    if (intent === 'qr' || intent === 'cloud') setConnectIntent(intent);
+  }, []);
+  useEffect(() => {
+    if (!connectIntent || intentHandledRef.current || loadingInstances || !user?.uid) return;
+    intentHandledRef.current = true;
+    window.history.replaceState(null, '', '/dashboard/integrations');
+    if (connectIntent === 'qr') {
+      if (isLimitReached) {
+        toast.error('Your plan has no free WhatsApp number slots. Upgrade or remove a number to add another.');
+      } else {
+        handleStartQrConnection();
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectIntent, loadingInstances, user?.uid, isLimitReached]);
+
   // Extract phone display from Meta connection embed_data if available
   const getMetaPhoneDisplay = () => {
     if (!metaConnection) return null;
@@ -637,6 +660,16 @@ export default function IntegrationsPage() {
         )}
 
         {/* Empty State */}
+        {connectIntent === 'cloud' && !metaConnection && (
+          <div role="status" className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
+            <p className="font-medium text-foreground">Connect the official Cloud API</p>
+            <p className="mt-1 text-muted-foreground">
+              Select <span className="font-medium text-foreground">Connect with Meta</span>. Meta opens a window
+              where you sign in to Facebook, choose your business, and verify your phone number.
+            </p>
+          </div>
+        )}
+
         {!loadingInstances && !loadingMeta && !hasAnyConnections && (
           <Card className="border shadow-xs">
             <CardContent className="p-10 text-center flex flex-col items-center justify-center gap-3">

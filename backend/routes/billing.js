@@ -120,6 +120,23 @@ async function cancelReplacedSubscription(previousSubscriptionId) {
   }
 }
 
+const ALLOWED_DURATION_MONTHS = [1, 3, 6, 12];
+
+/**
+ * Billing term requested by the client. Plans that are already a year (or longer) are
+ * always sold as a single term — multiplying their 365 days by 12 would be wrong.
+ */
+async function resolveDurationMonths(planId, requested) {
+  const months = parseInt(requested, 10);
+  if (!ALLOWED_DURATION_MONTHS.includes(months) || months === 1) return 1;
+  const plan = await prisma.plan.findFirst({
+    where: { id: parseInt(planId, 10) || -1 },
+    select: { plan_duration_in_days: true },
+  });
+  if (!plan || parseInt(plan.plan_duration_in_days || 30, 10) >= 365) return 1;
+  return months;
+}
+
 function isUniqueViolation(err) {
   return err?.code === "P2002";
 }
@@ -422,7 +439,7 @@ router.post("/calculate_price", validateUser, async (req, res) => {
 
     const priceSummary = await calculateCheckoutPrice({
       planId,
-      durationMonths: 1,
+      durationMonths: await resolveDurationMonths(planId, req.body.durationMonths),
       couponCode: couponCode || null,
       targetCurrency: currency || null,
     });
@@ -443,14 +460,16 @@ router.post("/calculate_price", validateUser, async (req, res) => {
  */
 router.post("/validate_coupon", validateUser, async (req, res) => {
   try {
-    const { planId, couponCode, currency } = req.body;
+    const { planId, currency } = req.body;
+    // The dashboard sends { code }, older clients { couponCode }
+    const couponCode = req.body.couponCode || req.body.code;
     if (!planId || !couponCode) {
       return res.status(400).json({ success: false, msg: "planId and couponCode are required" });
     }
 
     const priceSummary = await calculateCheckoutPrice({
       planId,
-      durationMonths: 1,
+      durationMonths: await resolveDurationMonths(planId, req.body.durationMonths),
       couponCode,
       targetCurrency: currency || null,
     });
@@ -501,10 +520,19 @@ router.post("/create_order", validateUser, async (req, res) => {
       });
     }
 
+    const durationMonths = await resolveDurationMonths(planId, req.body.durationMonths);
+    // Autopay creates a monthly recurring Razorpay plan; longer terms are one-time payments
+    if (autopay && durationMonths !== 1) {
+      return res.status(400).json({
+        success: false,
+        msg: "Autopay is available for monthly billing only. Choose monthly, or pay for the full term once.",
+      });
+    }
+
     // Authoritative calculation
     const priceSummary = await calculateCheckoutPrice({
       planId,
-      durationMonths: 1,
+      durationMonths,
       couponCode: couponCode || null,
       targetCurrency: currency || null,
     });

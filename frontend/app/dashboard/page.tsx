@@ -10,6 +10,7 @@ import {
   MetaApiKeys,
 } from '@/lib/api/dashboard';
 import { DashboardPageHeader } from '@/components/dashboard/dashboard-page-header';
+import { GettingStarted } from '@/components/dashboard/getting-started';
 import { getPlanTitle } from '@/lib/utils';
 import {
   Card,
@@ -127,6 +128,15 @@ export default function DashboardOverviewPage() {
             </button>
           </AlertDescription>
         </Alert>
+      )}
+
+      {!loading && (
+        <GettingStarted
+          uid={user?.uid}
+          whatsappConnected={isConnected}
+          agentCount={Number(data?.stats?.agents || 0)}
+          activeChatbotCount={data?.activeChatbots?.length || 0}
+        />
       )}
 
       {/* WhatsApp Connection Card */}

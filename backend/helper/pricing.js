@@ -450,7 +450,9 @@ async function calculateCheckoutPrice({ planId, durationMonths = 1, couponCode =
   const totalDays = planDaysPerMonth * months;
 
   // Fetch authoritative currency-wise fixed price
-  const priceInfo = await getPlanPrice(planId, currency, totalDays);
+  // Unit price for ONE plan term; it is multiplied by `months` below. Passing totalDays here
+  // would pick an annual price row for 12-month orders and then multiply it by 12 again.
+  const priceInfo = await getPlanPrice(planId, currency, planDaysPerMonth);
   const planUnitPrice = priceInfo.amount;
   const planStrikePrice = priceInfo.strikeAmount;
 
