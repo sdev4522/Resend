@@ -1,5 +1,6 @@
 const crypto = require("crypto");
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
+const { idParam, plain, str, whereStr } = require("../../database/prismaHelpers");
 const logger = require("../../utils/logger");
 
 /**
@@ -18,65 +19,71 @@ async function syncWorkspaceConnections(uid) {
 
   try {
     // 1. Sync QR instances
-    const instances = await query(
-      `SELECT * FROM instance WHERE uid = ?`,
-      [uid]
-    );
+    const instances = plain(await prisma.instance.findMany({ where: { uid: whereStr(uid) } }));
 
     for (const inst of instances) {
       if (!inst.uniqueId) continue;
-      const existing = await query(
-        `SELECT id, public_id FROM api_connections WHERE provider = 'qr' AND provider_ref = ? LIMIT 1`,
-        [inst.uniqueId]
-      );
+      const existing = plain(await prisma.api_connections.findMany({
+        where: { provider: "qr", provider_ref: whereStr(inst.uniqueId) },
+        select: { id: true, public_id: true },
+        take: 1,
+      }));
 
       const phone = (inst.number || "").replace(/\D/g, "");
       const name = inst.title || `WhatsApp QR (${phone || inst.uniqueId.slice(0, 8)})`;
 
       if (existing.length === 0) {
         const publicId = generatePublicConnectionId();
-        await query(
-          `INSERT INTO api_connections (public_id, uid, provider, provider_ref, name, phone_number) 
-           VALUES (?, ?, 'qr', ?, ?, ?)`,
-          [publicId, uid, inst.uniqueId, name, phone]
-        );
+        await prisma.api_connections.create({
+          data: {
+            public_id: str(publicId),
+            uid: str(uid),
+            provider: "qr",
+            provider_ref: str(inst.uniqueId),
+            name: str(name),
+            phone_number: str(phone),
+          },
+        });
       } else {
         // Update name/phone if changed
-        await query(
-          `UPDATE api_connections SET name = ?, phone_number = ?, uid = ? WHERE id = ?`,
-          [name, phone, uid, existing[0].id]
-        );
+        await prisma.api_connections.updateMany({
+          where: { id: idParam(existing[0].id) },
+          data: { name: str(name), phone_number: str(phone), uid: str(uid) },
+        });
       }
     }
 
     // 2. Sync Meta Cloud API
-    const metaRecords = await query(
-      `SELECT * FROM meta_api WHERE uid = ?`,
-      [uid]
-    );
+    const metaRecords = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
 
     for (const meta of metaRecords) {
       if (!meta.business_phone_number_id) continue;
-      const existing = await query(
-        `SELECT id, public_id FROM api_connections WHERE provider = 'meta' AND provider_ref = ? LIMIT 1`,
-        [meta.business_phone_number_id]
-      );
+      const existing = plain(await prisma.api_connections.findMany({
+        where: { provider: "meta", provider_ref: whereStr(meta.business_phone_number_id) },
+        select: { id: true, public_id: true },
+        take: 1,
+      }));
 
       const phone = (meta.business_phone_number_id || "").replace(/\D/g, "");
       const name = `Meta Cloud WhatsApp (${phone})`;
 
       if (existing.length === 0) {
         const publicId = generatePublicConnectionId();
-        await query(
-          `INSERT INTO api_connections (public_id, uid, provider, provider_ref, name, phone_number) 
-           VALUES (?, ?, 'meta', ?, ?, ?)`,
-          [publicId, uid, meta.business_phone_number_id, name, phone]
-        );
+        await prisma.api_connections.create({
+          data: {
+            public_id: str(publicId),
+            uid: str(uid),
+            provider: "meta",
+            provider_ref: str(meta.business_phone_number_id),
+            name: str(name),
+            phone_number: str(phone),
+          },
+        });
       } else {
-        await query(
-          `UPDATE api_connections SET name = ?, phone_number = ?, uid = ? WHERE id = ?`,
-          [name, phone, uid, existing[0].id]
-        );
+        await prisma.api_connections.updateMany({
+          where: { id: idParam(existing[0].id) },
+          data: { name: str(name), phone_number: str(phone), uid: str(uid) },
+        });
       }
     }
   } catch (err) {
@@ -91,10 +98,7 @@ async function getAuthorizedConnections(uid, apiKeyId = null) {
   await syncWorkspaceConnections(uid);
 
   // Fetch all connections belonging to this workspace
-  const connections = await query(
-    `SELECT * FROM api_connections WHERE uid = ? ORDER BY created_at ASC`,
-    [uid]
-  );
+  const connections = plain(await prisma.api_connections.findMany({ where: { uid: whereStr(uid) }, orderBy: { created_at: "asc" } }));
 
   if (connections.length === 0) {
     return [];
@@ -103,10 +107,7 @@ async function getAuthorizedConnections(uid, apiKeyId = null) {
   // If apiKeyId provided, check if key has connection restrictions
   let allowedSet = null;
   if (apiKeyId) {
-    const permRows = await query(
-      `SELECT connection_public_id FROM api_key_connections WHERE api_key_id = ?`,
-      [apiKeyId]
-    );
+    const permRows = plain(await prisma.api_key_connections.findMany({ where: { api_key_id: idParam(apiKeyId) }, select: { connection_public_id: true } }));
     if (permRows.length > 0) {
       allowedSet = new Set(permRows.map((r) => r.connection_public_id));
     }
@@ -123,10 +124,11 @@ async function getAuthorizedConnections(uid, apiKeyId = null) {
     let status = "disconnected";
 
     if (conn.provider === "qr") {
-      const [inst] = await query(
-        `SELECT status FROM instance WHERE uniqueId = ? AND uid = ? LIMIT 1`,
-        [conn.provider_ref, uid]
-      );
+      const [inst] = plain(await prisma.instance.findMany({
+        where: { uniqueId: whereStr(conn.provider_ref), uid: whereStr(uid) },
+        select: { status: true },
+        take: 1,
+      }));
       if (inst && inst.status === "ACTIVE") {
         // Also verify Baileys session memory if module is loaded
         try {
@@ -142,10 +144,11 @@ async function getAuthorizedConnections(uid, apiKeyId = null) {
         }
       }
     } else if (conn.provider === "meta") {
-      const [meta] = await query(
-        `SELECT access_token, business_phone_number_id FROM meta_api WHERE business_phone_number_id = ? AND uid = ? LIMIT 1`,
-        [conn.provider_ref, uid]
-      );
+      const [meta] = plain(await prisma.meta_api.findMany({
+        where: { business_phone_number_id: whereStr(conn.provider_ref), uid: whereStr(uid) },
+        select: { access_token: true, business_phone_number_id: true },
+        take: 1,
+      }));
       if (meta && meta.access_token && meta.business_phone_number_id) {
         status = "connected";
       }
@@ -191,10 +194,7 @@ async function resolveAndAuthorizeConnection({
   }
 
   // Lookup target connection
-  const connRows = await query(
-    `SELECT * FROM api_connections WHERE public_id = ? LIMIT 1`,
-    [targetId]
-  );
+  const connRows = plain(await prisma.api_connections.findMany({ where: { public_id: whereStr(targetId) }, take: 1 }));
 
   // Tenant Isolation / IDOR: if connection does not exist or belongs to another workspace, return CONNECTION_NOT_FOUND
   if (connRows.length === 0 || connRows[0].uid !== uid) {
@@ -209,10 +209,10 @@ async function resolveAndAuthorizeConnection({
 
   // Verify API Key connection permissions
   if (apiKey?.id) {
-    const permRows = await query(
-      `SELECT connection_public_id FROM api_key_connections WHERE api_key_id = ?`,
-      [apiKey.id]
-    );
+    const permRows = plain(await prisma.api_key_connections.findMany({
+      where: { api_key_id: idParam(apiKey.id) },
+      select: { connection_public_id: true },
+    }));
 
     if (permRows.length > 0) {
       const allowed = permRows.some((r) => r.connection_public_id === targetId);
@@ -228,10 +228,7 @@ async function resolveAndAuthorizeConnection({
 
   // Check connection active state
   if (conn.provider === "qr") {
-    const instRows = await query(
-      `SELECT * FROM instance WHERE uniqueId = ? AND uid = ? LIMIT 1`,
-      [conn.provider_ref, uid]
-    );
+    const instRows = plain(await prisma.instance.findMany({ where: { uniqueId: whereStr(conn.provider_ref), uid: whereStr(uid) }, take: 1 }));
 
     if (requireActive && (instRows.length === 0 || instRows[0].status !== "ACTIVE")) {
       return {
@@ -248,10 +245,10 @@ async function resolveAndAuthorizeConnection({
       instanceRecord: instRows[0] || null,
     };
   } else if (conn.provider === "meta") {
-    const metaRows = await query(
-      `SELECT * FROM meta_api WHERE business_phone_number_id = ? AND uid = ? LIMIT 1`,
-      [conn.provider_ref, uid]
-    );
+    const metaRows = plain(await prisma.meta_api.findMany({
+      where: { business_phone_number_id: whereStr(conn.provider_ref), uid: whereStr(uid) },
+      take: 1,
+    }));
 
     if (metaRows.length === 0 || !metaRows[0].access_token) {
       return {

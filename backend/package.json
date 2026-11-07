@@ -10,6 +10,7 @@
     "prisma:validate": "prisma validate",
     "test:prisma": "node test-prisma-health.mjs",
     "test:p2": "node test-prisma-dal-templets.mjs",
+    "test:p3": "node test-prisma-p3-user-admin-crud.mjs",
     "test:p5": "node test-prisma-billing.mjs"
   },
   "keywords": [],

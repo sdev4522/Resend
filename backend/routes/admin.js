@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const { query } = require("../database/dbpromise.js");
+const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const con = require("../database/config.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
@@ -464,30 +465,35 @@ router.post("/toggle_user_status", adminValidator, async (req, res) => {
 
     const blockedVal = is_blocked ? 1 : 0;
 
-    const [user] = await query(`SELECT uid, email, name FROM user WHERE uid = ?`, [uid]);
+    const user = await prisma.user.findFirst({
+      where: { uid },
+      select: { uid: true, email: true, name: true, tokenVersion: true },
+    });
     if (!user) {
       return res.status(404).json({ success: false, msg: "User not found" });
     }
 
-    // Invalidate existing sessions immediately via tokenVersion bump
-    await query(
-      `UPDATE user 
-       SET is_blocked = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
-       WHERE uid = ?`,
-      [blockedVal, uid]
-    );
+    const nextTokenVersion = (user.tokenVersion || 0) + 1;
 
-    // Audit log
-    await query(
-      `INSERT INTO admin_audit_logs (admin_uid, action, target_type, target_id, details) VALUES (?,?,?,?,?)`,
-      [
-        req.decode?.uid || "admin",
-        blockedVal ? "USER_BLOCK" : "USER_UNBLOCK",
-        "USER",
-        uid,
-        JSON.stringify({ email: user.email, name: user.name, is_blocked: blockedVal }),
-      ]
-    );
+    // Atomic transaction for user status update + admin audit log
+    await prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({
+        where: { uid },
+        data: {
+          is_blocked: Boolean(blockedVal),
+          tokenVersion: nextTokenVersion,
+        },
+      });
+      await tx.admin_audit_logs.create({
+        data: {
+          admin_uid: req.decode?.uid || "admin",
+          action: blockedVal ? "USER_BLOCK" : "USER_UNBLOCK",
+          target_type: "USER",
+          target_id: uid,
+          details: JSON.stringify({ email: user.email, name: user.name, is_blocked: blockedVal }),
+        },
+      });
+    });
 
     res.json({
       success: true,
@@ -513,22 +519,22 @@ router.post("/update_user", adminValidator, async (req, res) => {
       });
     }
 
-    const findUserByEmail = await query(`SELECT * FROM user WHERE email = ?`, [
-      email,
-    ]);
+    const findUserByEmail = await prisma.user.findFirst({
+      where: { email },
+    });
 
-    if (findUserByEmail.length > 0 && findUserByEmail[0].uid !== uid) {
+    if (findUserByEmail && findUserByEmail.uid !== uid) {
       return res.json({
         success: false,
         msg: "This email is already taken by another user",
       });
     }
 
-    const findUserByUid = await query(`SELECT * FROM user WHERE uid = ?`, [
-      uid,
-    ]);
+    const findUserByUid = await prisma.user.findFirst({
+      where: { uid },
+    });
 
-    if (findUserByUid.length === 0) {
+    if (!findUserByUid) {
       return res.json({
         success: false,
         msg: "User not found",
@@ -537,20 +543,27 @@ router.post("/update_user", adminValidator, async (req, res) => {
 
     if (newPassword) {
       const hashpass = await bcrypt.hash(newPassword, 10);
+      const nextTokenVersion = (findUserByUid.tokenVersion || 0) + 1;
 
-      await query(
-        `UPDATE user 
-         SET name = ?, email = ?, password = ?, mobile_with_country_code = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 
-         WHERE uid = ?`,
-        [name, email, hashpass, mobile_with_country_code, uid],
-      );
+      await prisma.user.updateMany({
+        where: { uid },
+        data: {
+          name,
+          email,
+          password: hashpass,
+          mobile_with_country_code,
+          tokenVersion: nextTokenVersion,
+        },
+      });
     } else {
-      await query(
-        `UPDATE user 
-         SET name = ?, email = ?, mobile_with_country_code = ? 
-         WHERE uid = ?`,
-        [name, email, mobile_with_country_code, uid],
-      );
+      await prisma.user.updateMany({
+        where: { uid },
+        data: {
+          name,
+          email,
+          mobile_with_country_code,
+        },
+      });
     }
 
     res.json({ msg: "User was updated", success: true });
@@ -1000,10 +1013,12 @@ router.post("/add_faq", adminValidator, async (req, res) => {
       });
     }
 
-    await query(`INSERT INTO faq (question, answer) VALUES (?,?)`, [
-      question,
-      answer,
-    ]);
+    await prisma.faq.create({
+      data: {
+        question,
+        answer,
+      },
+    });
 
     res.json({ success: true, msg: "Faq was added" });
   } catch (err) {
@@ -1015,8 +1030,8 @@ router.post("/add_faq", adminValidator, async (req, res) => {
 // get all faq
 router.get("/get_faq", async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM faq`, []);
-    res.json({ data, success: true });
+    const data = await prisma.faq.findMany();
+    res.json({ data: sanitizeBigInt(data), success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
     logger.log(err);
@@ -1027,7 +1042,9 @@ router.get("/get_faq", async (req, res) => {
 router.post("/del_faq", adminValidator, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM faq WHERE id = ?`, [id]);
+    await prisma.faq.deleteMany({
+      where: { id: parseInt(id, 10) },
+    });
     res.json({ success: true, msg: "Faq was deleted" });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -1126,23 +1143,27 @@ router.post("/auto_login", adminValidator, async (req, res) => {
       return res.json({ success: false, msg: "Invalid input" });
     }
 
-    const user = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
-    if (user.length < 1) {
-      return res.json({ success: false, msg: "User not found" });
+    const targetUser = await prisma.user.findFirst({
+      where: { uid },
+    });
+    if (!targetUser) {
+      return res.status(404).json({ success: false, msg: "User not found" });
     }
 
-    // ✅ No password in token — uses tokenVersion instead
+    // MED-03: Admin auto-login impersonation token expires in 1h with audit log
     const token = sign(
       {
-        uid: user[0].uid,
+        uid: targetUser.uid,
         role: "user",
-        email: user[0].email,
-        tokenVersion: user[0].tokenVersion ?? 0,
+        email: targetUser.email,
+        tokenVersion: targetUser.tokenVersion ?? 0,
+        impersonatedBy: req.decode?.uid || "admin",
       },
       process.env.JWTKEY,
-      {},
+      { expiresIn: "1h" },
     );
 
+    logger.log(`[ADMIN AUDIT] Admin ${req.decode?.uid || "unknown"} generated impersonation token for user ${targetUser.uid}`);
     res.json({ success: true, token });
   } catch (err) {
     logger.log(err);
@@ -1159,10 +1180,14 @@ router.post("/add_testimonial", adminValidator, async (req, res) => {
       return res.json({ success: false, msg: "Please fill all fields" });
     }
 
-    await query(
-      `INSERT INTO testimonial (title, description, reviewer_name, reviewer_position) VALUES (?,?,?,?)`,
-      [title, description, reviewer_name, reviewer_position],
-    );
+    await prisma.testimonial.create({
+      data: {
+        title,
+        description,
+        reviewer_name,
+        reviewer_position,
+      },
+    });
 
     res.json({ success: true, msg: "Testimonial was added" });
   } catch (err) {
@@ -1174,8 +1199,8 @@ router.post("/add_testimonial", adminValidator, async (req, res) => {
 // get all testi
 router.get("/get_testi", async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM testimonial`, []);
-    res.json({ success: true, data });
+    const data = await prisma.testimonial.findMany();
+    res.json({ success: true, data: sanitizeBigInt(data) });
   } catch (err) {
     logger.log(err);
     res.json({ msg: "server error", err });
@@ -1187,7 +1212,9 @@ router.post("/del_testi", adminValidator, async (req, res) => {
   try {
     const { id } = req.body;
 
-    await query(`DELETE FROM testimonial WHERE id = ?`, [id]);
+    await prisma.testimonial.deleteMany({
+      where: { id: parseInt(id, 10) },
+    });
     res.json({ success: true, msg: "Testimonial was deleted" });
   } catch (err) {
     logger.log(err);
@@ -2139,20 +2166,40 @@ router.post("/verify_user_email", adminValidator, async (req, res) => {
       return res.status(400).json({ success: false, msg: "User UID or ID is required" });
     }
 
-    const [user] = await query(
-      `SELECT id, uid, email, email_verified_at FROM user WHERE uid = ? OR id = ?`,
-      [uid || null, id || null]
-    );
+    const whereOr = [];
+    if (uid) whereOr.push({ uid: String(uid) });
+    if (id) whereOr.push({ id: parseInt(id, 10) });
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: whereOr,
+      },
+      select: {
+        id: true,
+        uid: true,
+        email: true,
+        email_verified_at: true,
+      },
+    });
 
     if (!user) {
       return res.status(404).json({ success: false, msg: "User not found" });
     }
 
-    await query(`UPDATE user SET email_verified_at = CURRENT_TIMESTAMP WHERE uid = ?`, [user.uid]);
-    // Also mark any pending email verification records as used
-    await query(`UPDATE email_verification SET used_at = CURRENT_TIMESTAMP WHERE email = ? AND used_at IS NULL`, [
-      user.email,
-    ]);
+    const now = new Date();
+    await prisma.$transaction(async (tx) => {
+      await tx.user.updateMany({
+        where: { uid: user.uid },
+        data: { email_verified_at: now },
+      });
+      await tx.email_verification.updateMany({
+        where: {
+          email: user.email,
+          used_at: null,
+        },
+        data: { used_at: now },
+      });
+    });
 
     logger.log(`[Admin Audit] Admin ${req.decode?.uid} manually verified email for ${user.email} (${user.uid})`);
 

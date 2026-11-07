@@ -1,5 +1,5 @@
 const jwt = require("jsonwebtoken");
-const { query } = require("../database/dbpromise");
+const { prisma, sanitizeBigInt } = require("../database/prisma");
 const logger = require("../utils/logger");
 
 const validateAgent = async (req, res, next) => {
@@ -35,10 +35,12 @@ const validateAgent = async (req, res, next) => {
       });
     }
 
-    const [agent] = await query(
-      `SELECT * FROM agents WHERE uid = ? AND owner_uid = ?`,
-      [decode.uid, decode.owner_uid],
-    );
+    const agent = await prisma.agents.findFirst({
+      where: {
+        uid: decode.uid,
+        owner_uid: decode.owner_uid,
+      },
+    });
 
     if (!agent) {
       return res.status(401).json({
@@ -65,9 +67,11 @@ const validateAgent = async (req, res, next) => {
       });
     }
 
-    const [owner] = await query(`SELECT * FROM user WHERE uid = ?`, [
-      agent.owner_uid,
-    ]);
+    const owner = await prisma.user.findFirst({
+      where: {
+        uid: agent.owner_uid,
+      },
+    });
 
     if (!owner) {
       return res.status(401).json({
@@ -77,7 +81,7 @@ const validateAgent = async (req, res, next) => {
       });
     }
 
-    req.owner = owner;
+    req.owner = sanitizeBigInt(owner);
 
     req.decode = {
       uid: agent.uid,
@@ -85,7 +89,7 @@ const validateAgent = async (req, res, next) => {
       email: agent.email,
       owner_uid: agent.owner_uid,
       tokenVersion: agent.tokenVersion,
-      userData: agent,
+      userData: sanitizeBigInt(agent),
     };
 
     next();
