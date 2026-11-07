@@ -3,6 +3,24 @@ const axios = require("axios");
 const { prisma } = require("../database/prisma");
 const logger = require("../utils/logger");
 
+// Dev-only mock secret (the onboarding modal's dev simulator signs with it).
+// It is ONLY accepted when mock mode is explicitly enabled — never as a fallback.
+const DEV_MOCK_KEY_SECRET = "rzp_test_mock_key_secret";
+
+/**
+ * Mock checkout is allowed only when RAZORPAY_MOCK=1 AND NODE_ENV is not production.
+ * Missing credentials alone must never enable mock payments.
+ */
+function isMockModeAllowed() {
+  return process.env.RAZORPAY_MOCK === "1" && process.env.NODE_ENV !== "production";
+}
+
+function notConfiguredError() {
+  const err = new Error("Payment gateway is not configured. Please contact support.");
+  err.code = "PAYMENT_GATEWAY_NOT_CONFIGURED";
+  return err;
+}
+
 /**
  * Retrieves Razorpay configuration from database or environment variables.
  * Never exposes the key_secret to clients.
@@ -40,17 +58,20 @@ async function getRazorpayConfig() {
       ? envWebhookSecret.trim()
       : webPrivate?.rz_webhook_secret && webPrivate.rz_webhook_secret.trim() !== ""
       ? webPrivate.rz_webhook_secret.trim()
-      : "wacrm_rz_webhook_secret";
+      : null;
 
   const isActive = Boolean(
     (keyId && keySecret) || webPrivate?.rz_active == "1" || envKeyId
   );
 
+  const isConfigured = Boolean(keyId && keySecret);
+
   return {
-    keyId: keyId || "rzp_test_mock_key_id",
-    keySecret: keySecret || "rzp_test_mock_key_secret",
+    keyId: keyId || (isMockModeAllowed() ? "rzp_test_mock_key_id" : null),
+    keySecret,
     webhookSecret,
-    isConfigured: Boolean(keyId && keySecret && keyId !== "rzp_test_mock_key_id"),
+    isConfigured,
+    isMockMode: !isConfigured && isMockModeAllowed(),
     isActive,
   };
 }
@@ -63,7 +84,8 @@ async function createRazorpayOrder({ amountMinor, currency = "USD", receipt, not
   const normalizedCurrency = currency.toUpperCase();
 
   if (!config.isConfigured) {
-    logger.log("[Razorpay] Using dev/mock order mode (credentials not configured in web_private or env)");
+    if (!config.isMockMode) throw notConfiguredError();
+    logger.log("[Razorpay] Using dev/mock order mode (RAZORPAY_MOCK=1, non-production)");
     const mockOrderId = `order_mock_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     return {
       id: mockOrderId,
@@ -100,15 +122,8 @@ async function createRazorpayOrder({ amountMinor, currency = "USD", receipt, not
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      logger.warn("[Razorpay] Authentication failed on api.razorpay.com. Using development test order.");
-      return {
-        id: `order_mock_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        amount: amountMinor,
-        currency: normalizedCurrency,
-        status: "created",
-        receipt: String(receipt),
-        isMock: true,
-      };
+      logger.error("[Razorpay] Authentication failed on api.razorpay.com — check key id / secret.");
+      throw notConfiguredError();
     }
     logger.error("[Razorpay] Order creation failed:", error.response?.data || error.message);
     throw new Error(
@@ -125,6 +140,7 @@ async function createRazorpayPlan({ name, amountMinor, currency = "INR", period 
   const normalizedCurrency = currency.toUpperCase();
 
   if (!config.isConfigured) {
+    if (!config.isMockMode) throw notConfiguredError();
     return {
       id: `plan_mock_${Date.now()}`,
       period,
@@ -162,14 +178,8 @@ async function createRazorpayPlan({ name, amountMinor, currency = "INR", period 
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      logger.warn("[Razorpay] Authentication failed on api.razorpay.com. Using development test plan.");
-      return {
-        id: `plan_mock_${Date.now()}`,
-        period,
-        interval,
-        item: { name, amount: amountMinor, currency: normalizedCurrency },
-        isMock: true,
-      };
+      logger.error("[Razorpay] Authentication failed on api.razorpay.com — check key id / secret.");
+      throw notConfiguredError();
     }
     logger.error("[Razorpay] Plan creation failed:", error.response?.data || error.message);
     throw new Error(
@@ -185,6 +195,7 @@ async function createRazorpaySubscription({ planId, customerNotify = 1, totalCou
   const config = await getRazorpayConfig();
 
   if (!config.isConfigured || String(planId).startsWith("plan_mock_")) {
+    if (!config.isMockMode) throw notConfiguredError();
     const mockSubId = `sub_mock_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     return {
       id: mockSubId,
@@ -221,16 +232,8 @@ async function createRazorpaySubscription({ planId, customerNotify = 1, totalCou
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      logger.warn("[Razorpay] Authentication failed on api.razorpay.com. Using development test subscription.");
-      return {
-        id: `sub_mock_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-        plan_id: planId,
-        status: "created",
-        total_count: totalCount,
-        customer_notify: customerNotify,
-        notes,
-        isMock: true,
-      };
+      logger.error("[Razorpay] Authentication failed on api.razorpay.com — check key id / secret.");
+      throw notConfiguredError();
     }
     logger.error("[Razorpay] Subscription creation failed:", error.response?.data || error.message);
     throw new Error(
@@ -245,9 +248,11 @@ async function createRazorpaySubscription({ planId, customerNotify = 1, totalCou
 async function cancelRazorpaySubscription(subscriptionId) {
   const config = await getRazorpayConfig();
 
-  if (!config.isConfigured || String(subscriptionId).startsWith("sub_mock_")) {
+  if (String(subscriptionId).startsWith("sub_mock_")) {
+    // A mock subscription never existed on Razorpay; nothing to cancel remotely.
     return { id: subscriptionId, status: "cancelled", isMock: true };
   }
+  if (!config.isConfigured) throw notConfiguredError();
 
   const authHeader =
     "Basic " +
@@ -268,7 +273,8 @@ async function cancelRazorpaySubscription(subscriptionId) {
     return response.data;
   } catch (error) {
     if (error.response?.status === 401) {
-      return { id: subscriptionId, status: "cancelled", isMock: true };
+      logger.error("[Razorpay] Authentication failed on api.razorpay.com — subscription NOT cancelled.");
+      throw notConfiguredError();
     }
     logger.error("[Razorpay] Subscription cancellation failed:", error.response?.data || error.message);
     throw new Error(
@@ -287,17 +293,27 @@ async function verifyRazorpaySignature({ orderId, paymentId, signature }) {
 
   const config = await getRazorpayConfig();
 
-  if (orderId.startsWith("order_mock_") && signature === "mock_signature_dev_test") {
-    if (process.env.NODE_ENV === "production") {
-      logger.error("[Razorpay Security] Mock signatures strictly forbidden in production!");
+  const isMockId = String(orderId).startsWith("order_mock_");
+  let secret = config.keySecret;
+
+  if (isMockId) {
+    // Mock ids are only valid in explicit dev mock mode
+    if (!config.isMockMode) {
+      logger.error("[Razorpay Security] Mock payment rejected (mock mode disabled).");
       return false;
     }
-    return true;
+    if (signature === "mock_signature_dev_test") return true;
+    secret = DEV_MOCK_KEY_SECRET;
+  }
+
+  if (!secret) {
+    logger.error("[Razorpay Security] Key secret not configured; signature cannot be verified.");
+    return false;
   }
 
   try {
     const expectedSignature = crypto
-      .createHmac("sha256", config.keySecret)
+      .createHmac("sha256", secret)
       .update(`${orderId}|${paymentId}`)
       .digest("hex");
 
@@ -323,17 +339,27 @@ async function verifySubscriptionSignature({ subscriptionId, paymentId, signatur
 
   const config = await getRazorpayConfig();
 
-  if (subscriptionId.startsWith("sub_mock_") && signature === "mock_signature_dev_test") {
-    if (process.env.NODE_ENV === "production") {
-      logger.error("[Razorpay Security] Mock signatures strictly forbidden in production!");
+  const isMockId = String(subscriptionId).startsWith("sub_mock_");
+  let secret = config.keySecret;
+
+  if (isMockId) {
+    // Mock ids are only valid in explicit dev mock mode
+    if (!config.isMockMode) {
+      logger.error("[Razorpay Security] Mock payment rejected (mock mode disabled).");
       return false;
     }
-    return true;
+    if (signature === "mock_signature_dev_test") return true;
+    secret = DEV_MOCK_KEY_SECRET;
+  }
+
+  if (!secret) {
+    logger.error("[Razorpay Security] Key secret not configured; signature cannot be verified.");
+    return false;
   }
 
   try {
     const expectedSignature = crypto
-      .createHmac("sha256", config.keySecret)
+      .createHmac("sha256", secret)
       .update(`${paymentId}|${subscriptionId}`)
       .digest("hex");
 
@@ -384,6 +410,7 @@ async function verifyWebhookSignature({ rawBody, signature }) {
 
 module.exports = {
   getRazorpayConfig,
+  isMockModeAllowed,
   createRazorpayOrder,
   createRazorpayPlan,
   createRazorpaySubscription,

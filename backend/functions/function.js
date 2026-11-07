@@ -1246,6 +1246,29 @@ async function updateUserPlan(plan, uid, customDays = null, extendIfActive = fal
       subscription_status: subStatus,
     },
   });
+
+  // `user.trial` only means "currently trialing" and is reset when a paid plan activates.
+  // Keep a permanent FREE_TRIAL order as the "trial already used" marker, for every way a
+  // trial can be granted (signup, Google signup, admin, onboarding).
+  if (isTrial) {
+    const existingTrialOrder = await db.orders.findFirst({
+      where: { uid, payment_mode: "FREE_TRIAL" },
+      select: { id: true },
+    });
+    if (!existingTrialOrder) {
+      await db.orders.create({
+        data: {
+          uid,
+          payment_mode: "FREE_TRIAL",
+          amount: "0.00",
+          data: JSON.stringify({ plan: sanitizedPlan, isTrial: true, durationDays: planDays }),
+          s_token: `trial_${String(uid).slice(0, 8)}_${Date.now()}`,
+          status: "paid",
+        },
+      });
+    }
+  }
+
   return timeStamp;
 }
 

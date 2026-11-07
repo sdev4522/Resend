@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
 const {
   validateEmail,
   getFileExtension,
@@ -38,6 +38,7 @@ const {
   getInstaCallbackUri,
 } = require("../helper/addon/insta/insta.js");
 const logger = require("../utils/logger.js");
+const validateUser = require("../middlewares/user.js");
 const { authRateLimiter } = require("../middlewares/rateLimiter.js");
 
 router.get("/get_all", async (req, res) => {
@@ -284,18 +285,17 @@ router.post(
       }
 
       // ── Save to DB ──────────────────────────────────
-      await query(
-        `INSERT INTO contact_form (email, name, company, mobile, subject, reason, content) VALUES (?,?,?,?,?,?,?)`,
-        [
-          cleanEmail,
-          cleanName,
-          cleanCompany || null,
-          cleanMobile || null,
-          cleanSubject || `${cleanReason} Inquiry`,
-          cleanReason,
-          cleanContent,
-        ],
-      );
+      await prisma.contact_form.create({
+        data: {
+          email: cleanEmail,
+          name: cleanName,
+          company: cleanCompany || null,
+          mobile: cleanMobile || null,
+          subject: cleanSubject || `${cleanReason} Inquiry`,
+          reason: cleanReason,
+          content: cleanContent,
+        },
+      });
 
       res.json({
         success: true,
@@ -359,27 +359,25 @@ router.post("/update_web_config", adminValidator, async (req, res) => {
     }
 
     // ── DB update (existing) ────────────────────────────────────
-    await query(
-      `UPDATE web_public SET logo = ?, app_name = ?, custom_home = ?,
-       is_custom_home = ?, meta_description = ?, currency_code = ?,
-       currency_symbol = ?, home_page_tutorial = ?,
-       chatbot_screen_tutorial = ?, broadcast_screen_tutorial = ?,
-       login_header_footer = ?, exchange_rate = ?`,
-      [
-        filename,
-        app_name,
-        custom_home,
-        parseInt(is_custom_home) > 0 ? 1 : 0,
-        meta_description,
-        currency_code,
-        currency_symbol,
-        home_page_tutorial,
-        chatbot_screen_tutorial,
-        broadcast_screen_tutorial,
-        login_header_footer,
-        exchange_rate,
-      ],
-    );
+    const toNullableString = (v) => (v === undefined || v === null ? null : String(v));
+    const parsedHeaderFooter = parseInt(login_header_footer, 10);
+
+    await prisma.web_public.updateMany({
+      data: {
+        logo: toNullableString(filename),
+        app_name: toNullableString(app_name),
+        custom_home: toNullableString(custom_home),
+        is_custom_home: parseInt(is_custom_home) > 0 ? 1 : 0,
+        meta_description: toNullableString(meta_description),
+        currency_code: toNullableString(currency_code),
+        currency_symbol: toNullableString(currency_symbol),
+        home_page_tutorial: toNullableString(home_page_tutorial),
+        chatbot_screen_tutorial: toNullableString(chatbot_screen_tutorial),
+        broadcast_screen_tutorial: toNullableString(broadcast_screen_tutorial),
+        login_header_footer: Number.isNaN(parsedHeaderFooter) ? null : parsedHeaderFooter,
+        exchange_rate: toNullableString(exchange_rate),
+      },
+    });
 
     // ── ✅ NEW: Patch index.html ─────────────────────────────────
     try {
@@ -539,7 +537,7 @@ router.get("/get_app_version", async (req, res) => {
 });
 
 // install app
-router.post("/install_app", async (req, res) => {
+router.post("/install_app", adminValidator, async (req, res) => {
   try {
     const filePath = `${__dirname}/../client/public/static`;
 
@@ -561,7 +559,11 @@ router.post("/install_app", async (req, res) => {
 });
 
 // update app
-router.post("/update_app", async (req, res) => {
+router.post(
+  "/update_app",
+  authRateLimiter({ limit: 5, prefix: "update_app" }),
+  adminValidator,
+  async (req, res) => {
   try {
     const { password, queries, newQueries } = req.body;
 
@@ -569,9 +571,15 @@ router.post("/update_app", async (req, res) => {
       return res.json({ msg: "Admin password missing", success: false });
     }
 
-    const getAdmin = await query("SELECT * FROM admin", []);
+    // Re-confirm the password of the logged-in administrator (not just the first admin row)
+    const getAdmin = await prisma.admin.findFirst({
+      where: { uid: req.decode.uid },
+      select: { password: true },
+    });
 
-    const compare = await bcrypt.compare(password, getAdmin[0].password);
+    const compare = getAdmin?.password
+      ? await bcrypt.compare(password, getAdmin.password)
+      : false;
     if (!compare) {
       return res.json({
         msg: "Invalid admin password. Please give a correct admin password",
@@ -636,8 +644,8 @@ router.get("/update_to_be_shown", async (req, res) => {
 // get web public
 router.get("/get_web_public", async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM web_public LIMIT 1`, []);
-    const publicData = data[0] ? { ...data[0] } : {};
+    const row = await prisma.web_public.findFirst();
+    const publicData = row ? { ...row } : {};
     delete publicData.fb_login_app_sec;
     const finalAddon = returnAddons();
     res.json({ data: publicData, addon: finalAddon || [], success: true });
@@ -756,10 +764,13 @@ router.post("/gen_wa_link", async (req, res) => {
       return res.json({ msg: "Please provide a valid email id" });
     }
 
-    await query(
-      `INSERT INTO gen_links (wa_mobile, email, msg) VALUES (?,?,?)`,
-      [mobile, email, msg],
-    );
+    await prisma.gen_links.create({
+      data: {
+        wa_mobile: String(mobile),
+        email: String(email),
+        msg: msg === undefined || msg === null ? null : String(msg),
+      },
+    });
 
     res.json({
       success: true,
@@ -790,10 +801,21 @@ router.get("/test", (req, res) => {
   }, 3000);
 });
 
-router.post("/exchange-token", async (req, res) => {
+router.post("/exchange-token", validateUser, async (req, res) => {
   const { code } = req.body;
 
   try {
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ success: false, msg: "code is required" });
+    }
+
+    const webPrivate = await prisma.web_private.findFirst({
+      select: { embed_app_id: true, embed_app_sec: true },
+    });
+    if (!webPrivate?.embed_app_id || !webPrivate?.embed_app_sec) {
+      return res.status(503).json({ success: false, msg: "Meta app is not configured" });
+    }
+
     const response = await fetch(
       "https://graph.facebook.com/v22.0/oauth/access_token",
       {
@@ -802,8 +824,8 @@ router.post("/exchange-token", async (req, res) => {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          client_id: "866062736391175",
-          client_secret: "0fd0a7a4f6f6a07de4c97b1713273283", // From environment variable
+          client_id: webPrivate.embed_app_id,
+          client_secret: webPrivate.embed_app_sec,
           code: code,
           grant_type: "authorization_code",
         }),
@@ -813,14 +835,15 @@ router.post("/exchange-token", async (req, res) => {
     const data = await response.json();
     res.json(data);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    logger.error("exchange-token error:", error);
+    res.status(500).json({ success: false, msg: "Token exchange failed" });
   }
 });
 
 // get embed config
-router.get("/get_web_pvt", async (req, res) => {
+router.get("/get_web_pvt", adminValidator, async (req, res) => {
   try {
-    const [data] = await query(`SELECT * FROM web_private`, []);
+    const data = (await prisma.web_private.findFirst()) || {};
     const webhook = await genEmbedWebhook();
     const instaWebhook = await genInstaWebhook();
     const instaCallBack = await getInstaCallbackUri();
@@ -840,10 +863,12 @@ router.post("/update_insta_config", adminValidator, async (req, res) => {
       return res.json({ success: false, msg: "Please provide all the fields" });
     }
 
-    await query(
-      `UPDATE web_private SET insta_app_id = ?, insta_app_secret = ?`,
-      [insta_app_id, insta_app_secret],
-    );
+    await prisma.web_private.updateMany({
+      data: {
+        insta_app_id: String(insta_app_id),
+        insta_app_secret: String(insta_app_secret),
+      },
+    });
 
     res.json({ success: true, msg: "Instagram config updated" });
   } catch (err) {

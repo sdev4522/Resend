@@ -22,6 +22,108 @@ const {
 } = require("../helper/razorpay");
 const logger = require("../utils/logger");
 
+const RAZORPAY_MIN_AMOUNT_MINOR = 100; // Razorpay rejects orders below 1.00 in the major unit
+
+function parseJsonSafe(value, fallback = {}) {
+  if (!value) return fallback;
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+async function loadLivePlan(tx, planSnapshot) {
+  const planId = parseInt(planSnapshot?.id, 10);
+  if (!Number.isInteger(planId)) return planSnapshot || null;
+  const row = await tx.plan.findFirst({ where: { id: planId } });
+  if (!row) return planSnapshot || null;
+  return { ...row, price: row.price != null ? Number(row.price) : 0 };
+}
+
+/**
+ * Atomically claims an unpaid order and activates its plan, inside the given transaction.
+ * The conditional UPDATE (status != 'paid') takes a row lock, so verify_payment and the
+ * webhook (or two parallel verify calls) can never both credit the same order.
+ *
+ * @returns {Promise<{claimed: boolean, newExpiry?: number, plan?: object, previousSubscriptionId?: string|null}>}
+ */
+async function activatePaidOrder(tx, order, { paymentId, signature = null, subscriptionId = null, source }) {
+  const orderData = parseJsonSafe(order.data);
+  orderData.razorpayPaymentId = paymentId || orderData.razorpayPaymentId || null;
+  if (signature) orderData.razorpaySignature = signature;
+  orderData.paidAt = new Date().toISOString();
+  orderData.paidVia = source;
+
+  const claim = await tx.orders.updateMany({
+    where: {
+      id: order.id,
+      OR: [{ status: null }, { status: { notIn: ["paid", "refunded"] } }],
+    },
+    data: { status: "paid", data: JSON.stringify(orderData) },
+  });
+  if (claim.count !== 1) {
+    return { claimed: false };
+  }
+
+  const planToActivate = await loadLivePlan(tx, orderData.plan);
+  if (!planToActivate) {
+    throw new Error("Could not resolve plan to activate");
+  }
+
+  const totalDays =
+    orderData.totalDays || parseInt(planToActivate.plan_duration_in_days || 30, 10);
+
+  const before = await tx.user.findFirst({
+    where: { uid: order.uid },
+    select: { subscription_id: true },
+  });
+
+  const newExpiry = await updateUserPlan(planToActivate, order.uid, totalDays, true, tx);
+
+  await tx.user.updateMany({
+    where: { uid: order.uid },
+    data: {
+      subscription_id: subscriptionId || undefined,
+      subscription_status: "active",
+      trial: 0,
+    },
+  });
+
+  if (orderData.couponCode) {
+    await tx.coupon.updateMany({
+      where: { code: String(orderData.couponCode).toUpperCase() },
+      data: { used_count: { increment: 1 } },
+    });
+  }
+
+  const previousSubscriptionId =
+    subscriptionId && before?.subscription_id && before.subscription_id !== subscriptionId
+      ? before.subscription_id
+      : null;
+
+  return { claimed: true, newExpiry, plan: planToActivate, previousSubscriptionId };
+}
+
+/** A new autopay replaced an older one: stop the old subscription so it is not charged too. */
+async function cancelReplacedSubscription(previousSubscriptionId) {
+  if (!previousSubscriptionId) return;
+  try {
+    await cancelRazorpaySubscription(previousSubscriptionId);
+    logger.log(`[Billing] Cancelled replaced subscription ${previousSubscriptionId}`);
+  } catch (err) {
+    logger.error(
+      `[Billing] Failed to cancel replaced subscription ${previousSubscriptionId} — cancel it manually:`,
+      err.message,
+    );
+  }
+}
+
+function isUniqueViolation(err) {
+  return err?.code === "P2002";
+}
+
 const COUNTRY_TO_CURRENCY = {
   IN: "INR",
   US: "USD",
@@ -221,39 +323,45 @@ router.post("/activate_trial", validateUser, async (req, res) => {
       return res.status(404).json({ success: false, msg: "User not found" });
     }
 
-    // Check if user has active paid subscription
-    if (
-      user.subscription_status === "active" &&
-      user.plan_expire &&
-      Number(user.plan_expire) > Date.now() &&
-      !user.trial
-    ) {
+    const now = Date.now();
+    const planExpire = Number(user.plan_expire || 0);
+    const planActive = planExpire > now;
+    const currentPlan = parseJsonSafe(user.plan, null);
+
+    // Already trialing (signup assigns the trial): treat as success so onboarding can finish.
+    if (planActive && Number(user.trial) === 1) {
+      return res.json({
+        success: true,
+        alreadyActive: true,
+        msg: "Your free trial is already active.",
+        plan: currentPlan,
+        subscription_status: "trialing",
+        newExpiry: planExpire,
+      });
+    }
+
+    // Any unexpired paid plan (active OR cancelled autopay) must not be overwritten by a trial
+    if (planActive && !Number(user.trial)) {
       return res.status(400).json({
         success: false,
         msg: "You already have an active paid subscription.",
       });
     }
 
-    // Check if user has already used their trial
+    // Trial is one-time: FREE_TRIAL order is the permanent marker (see updateUserPlan)
     const trialOrder = await prisma.orders.findFirst({
       where: { uid, payment_mode: "FREE_TRIAL" },
       select: { id: true },
     });
-    if (user.trial === 1 || trialOrder) {
+    if (trialOrder) {
       return res.status(400).json({
         success: false,
         msg: "You have already used your free trial.",
       });
     }
 
-    // Find Trial plan (is_trial = 1 or title like Trial)
     const rawTrialPlan = await prisma.plan.findFirst({
-      where: {
-        OR: [
-          { is_trial: 1 },
-          { title: { contains: "trial" } },
-        ],
-      },
+      where: { is_trial: 1 },
       orderBy: { id: "asc" },
     });
 
@@ -270,44 +378,34 @@ router.post("/activate_trial", validateUser, async (req, res) => {
     };
 
     const trialDays = parseInt(trialPlan.plan_duration_in_days || 14, 10);
-    const sToken = `trial_${uid.slice(0, 8)}_${Date.now()}`;
 
-    // Execute plan update and order audit record inside an atomic Prisma transaction
-    const { newExpiry } = await prisma.$transaction(async (tx) => {
-      const expiry = await updateUserPlan(trialPlan, uid, trialDays, false, tx);
-
-      await tx.user.updateMany({
-        where: { uid },
-        data: {
-          trial: 1,
-          subscription_status: "trialing",
-        },
+    // updateUserPlan also writes the FREE_TRIAL order inside the same transaction
+    const newExpiry = await prisma.$transaction(async (tx) => {
+      const recheck = await tx.orders.findFirst({
+        where: { uid, payment_mode: "FREE_TRIAL" },
+        select: { id: true },
       });
-
-      await tx.orders.create({
-        data: {
-          uid,
-          payment_mode: "FREE_TRIAL",
-          amount: "0.00",
-          data: JSON.stringify({ plan: trialPlan, isTrial: true, durationDays: trialDays }),
-          s_token: sToken,
-          status: "paid",
-        },
-      });
-
-      return { newExpiry: expiry };
+      if (recheck) {
+        const err = new Error("You have already used your free trial.");
+        err.status = 400;
+        throw err;
+      }
+      return updateUserPlan(trialPlan, uid, trialDays, false, tx);
     });
 
     res.json({
       success: true,
-      msg: "14-day free trial activated successfully!",
+      msg: `${trialDays}-day free trial activated successfully!`,
       plan: trialPlan,
       subscription_status: "trialing",
       newExpiry,
     });
   } catch (err) {
+    if (err.status === 400) {
+      return res.status(400).json({ success: false, msg: err.message });
+    }
     logger.error("[Billing] Activate trial error:", err);
-    res.status(500).json({ success: false, msg: err.message || "Failed to activate trial" });
+    res.status(500).json({ success: false, msg: "Failed to activate trial" });
   }
 });
 
@@ -394,6 +492,15 @@ router.post("/create_order", validateUser, async (req, res) => {
       return res.status(400).json({ success: false, msg: "planId is required" });
     }
 
+    // A coupon on autopay would be baked into the recurring Razorpay plan and discount
+    // every renewal, so coupons are limited to one-time payments.
+    if (autopay && couponCode && String(couponCode).trim() !== "") {
+      return res.status(400).json({
+        success: false,
+        msg: "Coupons can only be applied to one-time payments, not autopay.",
+      });
+    }
+
     // Authoritative calculation
     const priceSummary = await calculateCheckoutPrice({
       planId,
@@ -401,6 +508,13 @@ router.post("/create_order", validateUser, async (req, res) => {
       couponCode: couponCode || null,
       targetCurrency: currency || null,
     });
+
+    if (priceSummary.amountMinor < RAZORPAY_MIN_AMOUNT_MINOR) {
+      return res.status(400).json({
+        success: false,
+        msg: "The payable amount is too low for online payment. Please use a different coupon or contact support.",
+      });
+    }
 
     const config = await getRazorpayConfig();
     const receiptId = `rcpt_${uid.slice(0, 8)}_${Date.now()}`;
@@ -522,6 +636,9 @@ router.post("/create_order", validateUser, async (req, res) => {
     });
   } catch (err) {
     logger.error("[Billing] Order creation error:", err);
+    if (err.code === "PAYMENT_GATEWAY_NOT_CONFIGURED") {
+      return res.status(503).json({ success: false, code: err.code, msg: err.message });
+    }
     res.status(500).json({ success: false, msg: err.message || "Failed to create order" });
   }
 });
@@ -564,6 +681,9 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     // 2. Idempotency check
+    if (order.status === "refunded") {
+      return res.status(400).json({ success: false, msg: "This order was refunded." });
+    }
     if (order.status === "paid") {
       return res.json({
         success: true,
@@ -589,8 +709,8 @@ router.post("/verify_payment", validateUser, async (req, res) => {
     }
 
     if (!isValidSignature) {
-      await prisma.orders.update({
-        where: { id: order.id },
+      await prisma.orders.updateMany({
+        where: { id: order.id, OR: [{ status: null }, { status: { notIn: ["paid", "refunded"] } }] },
         data: { status: "failed" },
       });
       return res.status(400).json({
@@ -599,81 +719,37 @@ router.post("/verify_payment", validateUser, async (req, res) => {
       });
     }
 
-    // 4. Parse order data and load latest plan
-    let orderData = {};
-    try {
-      orderData = JSON.parse(order.data);
-    } catch (e) {
-      logger.error("[Billing] Error parsing order data JSON:", e);
-    }
-
-    const planId = orderData.plan?.id;
-    const rawLatestPlan = planId
-      ? await prisma.plan.findFirst({ where: { id: parseInt(planId, 10) } })
-      : null;
-    const latestPlan = rawLatestPlan
-      ? { ...rawLatestPlan, price: rawLatestPlan.price != null ? Number(rawLatestPlan.price) : 0 }
-      : null;
-    const planToActivate = latestPlan || orderData.plan;
-
-    if (!planToActivate) {
-      return res.status(500).json({
-        success: false,
-        msg: "Could not resolve plan to activate",
-      });
-    }
-
-    // 5. Activate plan & update state within atomic Prisma transaction
-    const totalDays = orderData.totalDays || parseInt(planToActivate.plan_duration_in_days || 30, 10);
+    // 4. Atomically claim the order and activate its plan (idempotent vs webhook / retries)
     const subIdToAttach = req.body.razorpay_subscription_id || req.body.subscriptionId || null;
+    const result = await prisma.$transaction((tx) =>
+      activatePaidOrder(tx, order, {
+        paymentId,
+        signature,
+        subscriptionId: subIdToAttach,
+        source: "verify_payment",
+      }),
+    );
 
-    const { newExpiry } = await prisma.$transaction(async (tx) => {
-      const expiry = await updateUserPlan(planToActivate, uid, totalDays, true, tx);
-
-      // If Autopay subscription, attach subscription to user (preserve existing if not provided)
-      await tx.user.updateMany({
-        where: { uid },
-        data: {
-          subscription_id: subIdToAttach || undefined,
-          subscription_status: "active",
-          trial: 0,
-        },
+    if (!result.claimed) {
+      return res.json({
+        success: true,
+        alreadyProcessed: true,
+        msg: "Payment already verified and plan activated.",
       });
+    }
 
-      // 6. Coupon usage increment
-      if (orderData.couponCode) {
-        await tx.coupon.updateMany({
-          where: { code: orderData.couponCode.toUpperCase() },
-          data: { used_count: { increment: 1 } },
-        });
-      }
-
-      // 7. Update internal order to 'paid'
-      orderData.razorpayPaymentId = paymentId;
-      orderData.razorpaySignature = signature;
-      orderData.paidAt = new Date().toISOString();
-
-      await tx.orders.update({
-        where: { id: order.id },
-        data: {
-          status: "paid",
-          data: JSON.stringify(orderData),
-        },
-      });
-
-      return { newExpiry: expiry };
-    });
+    await cancelReplacedSubscription(result.previousSubscriptionId);
 
     res.json({
       success: true,
       msg: "Payment verified successfully! Your plan is now active.",
-      plan: planToActivate,
-      newExpiry,
-      isAutopay: Boolean(req.body.razorpay_subscription_id || req.body.subscriptionId),
+      plan: result.plan,
+      newExpiry: result.newExpiry,
+      isAutopay: Boolean(subIdToAttach),
     });
   } catch (err) {
     logger.error("[Billing] Payment verification error:", err);
-    res.status(500).json({ success: false, msg: err.message || "Payment verification failed" });
+    res.status(500).json({ success: false, msg: "Payment verification failed" });
   }
 });
 
@@ -841,7 +917,8 @@ router.get("/subscription", validateUser, async (req, res) => {
 router.post("/webhook", async (req, res) => {
   try {
     const signature = req.headers["x-razorpay-signature"];
-    const rawBody = req.rawBody || JSON.stringify(req.body);
+    // Signature MUST be computed over the exact raw bytes; never over re-serialised JSON
+    const rawBody = req.rawBody;
 
     const isValid = await verifyWebhookSignature({ rawBody, signature });
     if (!isValid) {
@@ -854,146 +931,161 @@ router.post("/webhook", async (req, res) => {
 
     logger.log(`[Billing Webhook] Received valid event: ${event}`);
 
-    // Idempotency: verify this event has not been processed previously
+    const paymentEntity = payload?.payment?.entity;
     const eventId =
       req.headers["x-razorpay-event-id"] ||
       req.body?.event_id ||
-      (payload?.payment?.entity?.id ? `${event}_${payload.payment.entity.id}` : null);
+      (paymentEntity?.id ? `${event}_${paymentEntity.id}` : null);
 
-    if (eventId) {
-      const alreadyProcessed = await prisma.processed_webhook_events.findUnique({
-        where: { event_id: eventId },
+    let replacedSubscriptionId = null;
+
+    try {
+      await prisma.$transaction(async (tx) => {
+        // Idempotency marker is written in the SAME transaction as the side effects:
+        // a duplicate delivery hits the primary key, a failed run rolls the marker back.
+        if (eventId) {
+          await tx.processed_webhook_events.create({
+            data: { event_id: String(eventId), provider: "razorpay" },
+          });
+        }
+
+        // One-time order paid
+        if (event === "payment.captured" || event === "order.paid") {
+          const entity = paymentEntity || payload?.order?.entity;
+          const orderId = entity?.order_id || payload?.order?.entity?.id;
+          if (!orderId) return;
+
+          const order = await tx.orders.findFirst({ where: { s_token: String(orderId) } });
+          if (!order) return;
+
+          const result = await activatePaidOrder(tx, order, {
+            paymentId: paymentEntity?.id || null,
+            source: "webhook",
+          });
+          if (result.claimed) {
+            logger.log(`[Billing Webhook] Order ${order.id} marked as paid via webhook reconciliation`);
+          }
+          return;
+        }
+
+        // Autopay charge: first invoice activates the initial order, later ones renew
+        if (event === "subscription.charged") {
+          const subId = paymentEntity?.subscription_id || payload?.subscription?.entity?.id;
+          const chargePaymentId = paymentEntity?.id || null;
+          if (!subId) return;
+
+          const initialOrder = await tx.orders.findFirst({
+            where: { s_token: String(subId), payment_mode: "RAZORPAY_AUTOPAY" },
+            orderBy: { id: "asc" },
+          });
+          if (!initialOrder) {
+            logger.warn(`[Billing Webhook] No order found for subscription ${subId}`);
+            return;
+          }
+
+          if (initialOrder.status !== "paid") {
+            const result = await activatePaidOrder(tx, initialOrder, {
+              paymentId: chargePaymentId,
+              subscriptionId: String(subId),
+              source: "webhook",
+            });
+            if (result.claimed) {
+              replacedSubscriptionId = result.previousSubscriptionId;
+              return;
+            }
+          }
+
+          // Already credited this exact payment (e.g. by verify_payment)?
+          if (chargePaymentId) {
+            const credited = await tx.orders.findFirst({
+              where: {
+                s_token: String(subId),
+                status: "paid",
+                data: { contains: String(chargePaymentId) },
+              },
+              select: { id: true },
+            });
+            if (credited) return;
+          }
+
+          // Renewal: extend the plan that was SUBSCRIBED to, for the subscribing user
+          const initialData = parseJsonSafe(initialOrder.data);
+          const plan = await loadLivePlan(tx, initialData.plan);
+          if (!plan) {
+            logger.error(`[Billing Webhook] Could not resolve plan for subscription ${subId}`);
+            return;
+          }
+          const planDays = parseInt(plan.plan_duration_in_days || 30, 10);
+
+          await updateUserPlan(plan, initialOrder.uid, planDays, true, tx);
+          await tx.user.updateMany({
+            where: { uid: initialOrder.uid },
+            data: { subscription_status: "active", trial: 0 },
+          });
+          await tx.orders.create({
+            data: {
+              uid: initialOrder.uid,
+              payment_mode: "RAZORPAY_AUTOPAY",
+              amount: ((paymentEntity?.amount || 0) / 100).toFixed(2),
+              data: JSON.stringify({
+                plan,
+                subscriptionId: subId,
+                paymentId: chargePaymentId,
+                razorpayPaymentId: chargePaymentId,
+                autoRenewed: true,
+                isAutopay: true,
+              }),
+              s_token: String(subId),
+              status: "paid",
+            },
+          });
+          logger.log(`[Billing Webhook] Autopay renewed for user ${initialOrder.uid} on subscription ${subId}`);
+          return;
+        }
+
+        if (
+          event === "subscription.cancelled" ||
+          event === "subscription.halted" ||
+          event === "subscription.completed"
+        ) {
+          const subId = payload?.subscription?.entity?.id;
+          if (subId) {
+            await tx.user.updateMany({
+              where: { subscription_id: String(subId) },
+              data: {
+                subscription_status: event === "subscription.halted" ? "halted" : "cancelled",
+              },
+            });
+          }
+          return;
+        }
+
+        // Refund: record it on the order and flag for manual review. Access is not revoked
+        // automatically (partial refunds / goodwill refunds are common).
+        if (event === "refund.processed" || event === "payment.refunded") {
+          const orderId = paymentEntity?.order_id;
+          if (!orderId) return;
+          const order = await tx.orders.findFirst({ where: { s_token: String(orderId) } });
+          if (!order) return;
+          const orderData = parseJsonSafe(order.data);
+          orderData.refundedAt = new Date().toISOString();
+          orderData.refundEvent = event;
+          await tx.orders.update({
+            where: { id: order.id },
+            data: { status: "refunded", data: JSON.stringify(orderData) },
+          });
+          logger.warn(`[Billing Webhook] Order ${order.id} refunded — review plan access for ${order.uid}`);
+        }
       });
-      if (alreadyProcessed) {
+    } catch (err) {
+      if (isUniqueViolation(err)) {
         logger.log(`[Billing Webhook] Duplicate event ${eventId} safely ignored (idempotent)`);
         return res.json({ status: "ok", success: true, duplicate: true });
       }
+      throw err;
     }
 
-    // Handle standard order payment captured
-    if (event === "payment.captured" || event === "order.paid") {
-      const entity = payload?.payment?.entity || payload?.order?.entity;
-      const orderId = entity?.order_id || entity?.id;
-
-      if (orderId) {
-        const order = await prisma.orders.findFirst({
-          where: { s_token: orderId },
-        });
-        if (order && order.status !== "paid") {
-          let orderData = {};
-          try {
-            orderData = JSON.parse(order.data);
-          } catch (e) {}
-
-          const rawPlan = orderData.plan?.id
-            ? await prisma.plan.findFirst({ where: { id: parseInt(orderData.plan.id, 10) } })
-            : null;
-          const plan = rawPlan
-            ? { ...rawPlan, price: rawPlan.price != null ? Number(rawPlan.price) : 0 }
-            : orderData.plan;
-
-          if (plan) {
-            const totalDays = orderData.totalDays || parseInt(plan.plan_duration_in_days || 30, 10);
-
-            await prisma.$transaction(async (tx) => {
-              await updateUserPlan(plan, order.uid, totalDays, true, tx);
-
-              orderData.paidAt = new Date().toISOString();
-              orderData.webhookReconciled = true;
-
-              await tx.orders.update({
-                where: { id: order.id },
-                data: {
-                  status: "paid",
-                  data: JSON.stringify(orderData),
-                },
-              });
-
-              await tx.user.updateMany({
-                where: { uid: order.uid },
-                data: {
-                  subscription_status: "active",
-                  trial: 0,
-                },
-              });
-            });
-
-            logger.log(`[Billing Webhook] Order ${order.id} marked as paid via webhook reconciliation`);
-          }
-        }
-      }
-    }
-
-    // Handle Autopay Subscription Charged (Automatic Renewal)
-    if (event === "subscription.charged") {
-      const entity = payload?.payment?.entity;
-      const subEntity = payload?.subscription?.entity;
-      const subId = entity?.subscription_id || subEntity?.id;
-
-      if (subId) {
-        const user = await prisma.user.findFirst({
-          where: { subscription_id: subId },
-          select: { uid: true, plan: true },
-        });
-        if (user) {
-          let userPlan = null;
-          try {
-            userPlan = JSON.parse(user.plan);
-          } catch (e) {}
-          if (userPlan) {
-            const planDays = parseInt(userPlan.plan_duration_in_days || 30, 10);
-
-            await prisma.$transaction(async (tx) => {
-              await updateUserPlan(userPlan, user.uid, planDays, true, tx);
-
-              // Insert new renewal order record
-              await tx.orders.create({
-                data: {
-                  uid: user.uid,
-                  payment_mode: "RAZORPAY_AUTOPAY",
-                  amount: ((entity?.amount || 0) / 100).toFixed(2),
-                  data: JSON.stringify({
-                    plan: userPlan,
-                    subscriptionId: subId,
-                    paymentId: entity?.id,
-                    autoRenewed: true,
-                    isAutopay: true,
-                  }),
-                  s_token: subId,
-                  status: "paid",
-                },
-              });
-            });
-
-            logger.log(`[Billing Webhook] Autopay renewed for user ${user.uid} on subscription ${subId}`);
-          }
-        }
-      }
-    }
-
-    // Handle Subscription Cancelled
-    if (event === "subscription.cancelled") {
-      const subId = payload?.subscription?.entity?.id;
-      if (subId) {
-        await prisma.user.updateMany({
-          where: { subscription_id: subId },
-          data: { subscription_status: "cancelled" },
-        });
-      }
-    }
-
-    if (eventId) {
-      await prisma.processed_webhook_events.upsert({
-        where: { event_id: eventId },
-        create: {
-          event_id: eventId,
-          provider: "razorpay",
-        },
-        update: {},
-      }).catch((err) => {
-        logger.warn("[Billing Webhook] Duplicate event insert suppressed:", err.message);
-      });
-    }
+    await cancelReplacedSubscription(replacedSubscriptionId);
 
     res.json({ status: "ok", success: true });
   } catch (err) {

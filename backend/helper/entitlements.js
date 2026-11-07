@@ -1,5 +1,4 @@
-const { query } = require("../database/dbpromise");
-const { getNumberOfDaysFromTimestamp } = require("../functions/function");
+const { prisma } = require("../database/prisma");
 const logger = require("../utils/logger");
 
 /**
@@ -33,9 +32,11 @@ async function resolveUserPlan(userRecord) {
     };
   }
 
-  // Check expiry
-  const daysLeft = getNumberOfDaysFromTimestamp(userRecord.plan_expire);
-  if (daysLeft < 1) {
+  // Check expiry against the exact timestamp (a plan with < 24h left is still valid)
+  const expireAt = Number(userRecord.plan_expire);
+  const msLeft = Number.isFinite(expireAt) ? expireAt - Date.now() : 0;
+  const daysLeft = msLeft > 0 ? Math.ceil(msLeft / (24 * 60 * 60 * 1000)) : 0;
+  if (msLeft <= 0) {
     return {
       isValid: false,
       isExpired: true,
@@ -47,11 +48,12 @@ async function resolveUserPlan(userRecord) {
 
   // Live lookup from database for real-time propagation of admin updates
   let livePlan = snapshot;
-  if (snapshot?.id) {
+  const snapshotId = parseInt(snapshot?.id, 10);
+  if (Number.isInteger(snapshotId)) {
     try {
-      const rows = await query("SELECT * FROM plan WHERE id = ?", [snapshot.id]);
-      if (rows && rows.length > 0) {
-        livePlan = rows[0];
+      const row = await prisma.plan.findFirst({ where: { id: snapshotId } });
+      if (row) {
+        livePlan = { ...row, price: row.price != null ? Number(row.price) : 0 };
       }
     } catch (err) {
       logger.log("Error fetching live plan from DB:", err);
@@ -139,27 +141,26 @@ function getLimit(plan, limitKey) {
 
 /**
  * Query current usage count for a user
+ * @param {object} [options]
+ * @param {string} [options.excludeUniqueId] - qr_accounts only: do not count this instance
+ *   (used when re-connecting / re-scanning an instance the user already owns)
  */
-async function getUsage(uid, limitKey) {
+async function getUsage(uid, limitKey, options = {}) {
   if (!uid) return 0;
 
   switch (limitKey) {
     case "contacts":
     case "contact_limit": {
-      const rows = await query(
-        "SELECT COUNT(*) as count FROM contact WHERE uid = ?",
-        [uid]
-      );
-      return rows[0]?.count || 0;
+      return prisma.contact.count({ where: { uid } });
     }
 
     case "qr_accounts":
     case "qr_account": {
-      const rows = await query(
-        "SELECT COUNT(*) as count FROM instance WHERE uid = ? AND status = 'ACTIVE'",
-        [uid]
-      );
-      return rows[0]?.count || 0;
+      const where = { uid, status: "ACTIVE" };
+      if (options.excludeUniqueId) {
+        where.NOT = { uniqueId: options.excludeUniqueId };
+      }
+      return prisma.instance.count({ where });
     }
 
     default:
