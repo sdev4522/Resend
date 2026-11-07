@@ -1,4 +1,3 @@
-const { query } = require("../../database/dbpromise");
 
 async function processWebhook(params) {}
 

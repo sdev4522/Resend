@@ -2,7 +2,6 @@ const fs = require("fs");
 const path = require("path");
 const pino = require("pino");
 const { toDataURL } = require("qrcode");
-const { query } = require("../../../database/dbpromise");
 
 const downloadMediaMessage = () => {};
 const getUrlInfo = () => {};

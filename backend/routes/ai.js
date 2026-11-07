@@ -1,5 +1,4 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
 const randomstring = require("randomstring");
 const validateUser = require("../middlewares/user.js");
 const {
