@@ -249,3 +249,20 @@ function nowSqlString(date = new Date()) {
 }
 
 module.exports.nowSqlString = nowSqlString;
+
+/** `DELETE FROM t WHERE ... LIMIT 1`: delete only the first matching row. */
+async function deleteFirst(delegate, where) {
+  const row = await delegate.findFirst({ where, select: { id: true } });
+  if (!row) return { count: 0 };
+  return delegate.deleteMany({ where: { id: row.id } });
+}
+
+/** `UPDATE t SET ... WHERE ... LIMIT 1`: update only the first matching row. */
+async function updateFirst(delegate, where, data) {
+  const row = await delegate.findFirst({ where, select: { id: true } });
+  if (!row) return { count: 0 };
+  return delegate.updateMany({ where: { id: row.id }, data });
+}
+
+module.exports.deleteFirst = deleteFirst;
+module.exports.updateFirst = updateFirst;

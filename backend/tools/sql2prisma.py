@@ -153,9 +153,9 @@ def parse_sql(sql):
                 if not om: return None
                 orders.append((om.group(1), (om.group(2) or 'ASC').lower()))
         return {'kind': 'select', 'table': table, 'conds': conds, 'select': sel, 'order': orders, 'limit': limit}
-    m = re.fullmatch(r'UPDATE ' + IDENT + r' SET (.+?) WHERE (.+)', s, re.I)
+    m = re.fullmatch(r'UPDATE ' + IDENT + r' SET (.+?) WHERE (.+?)( LIMIT 1)?', s, re.I)
     if m:
-        table, sets, where = m.groups()
+        table, sets, where, limit1 = m.groups()
         assigns = []
         for a in split_top(sets):
             am = re.fullmatch(IDENT + r'\s*=\s*(.+)', a.strip())
@@ -165,12 +165,12 @@ def parse_sql(sql):
             assigns.append((am.group(1), lit))
         conds = parse_conds(where)
         if conds is None: return None
-        return {'kind': 'update', 'table': table, 'assigns': assigns, 'conds': conds}
-    m = re.fullmatch(r'DELETE FROM ' + IDENT + r' WHERE (.+)', s, re.I)
+        return {'kind': 'update', 'table': table, 'assigns': assigns, 'conds': conds, 'first': bool(limit1)}
+    m = re.fullmatch(r'DELETE FROM ' + IDENT + r' WHERE (.+?)( LIMIT 1)?', s, re.I)
     if m:
         conds = parse_conds(m.group(2))
         if conds is None: return None
-        return {'kind': 'delete', 'table': m.group(1), 'conds': conds}
+        return {'kind': 'delete', 'table': m.group(1), 'conds': conds, 'first': bool(m.group(3))}
     m = re.fullmatch(r'INSERT INTO ' + IDENT + r' ?\((.+?)\) VALUES ?\((.+)\)', s, re.I)
     if m:
         table, cols, vals = m.groups()
@@ -296,9 +296,15 @@ class Gen:
                         if v is None: raise ValueError(f'literal type mismatch {col}')
                         data.append(f'{col}: {v}')
                 where, pi = self.build_where(model, p['conds'], params, pi)
+                if p.get('first'):
+                    self.h('updateFirst')
+                    return ('updateFirst', p['table'], f'{where}|{{ ' + ', '.join(data) + ' }', None), None
                 return ('update', p['table'], f'where: {where}, data: {{ ' + ', '.join(data) + ' }', None), None
             if p['kind'] == 'delete':
                 where, _ = self.build_where(model, p['conds'], params, 0)
+                if p.get('first'):
+                    self.h('deleteFirst')
+                    return ('deleteFirst', p['table'], where, None), None
                 return ('delete', p['table'], f'where: {where}', None), None
             if p['kind'] == 'insert':
                 data, pi = [], 0
@@ -335,6 +341,15 @@ def fmt_obj(args, indent):
     return '{\n' + '\n'.join(lines) + '\n' + indent + '}'
 
 def render(kind, table, args, alias, awaited, used):
+    if kind in ('deleteFirst', 'updateFirst'):
+        if kind == 'deleteFirst':
+            core = f'deleteFirst(prisma.{table}, {args})'
+        else:
+            where, data = args.split('|', 1)
+            core = f'updateFirst(prisma.{table}, {where}, {data})'
+        if not used:
+            return f'await {core}' if awaited else core
+        return f'okPacket(await {core})' if awaited else f'{core}.then(okPacket)'
     call_args = fmt_obj(args, INDENT[0]) if args else ''
     if kind == 'select':
         core = f'prisma.{table}.findMany({call_args})'
@@ -365,6 +380,9 @@ def process(src, gen):
         before = src[max(0, start - 20):start]
         if re.search(r'(function\s+|\.)\s*$', before) and not m.group(1):
             pos = m.end(); continue
+        ls = src.rfind('\n', 0, start) + 1
+        if '//' in src[ls:start] or src.rfind('/*', 0, start) > src.rfind('*/', 0, start):
+            pos = m.end(); continue  # inside a comment
         paren = m.end() - 1
         try:
             end = skip_balanced(src, paren, '(', ')')
@@ -397,7 +415,7 @@ def process(src, gen):
         awaited = bool(m.group(1))
         INDENT[0] = re.match(r'\s*', src[line_start:]).group(0)
         replacement = render(kind, table, cargs, alias, awaited, used)
-        if kind in ('update', 'delete') and used: gen.h('okPacket')
+        if kind in ('update', 'delete', 'deleteFirst', 'updateFirst') and used: gen.h('okPacket')
         if kind == 'insert' and used: gen.h('insertResult')
         if kind == 'select': gen.h('plain')
         out.append((start, end, replacement))

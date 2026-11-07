@@ -1,5 +1,6 @@
 const flowProcessor = require("./functions");
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { plain, whereStr, deleteFirst } = require("../database/prismaHelpers");
 const logger = require("../utils/logger");
 
 async function processFlow({
@@ -33,12 +34,7 @@ async function processFlow({
     });
 
     // Clean up the session to prevent future issues
-    await query(
-      `DELETE FROM flow_session 
-       WHERE uid = ? AND flow_id = ? AND sender_mobile = ?
-       LIMIT 1`,
-      [uid, flowId, message.senderMobile],
-    );
+    await deleteFirst(prisma.flow_session, { uid: whereStr(uid), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
 
     return logger.log("Flow terminated due to timeout");
   }
@@ -58,12 +54,7 @@ async function processFlow({
     });
 
     // Clean up the session
-    await query(
-      `DELETE FROM flow_session 
-       WHERE uid = ? AND flow_id = ? AND sender_mobile = ?
-       LIMIT 1`,
-      [uid, flowId, message.senderMobile],
-    );
+    await deleteFirst(prisma.flow_session, { uid: whereStr(uid), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
 
     return logger.log("Flow terminated due to infinite loop");
   }
@@ -119,31 +110,19 @@ async function processFlow({
 
     try {
       if (origin === "qr") {
-        await query(
-          `DELETE FROM flow_session WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? LIMIT 1`,
-          [uid, origin, sessionId, flowId, message.senderMobile],
-        );
+        await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
       } else if (origin?.toLowerCase() === "webhook_automation") {
-        await query(
-          `DELETE FROM flow_session WHERE uid = ? AND origin = ? AND flow_id = ? AND sender_mobile = ? LIMIT 1`,
-          [uid, origin, flowId, message.senderMobile],
-        );
+        await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
       } else if (
         origin?.toLowerCase() === "messenger" ||
         origin?.toLowerCase() === "instagram" ||
         origin?.toLowerCase() === "instagram_comment" ||
         origin?.toLowerCase() === "telegram"
       ) {
-        await query(
-          `DELETE FROM flow_session WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? LIMIT 1`,
-          [uid, origin, sessionId, flowId, message.senderMobile],
-        );
+        await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
       } else {
         // meta default
-        await query(
-          `DELETE FROM flow_session WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? LIMIT 1`,
-          [uid, "meta", "META", flowId, message.senderMobile],
-        );
+        await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr("meta"), origin_id: whereStr("META"), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
       }
     } catch (deleteErr) {
       logger.error("[Flow] Failed to delete corrupt session:", deleteErr);
@@ -177,12 +156,7 @@ async function processFlow({
       );
 
       // Clean up the session
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND flow_id = ? AND sender_mobile = ?
-         LIMIT 1`,
-        [uid, flowId, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), flow_id: whereStr(flowId), sender_mobile: whereStr(message.senderMobile) });
 
       return logger.log(
         "Flow terminated - node visited too many times",
@@ -633,9 +607,7 @@ async function processWebhookAutomation({ webhook, data }) {
           );
         }
 
-        const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [
-          uid,
-        ]);
+        const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
         if (user) {
           await processFlow({

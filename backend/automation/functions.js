@@ -1,4 +1,5 @@
-const { query } = require("../database/dbpromise");
+const { prisma } = require("../database/prisma");
+const { deleteFirst, idParam, insertResult, plain, str, strList, updateFirst, whereStr } = require("../database/prismaHelpers");
 const {
   getCurrentTimestampInTimeZone,
   saveMessageToConversation,
@@ -238,10 +239,14 @@ async function processGoogleService({
       variables: allVars,
     };
 
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -271,7 +276,7 @@ function isAllowedUrl(urlString) {
 // Add this new function for sending media messages (to avoid rate limits)
 async function sendMetaMsgWithMediaUpload({ uid, to, msgObj }) {
   try {
-    const [api] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [uid]);
+    const [api] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
     if (!api || !api?.access_token || !api?.business_phone_number_id) {
       return { success: false, msg: "Please add your meta API keys" };
     }
@@ -456,10 +461,7 @@ const replaceJsonWithVarsNew = (data, variables) => {
 async function pushNewKeyInData({ key, pushObj, flowSession }) {
   try {
     // Fetch only needed column
-    const [oldData] = await query(
-      `SELECT data FROM flow_session WHERE id = ? LIMIT 1`,
-      [flowSession?.id],
-    );
+    const [oldData] = plain(await prisma.flow_session.findMany({ where: { id: idParam(flowSession?.id) }, select: { data: true }, take: 1 }));
 
     if (!oldData) {
       logger.log("No data found for the provided flowSession ID.");
@@ -477,13 +479,7 @@ async function pushNewKeyInData({ key, pushObj, flowSession }) {
       ...pushObj,
     };
 
-    await query(
-      `UPDATE flow_session 
-       SET data = ? 
-       WHERE id = ?
-       LIMIT 1`,
-      [JSON.stringify(oldDataObj), flowSession?.id],
-    );
+    await updateFirst(prisma.flow_session, { id: idParam(flowSession?.id) }, { data: str(JSON.stringify(oldDataObj)) });
   } catch (err) {
     logger.log("Error during updating flow_session data:", err);
   }
@@ -956,10 +952,10 @@ async function sendWaMessage({
       } = require("../helper/addon/telegram/processTelegramInbox");
 
       // Get chat info from beta_chats
-      const [chatInfo] = await query(
-        `SELECT * FROM beta_chats WHERE sender_mobile = ? AND uid = ? LIMIT 1`,
-        [message.senderMobile, uid],
-      );
+      const [chatInfo] = plain(await prisma.beta_chats.findMany({
+        where: { sender_mobile: whereStr(message.senderMobile), uid: whereStr(uid) },
+        take: 1,
+      }));
 
       if (!chatInfo) {
         logger.error("❌ Chat info not found for Telegram message");
@@ -978,11 +974,14 @@ async function sendWaMessage({
       const { sendInstaMsg } = require("../helper/socket/function");
 
       // Get chatInfo — same pattern as instagram origin
-      const [chatInfo] = await query(
-        `SELECT * FROM beta_chats 
-     WHERE sender_mobile = ? AND uid = ? AND origin = 'instagram_comment' LIMIT 1`,
-        [message.senderMobile, uid],
-      );
+      const [chatInfo] = plain(await prisma.beta_chats.findMany({
+        where: {
+          sender_mobile: whereStr(message.senderMobile),
+          uid: whereStr(uid),
+          origin: "instagram_comment",
+        },
+        take: 1,
+      }));
 
       if (!chatInfo) {
         logger.error("❌ Chat info not found for instagram_comment reply");
@@ -1003,10 +1002,14 @@ async function sendWaMessage({
       const { sendInstaMsg } = require("../helper/socket/function");
 
       // Get chatInfo to resolve origin_instance_id
-      const [chatInfo] = await query(
-        `SELECT * FROM beta_chats WHERE sender_mobile = ? AND uid = ? AND origin = 'instagram' LIMIT 1`,
-        [message.senderMobile, uid],
-      );
+      const [chatInfo] = plain(await prisma.beta_chats.findMany({
+        where: {
+          sender_mobile: whereStr(message.senderMobile),
+          uid: whereStr(uid),
+          origin: "instagram",
+        },
+        take: 1,
+      }));
 
       if (!chatInfo) {
         logger.error("❌ Chat info not found for Instagram automation message");
@@ -1024,10 +1027,14 @@ async function sendWaMessage({
     } else if (origin === "messenger") {
       const { sendMessengerMsg } = require("../helper/socket/function");
 
-      const [chatInfo] = await query(
-        `SELECT * FROM beta_chats WHERE sender_mobile = ? AND uid = ? AND origin = 'messenger' LIMIT 1`,
-        [message.senderMobile, uid],
-      );
+      const [chatInfo] = plain(await prisma.beta_chats.findMany({
+        where: {
+          sender_mobile: whereStr(message.senderMobile),
+          uid: whereStr(uid),
+          origin: "messenger",
+        },
+        take: 1,
+      }));
 
       if (!chatInfo) {
         logger.error("❌ Chat info not found for Messenger automation message");
@@ -1109,10 +1116,10 @@ async function sendWaMessage({
         sendMessageTelegram,
       } = require("../helper/addon/telegram/processTelegramInbox");
 
-      const [chatInfo] = await query(
-        `SELECT * FROM beta_chats WHERE sender_mobile = ? AND uid = ? LIMIT 1`,
-        [message.senderMobile, uid],
-      );
+      const [chatInfo] = plain(await prisma.beta_chats.findMany({
+        where: { sender_mobile: whereStr(message.senderMobile), uid: whereStr(uid) },
+        take: 1,
+      }));
 
       if (!chatInfo) {
         logger.error("❌ Chat info not found for Telegram webhook");
@@ -1182,7 +1189,7 @@ async function sendWaMessage({
 
 async function getActiveFlows({ uid, origin, sessionId, webhook }) {
   try {
-    const [user] = await query(`SELECT plan FROM user WHERE uid = ?`, [uid]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) }, select: { plan: true } }));
 
     if (!user?.plan) return [];
 
@@ -1192,49 +1199,63 @@ async function getActiveFlows({ uid, origin, sessionId, webhook }) {
     let chatbots = [];
 
     if (origin?.toLowerCase() === "qr" && sessionId) {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-         WHERE uid = ? AND origin_id = ? AND active = 1`,
-        [uid, sessionId],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: { uid: whereStr(uid), origin_id: whereStr(sessionId), active: 1 },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     } else if (origin?.toLowerCase() === "instagram_comment" && sessionId) {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-     WHERE uid = ? AND origin_id = ? AND active = 1 AND source = ?`,
-        [uid, sessionId, "instagram_comment"],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: {
+          uid: whereStr(uid),
+          origin_id: whereStr(sessionId),
+          active: 1,
+          source: whereStr("instagram_comment"),
+        },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     } else if (origin?.toLowerCase() === "telegram" && sessionId) {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-         WHERE uid = ? AND origin_id = ? AND active = 1`,
-        [uid, sessionId],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: { uid: whereStr(uid), origin_id: whereStr(sessionId), active: 1 },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     } else if (origin?.toLowerCase() === "messenger") {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-          WHERE uid = ? AND origin_id = ? AND active = 1 AND source = ?`,
-        [uid, sessionId, "messenger_chatbot"],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: {
+          uid: whereStr(uid),
+          origin_id: whereStr(sessionId),
+          active: 1,
+          source: whereStr("messenger_chatbot"),
+        },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     } else if (origin?.toLowerCase() === "instagram" && sessionId) {
       // sessionId = igAccount.user_id passed from processInstaMessage
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-         WHERE uid = ? AND origin_id = ? AND active = 1 AND source = ?`,
-        [uid, sessionId, "instagram_chatbot"],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: {
+          uid: whereStr(uid),
+          origin_id: whereStr(sessionId),
+          active: 1,
+          source: whereStr("instagram_chatbot"),
+        },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     } else if (origin?.toLowerCase() === "webhook_automation") {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id, origin FROM beta_chatbot 
-         WHERE uid = ? AND source = ? AND active = 1 
-         AND origin LIKE ?`,
-        [uid, "webhook_automation", `%"webhook_id":"${webhook?.webhook_id}"%`],
+      chatbots = plain(
+        await prisma.beta_chatbot.findMany({
+          where: {
+            uid: whereStr(uid),
+            source: "webhook_automation",
+            active: 1,
+            origin: { contains: `"webhook_id":"${webhook?.webhook_id}"` },
+          },
+          select: { flow_id: true, uid: true, origin_id: true, origin: true },
+        }),
       );
     } else if (origin?.toLowerCase() === "meta") {
-      chatbots = await query(
-        `SELECT flow_id, uid, origin_id FROM beta_chatbot 
-         WHERE uid = ? AND origin_id = ? AND active = 1`,
-        [uid, "META"],
-      );
+      chatbots = plain(await prisma.beta_chatbot.findMany({
+        where: { uid: whereStr(uid), origin_id: whereStr("META"), active: 1 },
+        select: { flow_id: true, uid: true, origin_id: true },
+      }));
     }
 
     if (chatbots?.length < 1) {
@@ -1265,11 +1286,10 @@ async function getActiveFlows({ uid, origin, sessionId, webhook }) {
     //   [uid, sourceType, flowIds],
     // );
 
-    const flows = await query(
-      `SELECT * FROM beta_flows 
-        WHERE uid = ? AND is_active = 1
-        AND flow_id IN (?)`,
-      [uid, flowIds],
+    const flows = plain(
+      await prisma.beta_flows.findMany({
+        where: { uid: whereStr(uid), is_active: 1, flow_id: { in: strList(flowIds) } },
+      }),
     );
 
     const flowMap = new Map(flows.map((f) => [f.flow_id, f]));
@@ -1300,12 +1320,15 @@ async function getFlowSession({
     if (!message?.senderMobile) return null;
 
     // Single query with proper index usage
-    let [flowSession] = await query(
-      `SELECT id, data FROM flow_session 
-       WHERE uid = ? AND flow_id = ? AND sender_mobile = ?
-       LIMIT 1`,
-      [uid, flowId, message.senderMobile],
-    );
+    let [flowSession] = plain(await prisma.flow_session.findMany({
+      where: {
+        uid: whereStr(uid),
+        flow_id: whereStr(flowId),
+        sender_mobile: whereStr(message.senderMobile),
+      },
+      select: { id: true, data: true },
+      take: 1,
+    }));
 
     if (!flowSession) {
       const initialFlow = nodes.find((n) => n.id === "initialNode");
@@ -1330,11 +1353,16 @@ async function getFlowSession({
       });
 
       // Insert and get ID in one operation
-      const result = await query(
-        `INSERT INTO flow_session (uid, origin, origin_id, flow_id, sender_mobile, data) 
-         VALUES (?,?,?,?,?,?)`,
-        [uid, origin, sessionId, flowId, message.senderMobile, sessionData],
-      );
+      const result = insertResult(await prisma.flow_session.create({
+        data: {
+          uid: str(uid),
+          origin: str(origin),
+          origin_id: str(sessionId),
+          flow_id: str(flowId),
+          sender_mobile: str(message.senderMobile),
+          data: str(sessionData),
+        },
+      }));
 
       flowSession = {
         id: result.insertId,
@@ -1372,9 +1400,7 @@ async function getFlowSession({
 
 async function uploadMediaToMeta(mediaUrl, uid) {
   try {
-    const [user] = await query(`SELECT * FROM user WHERE uid = ? LIMIT 1`, [
-      uid,
-    ]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
     if (!user?.meta_token) {
       throw new Error("Meta token not found");
@@ -1477,10 +1503,10 @@ async function processSendMessage({
         sentBy: "bot",
       });
 
-      await query(
-        `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify(messageData), chatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify(messageData)) },
+      });
 
       // finding new id
       const e = edges.find((e) => e.source === node.id);
@@ -1490,15 +1516,14 @@ async function processSendMessage({
       if (n) {
         const oldData = flowSession?.data;
         const newData = { ...oldData, node: n };
-        await query(
-          `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-          [
-            JSON.stringify(newData),
-            element?.flow_id,
-            uid,
-            message?.senderMobile,
-          ],
-        );
+        await prisma.flow_session.updateMany({
+          where: {
+            flow_id: whereStr(element?.flow_id),
+            uid: whereStr(uid),
+            sender_mobile: whereStr(message?.senderMobile),
+          },
+          data: { data: str(JSON.stringify(newData)) },
+        });
         return { moveToNextNode: node?.data?.moveToNextNode || false };
       } else {
         return {};
@@ -1550,15 +1575,14 @@ async function processCondition({
       if (n) {
         const oldData = flowSession?.data;
         const newData = { ...oldData, node: n };
-        await query(
-          `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-          [
-            JSON.stringify(newData),
-            element?.flow_id,
-            uid,
-            message?.senderMobile,
-          ],
-        );
+        await prisma.flow_session.updateMany({
+          where: {
+            flow_id: whereStr(element?.flow_id),
+            uid: whereStr(uid),
+            sender_mobile: whereStr(message?.senderMobile),
+          },
+          data: { data: str(JSON.stringify(newData)) },
+        });
       }
     } else {
       // process default condition if not matched
@@ -1570,15 +1594,14 @@ async function processCondition({
       if (n) {
         const oldData = flowSession?.data;
         const newData = { ...oldData, node: n };
-        await query(
-          `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-          [
-            JSON.stringify(newData),
-            element?.flow_id,
-            uid,
-            message?.senderMobile,
-          ],
-        );
+        await prisma.flow_session.updateMany({
+          where: {
+            flow_id: whereStr(element?.flow_id),
+            uid: whereStr(uid),
+            sender_mobile: whereStr(message?.senderMobile),
+          },
+          data: { data: str(JSON.stringify(newData)) },
+        });
       }
     }
 
@@ -1621,10 +1644,14 @@ async function processResponseSaver({
       variables: savingVars,
     };
 
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -1671,10 +1698,14 @@ async function processDisableAutoReply({
       disableChat: { node, timestamp: timeStamp },
     };
 
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -1726,10 +1757,14 @@ async function processMakeRequest({
       variables: allVars,
     };
 
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -1764,19 +1799,13 @@ async function processDelay({
     const oldData = flowSession?.data;
     const newData = { ...oldData, node: n };
 
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ? LIMIT 1`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await updateFirst(prisma.flow_session, { flow_id: whereStr(element?.flow_id), uid: whereStr(uid), sender_mobile: whereStr(message?.senderMobile) }, { data: str(JSON.stringify(newData)) });
 
     // Schedule execution without blocking the current flow
     setTimeout(async () => {
       try {
         // Get fresh user data
-        const [updatedUser] = await query(
-          `SELECT * FROM user WHERE uid = ? LIMIT 1`,
-          [uid],
-        );
+        const [updatedUser] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
         if (!updatedUser) {
           logger.log("User not found for delayed execution");
@@ -1848,10 +1877,14 @@ async function processSpreadSheet({
 
     const oldData = flowSession?.data;
     const newData = { ...oldData, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -1911,10 +1944,14 @@ async function processSendEmail({
 
     const oldData = flowSession?.data;
     const newData = { ...oldData, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -1945,10 +1982,7 @@ async function processAgentTransfer({
 
     if (toAll) {
       // Assign to all active agents
-      const allAgents = await query(
-        `SELECT * FROM agents WHERE owner_uid = ? AND is_active = ?`,
-        [uid, 1],
-      );
+      const allAgents = plain(await prisma.agents.findMany({ where: { owner_uid: whereStr(uid), is_active: idParam(1) } }));
 
       if (allAgents?.length > 0) {
         agentNewData = allAgents; // This will be an array of all agents
@@ -1957,10 +1991,7 @@ async function processAgentTransfer({
       }
     } else if (autoAgentSelect) {
       // Auto-select a random single agent
-      const agents = await query(
-        `SELECT * FROM agents WHERE owner_uid = ? AND is_active = ?`,
-        [uid, 1],
-      );
+      const agents = plain(await prisma.agents.findMany({ where: { owner_uid: whereStr(uid), is_active: idParam(1) } }));
 
       if (agents?.length > 0) {
         const randomAgent = agents[Math.floor(Math.random() * agents.length)];
@@ -1970,10 +2001,7 @@ async function processAgentTransfer({
       }
     } else {
       // Manual agent selection
-      const [findAgent] = await query(
-        `SELECT * FROM agents WHERE owner_uid = ? AND uid = ?`,
-        [uid, agentData?.uid],
-      );
+      const [findAgent] = plain(await prisma.agents.findMany({ where: { owner_uid: whereStr(uid), uid: whereStr(agentData?.uid) } }));
 
       if (findAgent) {
         agentNewData = [findAgent]; // Wrap in array for consistency
@@ -1986,10 +2014,10 @@ async function processAgentTransfer({
         ? agentNewData
         : [agentNewData];
 
-      await query(
-        `UPDATE beta_chats SET assigned_agent = ? WHERE uid = ? AND chat_id = ?`,
-        [JSON.stringify(agentsArray), uid, chatId],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { uid: whereStr(uid), chat_id: whereStr(chatId) },
+        data: { assigned_agent: str(JSON.stringify(agentsArray)) },
+      });
     }
 
     // ____
@@ -2001,10 +2029,14 @@ async function processAgentTransfer({
 
     const oldData = flowSession?.data;
     const newData = { ...oldData, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -2034,13 +2066,7 @@ async function processAiTransfer({
     if (config?.assignedToAi) {
       let a = flowSession?.data || {};
       a.aiTransfer = { active: true, node: node };
-      await query(
-        `UPDATE flow_session 
-         SET data = ? 
-         WHERE flow_id = ? AND uid = ? AND sender_mobile = ?
-         LIMIT 1`,
-        [JSON.stringify(a), element?.flow_id, uid, message?.senderMobile],
-      );
+      await updateFirst(prisma.flow_session, { flow_id: whereStr(element?.flow_id), uid: whereStr(uid), sender_mobile: whereStr(message?.senderMobile) }, { data: str(JSON.stringify(a)) });
     } else {
       const e = edges.find((e) => e.source === node.id);
       if (!e) return {};
@@ -2049,24 +2075,16 @@ async function processAiTransfer({
 
       const oldData = flowSession?.data;
       const newData = { ...oldData, node: n };
-      await query(
-        `UPDATE flow_session 
-         SET data = ? 
-         WHERE flow_id = ? AND uid = ? AND sender_mobile = ?
-         LIMIT 1`,
-        [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-      );
+      await updateFirst(prisma.flow_session, { flow_id: whereStr(element?.flow_id), uid: whereStr(uid), sender_mobile: whereStr(message?.senderMobile) }, { data: str(JSON.stringify(newData)) });
     }
 
     // Optimize: Only select needed columns and use proper index
-    let conversationArr = await query(
-      `SELECT type, msgContext, route, timestamp 
-      FROM beta_conversation 
-      WHERE chat_id = ? AND uid = ?
-      ORDER BY timestamp DESC 
-      LIMIT ?`,
-      [chatId, uid, node?.data?.messageReferenceCount || 10],
-    );
+    let conversationArr = plain(await prisma.beta_conversation.findMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+      select: { type: true, msgContext: true, route: true, timestamp: true },
+      orderBy: { timestamp: "desc" },
+      take: Math.max(0, parseInt(node?.data?.messageReferenceCount || 10, 10) || 0),
+    }));
 
     conversationArr = [...conversationArr]?.reverse() || [];
 
@@ -2125,13 +2143,7 @@ async function processAiTransfer({
           sentBy: "ai",
         });
 
-        await query(
-          `UPDATE beta_chats 
-           SET last_message = ? 
-           WHERE chat_id = ? AND uid = ?
-           LIMIT 1`,
-          [JSON.stringify(messageData), chatId, uid],
-        );
+        await updateFirst(prisma.beta_chats, { chat_id: whereStr(chatId), uid: whereStr(uid) }, { last_message: str(JSON.stringify(messageData)) });
 
         return {};
       } else {
@@ -2153,18 +2165,7 @@ async function processAiTransfer({
           node: n,
           aiTransfer: { active: false, node: null },
         };
-        await query(
-          `UPDATE flow_session 
-           SET data = ? 
-           WHERE flow_id = ? AND uid = ? AND sender_mobile = ?
-           LIMIT 1`,
-          [
-            JSON.stringify(newData),
-            element?.flow_id,
-            uid,
-            message?.senderMobile,
-          ],
-        );
+        await updateFirst(prisma.flow_session, { flow_id: whereStr(element?.flow_id), uid: whereStr(uid), sender_mobile: whereStr(message?.senderMobile) }, { data: str(JSON.stringify(newData)) });
       }
       return { moveToNextNode: true };
     } else {
@@ -2249,48 +2250,18 @@ async function processResetSession({
 
     // Delete the flow session based on origin
     if (origin === "qr") {
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? 
-         LIMIT 1`,
-        [uid, origin, sessionId, element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     } else if (origin?.toLowerCase() === "webhook_automation") {
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND origin = ? AND flow_id = ? AND sender_mobile = ? 
-         LIMIT 1`,
-        [uid, origin, element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     } else if (origin?.toLowerCase() === "instagram_comment") {
-      await query(
-        `DELETE FROM flow_session 
-     WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? 
-     LIMIT 1`,
-        [uid, origin, sessionId, element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     } else if (origin?.toLowerCase() === "instagram") {
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? 
-         LIMIT 1`,
-        [uid, origin, sessionId, element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     } else if (origin?.toLowerCase() === "telegram") {
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? 
-         LIMIT 1`,
-        [uid, origin, sessionId, element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr(origin), origin_id: whereStr(sessionId), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     } else {
       // Default Meta
-      await query(
-        `DELETE FROM flow_session 
-         WHERE uid = ? AND origin = ? AND origin_id = ? AND flow_id = ? AND sender_mobile = ? 
-         LIMIT 1`,
-        [uid, "meta", "META", element?.flow_id, message.senderMobile],
-      );
+      await deleteFirst(prisma.flow_session, { uid: whereStr(uid), origin: whereStr("meta"), origin_id: whereStr("META"), flow_id: whereStr(element?.flow_id), sender_mobile: whereStr(message.senderMobile) });
     }
 
     logger.log(`✅ Session reset completed for ${message.senderMobile}`);
@@ -2317,18 +2288,16 @@ async function processResetSession({
         node: getNode,
       });
 
-      await query(
-        `INSERT INTO flow_session (uid, origin, origin_id, flow_id, sender_mobile, data) 
-         VALUES (?,?,?,?,?,?)`,
-        [
-          uid,
-          origin,
-          sessionId,
-          element?.flow_id,
-          message.senderMobile,
-          sessionData,
-        ],
-      );
+      await prisma.flow_session.create({
+        data: {
+          uid: str(uid),
+          origin: str(origin),
+          origin_id: str(sessionId),
+          flow_id: str(element?.flow_id),
+          sender_mobile: str(message.senderMobile),
+          data: str(sessionData),
+        },
+      });
 
       logger.log(`✅ New fresh session created for ${message.senderMobile}`);
     }
@@ -2359,10 +2328,11 @@ async function processSetChatLabel({
     const { labelsToAdd = [], labelsToRemove = [] } = node.data;
 
     // ── Fetch current chat_label from beta_chats ──
-    const [chat] = await query(
-      `SELECT chat_label FROM beta_chats WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [chatId, uid],
-    );
+    const [chat] = plain(await prisma.beta_chats.findMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+      select: { chat_label: true },
+      take: 1,
+    }));
 
     let currentLabels = [];
     if (chat?.chat_label) {
@@ -2390,10 +2360,7 @@ async function processSetChatLabel({
     }
 
     // ── Persist ──
-    await query(
-      `UPDATE beta_chats SET chat_label = ? WHERE chat_id = ? AND uid = ? LIMIT 1`,
-      [JSON.stringify(currentLabels), chatId, uid],
-    );
+    await updateFirst(prisma.beta_chats, { chat_id: whereStr(chatId), uid: whereStr(uid) }, { chat_label: str(JSON.stringify(currentLabels)) });
 
     // ── Advance to next node ──
     const e = edges.find((e) => e.source === node.id);
@@ -2402,10 +2369,14 @@ async function processSetChatLabel({
     if (!n) return {};
 
     const newData = { ...flowSession?.data, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -2469,9 +2440,7 @@ async function processSendWaTemplate({
     })();
 
     // ── get Meta API credentials ─────────────────────────────────────────────
-    const [api] = await query(`SELECT * FROM meta_api WHERE uid = ? LIMIT 1`, [
-      uid,
-    ]);
+    const [api] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
     if (!api?.access_token || !api?.business_phone_number_id) {
       logger.error("❌ SEND_WA_TEMPLATE: Meta API credentials not found");
@@ -2881,10 +2850,10 @@ async function processSendWaTemplate({
         sentBy: "bot",
       });
 
-      await query(
-        `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify(messageData), chatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify(messageData)) },
+      });
     }
 
     // ── advance to next node ─────────────────────────────────────────────────
@@ -2894,10 +2863,14 @@ async function processSendWaTemplate({
     if (!n) return {};
 
     const newData = { ...flowSession?.data, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
@@ -2971,9 +2944,7 @@ async function processSendWaForm({
     const resolvedCta = replaceVariables(ctaText, variablesObj);
 
     // ── get Meta API credentials ──────────────────────────────────────────
-    const [api] = await query(`SELECT * FROM meta_api WHERE uid = ? LIMIT 1`, [
-      uid,
-    ]);
+    const [api] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) }, take: 1 }));
 
     if (!api?.access_token || !api?.business_phone_number_id) {
       logger.error("❌ SEND_WA_FORM: Meta API credentials not found");
@@ -3118,10 +3089,10 @@ async function processSendWaForm({
         sentBy: "bot",
       });
 
-      await query(
-        `UPDATE beta_chats SET last_message = ? WHERE chat_id = ? AND uid = ?`,
-        [JSON.stringify(messageData), chatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+        data: { last_message: str(JSON.stringify(messageData)) },
+      });
     }
 
     // ── advance to next node ──────────────────────────────────────────────
@@ -3131,10 +3102,14 @@ async function processSendWaForm({
     if (!n) return {};
 
     const newData = { ...flowSession?.data, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || true };
   } catch (err) {
@@ -3190,52 +3165,52 @@ async function processPhonebookManager({
         logger.warn("processPhonebookManager: no phonebook selected for add");
       } else {
         // Check if contact already exists in this phonebook
-        const existing = await query(
-          `SELECT id FROM contact 
-           WHERE uid = ? AND phonebook_id = ? AND mobile = ? LIMIT 1`,
-          [uid, phonebook.id, resolvedMobile],
-        );
+        const existing = plain(await prisma.contact.findMany({
+          where: {
+            uid: whereStr(uid),
+            phonebook_id: whereStr(phonebook.id),
+            mobile: whereStr(resolvedMobile),
+          },
+          select: { id: true },
+          take: 1,
+        }));
 
         if (existing.length > 0) {
           // Update — don't duplicate
-          await query(
-            `UPDATE contact 
-             SET name = ?, var1 = ?, var2 = ?, var3 = ?, var4 = ?, var5 = ?
-             WHERE uid = ? AND phonebook_id = ? AND mobile = ?`,
-            [
-              resolvedName,
-              resolvedVar1,
-              resolvedVar2,
-              resolvedVar3,
-              resolvedVar4,
-              resolvedVar5,
-              uid,
-              phonebook.id,
-              resolvedMobile,
-            ],
-          );
+          await prisma.contact.updateMany({
+            where: {
+              uid: whereStr(uid),
+              phonebook_id: whereStr(phonebook.id),
+              mobile: whereStr(resolvedMobile),
+            },
+            data: {
+              name: str(resolvedName),
+              var1: str(resolvedVar1),
+              var2: str(resolvedVar2),
+              var3: str(resolvedVar3),
+              var4: str(resolvedVar4),
+              var5: str(resolvedVar5),
+            },
+          });
           logger.log(
             `✅ PhonebookManager: updated ${resolvedMobile} in "${phonebook.name}"`,
           );
         } else {
           // Insert fresh — same columns your existing routes use
-          await query(
-            `INSERT INTO contact 
-             (uid, phonebook_id, phonebook_name, name, mobile, var1, var2, var3, var4, var5)
-             VALUES (?,?,?,?,?,?,?,?,?,?)`,
-            [
-              uid,
-              phonebook.id,
-              phonebook.name,
-              resolvedName,
-              resolvedMobile,
-              resolvedVar1,
-              resolvedVar2,
-              resolvedVar3,
-              resolvedVar4,
-              resolvedVar5,
-            ],
-          );
+          await prisma.contact.create({
+            data: {
+              uid: str(uid),
+              phonebook_id: str(phonebook.id),
+              phonebook_name: str(phonebook.name),
+              name: str(resolvedName),
+              mobile: str(resolvedMobile),
+              var1: str(resolvedVar1),
+              var2: str(resolvedVar2),
+              var3: str(resolvedVar3),
+              var4: str(resolvedVar4),
+              var5: str(resolvedVar5),
+            },
+          });
           logger.log(
             `✅ PhonebookManager: added ${resolvedMobile} to "${phonebook.name}"`,
           );
@@ -3244,18 +3219,18 @@ async function processPhonebookManager({
     } else if (action === "remove") {
       if (removeFromAll) {
         // Same table, same uid check — just no phonebook_id filter
-        await query(`DELETE FROM contact WHERE uid = ? AND mobile = ?`, [
-          uid,
-          resolvedMobile,
-        ]);
+        await prisma.contact.deleteMany({ where: { uid: whereStr(uid), mobile: whereStr(resolvedMobile) } });
         logger.log(
           `✅ PhonebookManager: removed ${resolvedMobile} from ALL phonebooks`,
         );
       } else if (phonebook?.id) {
-        await query(
-          `DELETE FROM contact WHERE uid = ? AND phonebook_id = ? AND mobile = ?`,
-          [uid, phonebook.id, resolvedMobile],
-        );
+        await prisma.contact.deleteMany({
+          where: {
+            uid: whereStr(uid),
+            phonebook_id: whereStr(phonebook.id),
+            mobile: whereStr(resolvedMobile),
+          },
+        });
         logger.log(
           `✅ PhonebookManager: removed ${resolvedMobile} from "${phonebook.name}"`,
         );
@@ -3273,10 +3248,14 @@ async function processPhonebookManager({
     if (!n) return {};
 
     const newData = { ...flowSession?.data, node: n };
-    await query(
-      `UPDATE flow_session SET data = ? WHERE flow_id = ? AND uid = ? AND sender_mobile = ?`,
-      [JSON.stringify(newData), element?.flow_id, uid, message?.senderMobile],
-    );
+    await prisma.flow_session.updateMany({
+      where: {
+        flow_id: whereStr(element?.flow_id),
+        uid: whereStr(uid),
+        sender_mobile: whereStr(message?.senderMobile),
+      },
+      data: { data: str(JSON.stringify(newData)) },
+    });
 
     return { moveToNextNode: node?.data?.moveToNextNode || false };
   } catch (err) {
