@@ -126,3 +126,42 @@ function dateOrNull(value) {
 module.exports.whereStr = whereStr;
 module.exports.dateOrNull = dateOrNull;
 module.exports.NO_MATCH = NO_MATCH;
+
+/** Array of strings from request input (`IN (?)` on VARCHAR columns). */
+function strList(values) {
+  const arr = Array.isArray(values) ? values : [values];
+  return arr.filter((v) => v !== null && v !== undefined).map(String);
+}
+
+/** Nullable BigInt for BIGINT columns on write. */
+function bigOrNull(value) {
+  const n = intOrNull(value);
+  return n === null ? null : BigInt(n);
+}
+
+/** mysql2-compatible result for UPDATE/DELETE converted to updateMany/deleteMany. */
+function okPacket(result) {
+  const count = result?.count ?? 0;
+  return { affectedRows: count, changedRows: count };
+}
+
+/** mysql2-compatible result for INSERT converted to create(). */
+function insertResult(row) {
+  return { insertId: row?.id, affectedRows: row ? 1 : 0 };
+}
+
+module.exports.strList = strList;
+module.exports.bigOrNull = bigOrNull;
+module.exports.okPacket = okPacket;
+module.exports.insertResult = insertResult;
+
+/**
+ * Enum column WHERE value: `{ in: enumIn(v, allowed) }`. Unknown values match nothing
+ * (SQL behaviour) instead of throwing a Prisma validation error.
+ */
+function enumIn(value, allowed) {
+  const arr = Array.isArray(value) ? value : [value];
+  return arr.filter((v) => v !== null && v !== undefined).map(String).filter((v) => allowed.includes(v));
+}
+
+module.exports.enumIn = enumIn;

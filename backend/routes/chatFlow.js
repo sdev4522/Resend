@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { idList, idParam, plain, str, whereStr } = require("../database/prismaHelpers");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -109,25 +110,27 @@ router.post("/insert_flow_beta", validateUser, checkPlan, checkChatbot, async (r
     }
 
     // checking with the same id
-    const [existingFlow] = await query(
-      `SELECT * FROM beta_flows WHERE flow_id = ?`,
-      [flow_id],
-    );
+    const [existingFlow] = plain(await prisma.beta_flows.findMany({ where: { flow_id: whereStr(flow_id) } }));
     if (existingFlow) {
       if (existingFlow.uid !== req.decode.uid) {
         return res.status(403).json({ success: false, msg: "Unauthorized access to flow" });
       }
-      await query(
-        `UPDATE beta_flows SET name = ?, data = ?, source = ? WHERE flow_id = ? AND uid = ?`,
-        [name, JSON.stringify(data), source, flow_id, req.decode.uid],
-      );
+      await prisma.beta_flows.updateMany({
+        where: { flow_id: whereStr(flow_id), uid: whereStr(req.decode.uid) },
+        data: { name: str(name), data: str(JSON.stringify(data)), source: str(source) },
+      });
 
       res.json({ msg: "Flows was updated", success: true, flow_id });
     } else {
-      await query(
-        `INSERT INTO beta_flows (uid, flow_id, source, name, data) VALUES (?,?,?,?,?)`,
-        [req.decode.uid, flow_id, source, name, JSON.stringify(data)],
-      );
+      await prisma.beta_flows.create({
+        data: {
+          uid: str(req.decode.uid),
+          flow_id: str(flow_id),
+          source: str(source),
+          name: str(name),
+          data: str(JSON.stringify(data)),
+        },
+      });
 
       res.json({ msg: "Flows was saved", success: true, flow_id });
     }
@@ -143,15 +146,9 @@ router.get("/get_flow_beta", validateUser, checkPlan, async (req, res) => {
     const { flow_id, id } = req.query;
     let rows;
     if (flow_id) {
-      rows = await query(
-        `SELECT * FROM beta_flows WHERE flow_id = ? AND uid = ?`,
-        [flow_id, req.decode.uid],
-      );
+      rows = plain(await prisma.beta_flows.findMany({ where: { flow_id: whereStr(flow_id), uid: whereStr(req.decode.uid) } }));
     } else if (id) {
-      rows = await query(
-        `SELECT * FROM beta_flows WHERE id = ? AND uid = ?`,
-        [id, req.decode.uid],
-      );
+      rows = plain(await prisma.beta_flows.findMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } }));
     } else {
       return res.status(400).json({ success: false, msg: "flow_id or id is required" });
     }
@@ -189,15 +186,9 @@ router.post("/duplicate_flow_beta", validateUser, checkPlan, checkChatbot, async
     const { flow_id, id } = req.body;
     let rows;
     if (flow_id) {
-      rows = await query(
-        `SELECT * FROM beta_flows WHERE flow_id = ? AND uid = ?`,
-        [flow_id, req.decode.uid],
-      );
+      rows = plain(await prisma.beta_flows.findMany({ where: { flow_id: whereStr(flow_id), uid: whereStr(req.decode.uid) } }));
     } else if (id) {
-      rows = await query(
-        `SELECT * FROM beta_flows WHERE id = ? AND uid = ?`,
-        [id, req.decode.uid],
-      );
+      rows = plain(await prisma.beta_flows.findMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } }));
     } else {
       return res.status(400).json({ success: false, msg: "flow_id or id is required" });
     }
@@ -210,10 +201,15 @@ router.post("/duplicate_flow_beta", validateUser, checkPlan, checkChatbot, async
     const newFlowId = randomstring.generate(32);
     const newName = `${sourceFlow.name || "Flow"} (Copy)`;
 
-    await query(
-      `INSERT INTO beta_flows (uid, flow_id, source, name, data) VALUES (?,?,?,?,?)`,
-      [req.decode.uid, newFlowId, sourceFlow.source, newName, sourceFlow.data],
-    );
+    await prisma.beta_flows.create({
+      data: {
+        uid: str(req.decode.uid),
+        flow_id: str(newFlowId),
+        source: str(sourceFlow.source),
+        name: str(newName),
+        data: str(sourceFlow.data),
+      },
+    });
 
     res.json({
       success: true,
@@ -233,14 +229,12 @@ router.get("/get_flows_beta", validateUser, checkPlan, async (req, res) => {
 
     let data = [];
     if (!type || type === "all") {
-      data = await query(`SELECT * FROM beta_flows WHERE uid = ? ORDER BY id DESC`, [
-        req.decode.uid,
-      ]);
+      data = plain(await prisma.beta_flows.findMany({ where: { uid: whereStr(req.decode.uid) }, orderBy: { id: "desc" } }));
     } else {
-      data = await query(
-        `SELECT * FROM beta_flows WHERE uid = ? AND source = ? ORDER BY id DESC`,
-        [req.decode.uid, type],
-      );
+      data = plain(await prisma.beta_flows.findMany({
+        where: { uid: whereStr(req.decode.uid), source: whereStr(type) },
+        orderBy: { id: "desc" },
+      }));
     }
     data = data.map((x) => {
       let parsed = x.data;
@@ -268,10 +262,7 @@ router.get("/get_flows_beta", validateUser, checkPlan, async (req, res) => {
 router.post("/del_flow_beta", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM beta_flows WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.beta_flows.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
     res.json({ msg: "Flow was deleted", success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -282,9 +273,7 @@ router.post("/del_flow_beta", validateUser, async (req, res) => {
 // get my flows
 router.get("/get_mine", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM flow WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = plain(await prisma.flow.findMany({ where: { uid: whereStr(req.decode.uid) } }));
     res.json({ data, success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -297,10 +286,7 @@ router.post("/get_activity", validateUser, checkPlan, async (req, res) => {
   try {
     const { flowId } = req.body;
 
-    const getFlow = await query(
-      `SELECT * FROM flow WHERE uid = ? AND flow_id = ?`,
-      [req.decode.uid, flowId],
-    );
+    const getFlow = plain(await prisma.flow.findMany({ where: { uid: whereStr(req.decode.uid), flow_id: whereStr(flowId) } }));
 
     // Parse prevent and ai lists from the database
     const prevent = getFlow[0]?.prevent_list
@@ -337,20 +323,17 @@ router.post("/remove_number_from_activity", validateUser, async (req, res) => {
   try {
     const { type, number, flowId } = req.body;
 
-    const [flow] = await query(`SELECT * FROM flow WHERE flow_id = ?`, [
-      flowId,
-    ]);
+    const [flow] = plain(await prisma.flow.findMany({ where: { flow_id: whereStr(flowId) } }));
 
     if (type == "AI") {
       // removing from ai arr
       const aiArr = flow?.ai_list ? JSON.parse(flow?.ai_list) : [];
       const updatedArr = aiArr?.filter((x) => x.senderNumber !== number);
 
-      await query(`UPDATE flow SET ai_list = ? WHERE flow_id = ? AND uid = ?`, [
-        JSON.stringify(updatedArr),
-        flowId,
-        req.decode.uid,
-      ]);
+      await prisma.flow.updateMany({
+        where: { flow_id: whereStr(flowId), uid: whereStr(req.decode.uid) },
+        data: { ai_list: str(JSON.stringify(updatedArr)) },
+      });
     } else if (type == "DISABLED") {
       // removing from prevent arr
       const preventArr = flow?.prevent_list
@@ -360,10 +343,10 @@ router.post("/remove_number_from_activity", validateUser, async (req, res) => {
         (x) => x.senderNumber !== number,
       );
 
-      await query(
-        `UPDATE flow SET prevent_list = ? WHERE flow_id = ? AND uid = ?`,
-        [JSON.stringify(updatedPreventArr), flowId, req.decode.uid],
-      );
+      await prisma.flow.updateMany({
+        where: { flow_id: whereStr(flowId), uid: whereStr(req.decode.uid) },
+        data: { prevent_list: str(JSON.stringify(updatedPreventArr)) },
+      });
     }
 
     res.json({ msg: "Number was removed", success: true });
@@ -377,10 +360,13 @@ router.post("/remove_number_from_activity", validateUser, async (req, res) => {
 router.post("/session_mine", validateUser, async (req, res) => {
   try {
     const { flow_id, sender_mobile } = req.body;
-    const data = await query(
-      `SELECT * FROM flow_session WHERE uid = ? AND flow_id = ? AND sender_mobile = ?`,
-      [req.decode.uid, flow_id, sender_mobile],
-    );
+    const data = plain(await prisma.flow_session.findMany({
+      where: {
+        uid: whereStr(req.decode.uid),
+        flow_id: whereStr(flow_id),
+        sender_mobile: whereStr(sender_mobile),
+      },
+    }));
 
     res.json({ data, success: true });
   } catch (err) {
@@ -393,10 +379,13 @@ router.post("/session_mine", validateUser, async (req, res) => {
 router.post("/session_mine_agent", validateAgent, async (req, res) => {
   try {
     const { flow_id, sender_mobile } = req.body;
-    const data = await query(
-      `SELECT * FROM flow_session WHERE uid = ? AND flow_id = ? AND sender_mobile = ?`,
-      [req.owner.uid, flow_id, sender_mobile],
-    );
+    const data = plain(await prisma.flow_session.findMany({
+      where: {
+        uid: whereStr(req.owner.uid),
+        flow_id: whereStr(flow_id),
+        sender_mobile: whereStr(sender_mobile),
+      },
+    }));
 
     res.json({ data, success: true });
   } catch (err) {
@@ -408,10 +397,7 @@ router.post("/session_mine_agent", validateAgent, async (req, res) => {
 router.post("/enable_chat_agent", validateAgent, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM flow_session WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.flow_session.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
     res.json({ msg: "Auto reply enabled", success: true });
   } catch (err) {
     logger.log(err);
@@ -423,10 +409,7 @@ router.post("/enable_chat", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
 
-    await query(`DELETE FROM flow_session WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.flow_session.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
 
     res.json({ msg: "Auto reply enabled", success: true });
   } catch (err) {
@@ -442,10 +425,7 @@ router.post("/disable_chat", validateUser, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Session ID is required" });
     }
 
-    const [flow] = await query(
-      `SELECT * FROM flow_session WHERE id = ? AND uid = ?`,
-      [id, req.decode.uid],
-    );
+    const [flow] = plain(await prisma.flow_session.findMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } }));
 
     if (flow) {
       let data = flow?.data ? JSON.parse(flow?.data) : {};
@@ -459,11 +439,10 @@ router.post("/disable_chat", validateUser, async (req, res) => {
         timestamp: currentTime.getTime(),
       };
 
-      await query(`UPDATE flow_session SET data = ? WHERE id = ? AND uid = ?`, [
-        JSON.stringify(data),
-        id,
-        req.decode.uid,
-      ]);
+      await prisma.flow_session.updateMany({
+        where: { id: idParam(id), uid: whereStr(req.decode.uid) },
+        data: { data: str(JSON.stringify(data)) },
+      });
     } else {
       return res.status(404).json({ success: false, msg: "Flow session not found or unauthorized" });
     }
@@ -483,7 +462,7 @@ router.post("/disable_chat_agent", validateAgent, async (req, res) => {
     }
 
     const ownerUid = req.owner?.uid || req.decode?.owner_uid;
-    const [flow] = await query(`SELECT * FROM flow_session WHERE id = ? AND uid = ?`, [id, ownerUid]);
+    const [flow] = plain(await prisma.flow_session.findMany({ where: { id: idParam(id), uid: whereStr(ownerUid) } }));
     if (flow) {
       let data = flow?.data ? JSON.parse(flow?.data) : {};
 
@@ -496,11 +475,10 @@ router.post("/disable_chat_agent", validateAgent, async (req, res) => {
         timestamp: currentTime.getTime(),
       };
 
-      await query(`UPDATE flow_session SET data = ? WHERE id = ? AND uid = ?`, [
-        JSON.stringify(data),
-        id,
-        ownerUid,
-      ]);
+      await prisma.flow_session.updateMany({
+        where: { id: idParam(id), uid: whereStr(ownerUid) },
+        data: { data: str(JSON.stringify(data)) },
+      });
     } else {
       return res.status(404).json({ success: false, msg: "Flow session not found or unauthorized" });
     }
@@ -516,10 +494,7 @@ router.post("/disable_chat_agent", validateAgent, async (req, res) => {
 router.post("/get_beta_flow_sessions", validateUser, async (req, res) => {
   try {
     const { flow_id } = req.body;
-    const data = await query(
-      `SELECT * FROM flow_session WHERE uid = ? AND flow_id = ?`,
-      [req.decode.uid, flow_id],
-    );
+    const data = plain(await prisma.flow_session.findMany({ where: { uid: whereStr(req.decode.uid), flow_id: whereStr(flow_id) } }));
 
     res.json({ data, success: true });
   } catch (err) {
@@ -532,10 +507,7 @@ router.post("/get_beta_flow_sessions", validateUser, async (req, res) => {
 router.post("/del_flow_sess", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM flow_session WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.flow_session.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
     res.json({ msg: "Session was deleted", success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -547,18 +519,12 @@ router.post("/del_flow_sess", validateUser, async (req, res) => {
 router.post("/reset_dc_sess", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    const [getSess] = await query(
-      `SELECT * FROM flow_session WHERE id = ? AND uid = ?`,
-      [id, req.decode.uid],
-    );
+    const [getSess] = plain(await prisma.flow_session.findMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } }));
 
     if (getSess) {
       let a = JSON.parse(getSess.data);
       delete a.disableChat;
-      await query(`UPDATE flow_session SET data = ? WHERE id = ?`, [
-        JSON.stringify(a),
-        id,
-      ]);
+      await prisma.flow_session.updateMany({ where: { id: idParam(id) }, data: { data: str(JSON.stringify(a)) } });
     }
 
     res.json({ msg: "Disable chat was reset", success: true });
@@ -577,13 +543,9 @@ router.post("/del_multiple_flow_sess", validateUser, async (req, res) => {
       return res.json({ success: false, msg: "No sessions selected" });
     }
 
-    // Create placeholders for the SQL query
-    const placeholders = ids.map(() => "?").join(",");
-
-    await query(
-      `DELETE FROM flow_session WHERE id IN (${placeholders}) AND uid = ?`,
-      [...ids, req.decode.uid],
-    );
+    await prisma.flow_session.deleteMany({
+      where: { id: { in: idList(ids) }, uid: req.decode.uid },
+    });
 
     res.json({ msg: "Selected sessions were deleted", success: true });
   } catch (err) {
@@ -645,10 +607,7 @@ router.get("/get_origians", validateUser, async (req, res) => {
     ];
 
     if (addons?.includes("QR")) {
-      const instances = await query(
-        `SELECT * FROM instance WHERE uid = ? AND status = ?`,
-        [req.decode.uid, "ACTIVE"],
-      );
+      const instances = plain(await prisma.instance.findMany({ where: { uid: whereStr(req.decode.uid), status: whereStr("ACTIVE") } }));
 
       const correctOrign = instances.map((x) => ({
         title: x.number,
@@ -660,10 +619,7 @@ router.get("/get_origians", validateUser, async (req, res) => {
     }
 
     if (addons?.includes("TELEGRAM")) {
-      const teleSess = await query(
-        `SELECT * FROM telegram_session WHERE uid = ? AND status = ?`,
-        [req.decode.uid, "active"],
-      );
+      const teleSess = plain(await prisma.telegram_session.findMany({ where: { uid: whereStr(req.decode.uid), status: whereStr("active") } }));
 
       const correctOrign =
         teleSess?.map((x) => ({
@@ -678,10 +634,7 @@ router.get("/get_origians", validateUser, async (req, res) => {
     // In get_origians — add Instagram accounts
     if (addons?.includes("INSTAGRAM")) {
       // Instagram is always available (no addon check needed)
-      const igAccounts = await query(
-        `SELECT * FROM instagram_accounts WHERE uid = ?`,
-        [req.decode.uid],
-      );
+      const igAccounts = plain(await prisma.instagram_accounts.findMany({ where: { uid: whereStr(req.decode.uid) } }));
 
       const igOrigins = igAccounts.map((x) => ({
         title: `@${x.username || x.user_id}`,
@@ -692,10 +645,7 @@ router.get("/get_origians", validateUser, async (req, res) => {
       origins.push(...igOrigins);
     }
 
-    const messengerAccounts = await query(
-      `SELECT * FROM messenger_accounts WHERE uid = ?`,
-      [req.decode.uid],
-    );
+    const messengerAccounts = plain(await prisma.messenger_accounts.findMany({ where: { uid: whereStr(req.decode.uid) } }));
 
     const messengerOrigins = messengerAccounts.map((x) => ({
       title: x.page_name,

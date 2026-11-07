@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { idList, idParam, intOrNull, plain, str, whereStr } = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user.js");
 const Stripe = require("stripe");
 const {
@@ -36,22 +37,24 @@ router.post("/insert_flow", validateUser, checkPlan, async (req, res) => {
     }
 
     // checking with the same id
-    const [cehckId] = await query(
-      `SELECT * FROM wa_call_flows WHERE flow_id = ?`,
-      [flow_id],
-    );
+    const [cehckId] = plain(await prisma.wa_call_flows.findMany({ where: { flow_id: whereStr(flow_id) } }));
     if (cehckId) {
-      await query(
-        `UPDATE wa_call_flows SET name = ?, data = ?, source = ? WHERE flow_id = ?`,
-        [name, JSON.stringify(data), source, flow_id],
-      );
+      await prisma.wa_call_flows.updateMany({
+        where: { flow_id: whereStr(flow_id) },
+        data: { name: str(name), data: str(JSON.stringify(data)), source: str(source) },
+      });
 
       res.json({ msg: "Flows was updated", success: true });
     } else {
-      await query(
-        `INSERT INTO wa_call_flows (uid, flow_id, source, name, data) VALUES (?,?,?,?,?)`,
-        [req.decode.uid, flow_id, source, name, JSON.stringify(data)],
-      );
+      await prisma.wa_call_flows.create({
+        data: {
+          uid: str(req.decode.uid),
+          flow_id: str(flow_id),
+          source: str(source),
+          name: str(name),
+          data: str(JSON.stringify(data)),
+        },
+      });
 
       res.json({ msg: "Flows was saved", success: true });
     }
@@ -64,9 +67,7 @@ router.post("/insert_flow", validateUser, checkPlan, async (req, res) => {
 // get flows beta
 router.get("/get_flows", validateUser, checkPlan, async (req, res) => {
   try {
-    let data = await query(`SELECT * FROM wa_call_flows WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    let data = plain(await prisma.wa_call_flows.findMany({ where: { uid: whereStr(req.decode.uid) } }));
 
     data = data.map((x) => {
       return {
@@ -86,10 +87,7 @@ router.get("/get_flows", validateUser, checkPlan, async (req, res) => {
 router.post("/del_flow", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM wa_call_flows WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.wa_call_flows.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
     res.json({ msg: "Flow was deleted", success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -116,9 +114,7 @@ router.post("/fetch_el_voice", validateUser, async (req, res) => {
 // get call logs
 router.get("/call_logs", validateUser, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM wa_call_logs WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = plain(await prisma.wa_call_logs.findMany({ where: { uid: whereStr(req.decode.uid) } }));
     res.json({ data, success: true });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong", err });
@@ -139,12 +135,10 @@ router.post("/bulk_delete", validateUser, async (req, res) => {
     const numericIds = ids.map((id) => parseInt(id));
 
     // Verify all logs belong to the user before deleting
-    const placeholders = numericIds.map(() => "?").join(",");
-    const verifyQuery = `SELECT id FROM wa_call_logs WHERE id IN (${placeholders}) AND uid = ?`;
-    const verifyData = await query(verifyQuery, [
-      ...numericIds,
-      req.decode.uid,
-    ]);
+    const verifyData = await prisma.wa_call_logs.findMany({
+      where: { id: { in: idList(numericIds) }, uid: req.decode.uid },
+      select: { id: true },
+    });
 
     if (verifyData.length !== numericIds.length) {
       return res.json({
@@ -154,8 +148,9 @@ router.post("/bulk_delete", validateUser, async (req, res) => {
     }
 
     // Delete the logs
-    const deleteQuery = `DELETE FROM wa_call_logs WHERE id IN (${placeholders}) AND uid = ?`;
-    await query(deleteQuery, [...numericIds, req.decode.uid]);
+    await prisma.wa_call_logs.deleteMany({
+      where: { id: { in: idList(numericIds) }, uid: req.decode.uid },
+    });
 
     res.json({
       success: true,
@@ -177,30 +172,28 @@ router.post("/add_in_bot", validateUser, checkPlan, async (req, res) => {
       return res.json({ msg: "Please type title and select Flow" });
     }
 
-    const [getFlow] = await query(
-      `SELECT * FROM wa_call_flows WHERE uid = ? AND flow_id = ?`,
-      [req.decode.uid, flowId],
-    );
+    const [getFlow] = plain(await prisma.wa_call_flows.findMany({ where: { uid: whereStr(req.decode.uid), flow_id: whereStr(flowId) } }));
     if (!getFlow) {
       return res.json({
         msg: "Flow does not exist. Please select valid flow once again",
       });
     }
 
-    const [existFlow] = await query(
-      `SELECT * FROM wa_call_bot WHERE active = ? AND uid = ?`,
-      [1, req.decode.uid],
-    );
+    const [existFlow] = plain(await prisma.wa_call_bot.findMany({ where: { active: idParam(1), uid: whereStr(req.decode.uid) } }));
     if (existFlow) {
       return res.json({
         msg: "An active flow call bot is already running. Please disable that or delete that",
       });
     }
 
-    await query(
-      `INSERT INTO wa_call_bot (uid, title, flow_id, active) VALUES (?,?,?,?)`,
-      [req.decode.uid, title, getFlow?.flow_id, 1],
-    );
+    await prisma.wa_call_bot.create({
+      data: {
+        uid: str(req.decode.uid),
+        title: str(title),
+        flow_id: str(getFlow?.flow_id),
+        active: intOrNull(1),
+      },
+    });
 
     res.json({ msg: "Call Bot was added", success: true });
   } catch (err) {
@@ -219,10 +212,7 @@ router.post(
       const { id, active } = req.body;
 
       if (parseInt(active) > 0) {
-        const [existFlow] = await query(
-          `SELECT * FROM wa_call_bot WHERE active = ? AND uid = ?`,
-          [1, req.decode.uid],
-        );
+        const [existFlow] = plain(await prisma.wa_call_bot.findMany({ where: { active: idParam(1), uid: whereStr(req.decode.uid) } }));
         if (existFlow) {
           return res.json({
             msg: "An active flow call bot is already running. Please disable that or delete that",
@@ -230,10 +220,10 @@ router.post(
         }
       }
 
-      await query(
-        `UPDATE wa_call_bot SET active = ? WHERE uid = ? AND id = ?`,
-        [parseInt(active) > 0 ? 1 : 0, req.decode.uid, id],
-      );
+      await prisma.wa_call_bot.updateMany({
+        where: { uid: whereStr(req.decode.uid), id: idParam(id) },
+        data: { active: intOrNull(parseInt(active) > 0 ? 1 : 0) },
+      });
 
       res.json({ success: true, msg: "Status changed" });
     } catch (err) {
@@ -250,9 +240,7 @@ router.post(
 // get running bot
 router.get("/get_call_bot", validateUser, checkPlan, async (req, res) => {
   try {
-    const data = await query(`SELECT * FROM wa_call_bot WHERE uid = ?`, [
-      req.decode.uid,
-    ]);
+    const data = plain(await prisma.wa_call_bot.findMany({ where: { uid: whereStr(req.decode.uid) } }));
     res.json({ data, success: true });
   } catch (err) {
     res.json({
@@ -268,10 +256,7 @@ router.get("/get_call_bot", validateUser, checkPlan, async (req, res) => {
 router.post("/del_call_bot", validateUser, checkPlan, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM wa_call_bot WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.wa_call_bot.deleteMany({ where: { id: idParam(id), uid: whereStr(req.decode.uid) } });
     res.json({ msg: "Bot was deleted", success: true });
   } catch (err) {
     res.json({
@@ -292,20 +277,14 @@ router.post("/create_broadcast", validateUser, checkPlan, async (req, res) => {
       return res.json({ msg: "Title and Flow are required" });
     }
 
-    const contacts = await query(
-      `SELECT * FROM contact WHERE uid = ? AND phonebook_id = ?`,
-      [req.decode.uid, phonebook?.id],
-    );
+    const contacts = plain(await prisma.contact.findMany({ where: { uid: whereStr(req.decode.uid), phonebook_id: whereStr(phonebook?.id) } }));
 
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
       return res.json({ msg: "At least one contact is required" });
     }
 
     // Validate flow exists
-    const [flow] = await query(
-      `SELECT * FROM wa_call_flows WHERE uid = ? AND flow_id = ?`,
-      [req.decode.uid, flowId],
-    );
+    const [flow] = plain(await prisma.wa_call_flows.findMany({ where: { uid: whereStr(req.decode.uid), flow_id: whereStr(flowId) } }));
 
     if (!flow) {
       return res.json({ msg: "Selected flow does not exist" });
@@ -363,7 +342,9 @@ router.post("/create_broadcast", validateUser, checkPlan, async (req, res) => {
       }),
     };
 
-    await query(`INSERT INTO wa_call_broadcasts SET ?`, campaignData);
+    await prisma.wa_call_broadcasts.create({
+      data: { ...campaignData, retry_failed: Boolean(campaignData.retry_failed) },
+    });
 
     res.json({
       success: true,
@@ -379,10 +360,7 @@ router.post("/create_broadcast", validateUser, checkPlan, async (req, res) => {
 // Get all broadcasts for user
 router.get("/get_broadcasts", validateUser, checkPlan, async (req, res) => {
   try {
-    const broadcasts = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE uid = ? ORDER BY created_at DESC`,
-      [req.decode.uid],
-    );
+    const broadcasts = plain(await prisma.wa_call_broadcasts.findMany({ where: { uid: whereStr(req.decode.uid) }, orderBy: { created_at: "desc" } }));
 
     const formattedBroadcasts = broadcasts.map((b) => ({
       ...b,
@@ -407,10 +385,7 @@ router.get(
     try {
       const { campaignId } = req.params;
 
-      const [broadcast] = await query(
-        `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-        [campaignId, req.decode.uid],
-      );
+      const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) } }));
 
       if (!broadcast) {
         return res.json({ success: false, msg: "Broadcast not found" });
@@ -440,10 +415,7 @@ router.post(
     try {
       const { campaignId } = req.body;
 
-      const [broadcast] = await query(
-        `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-        [campaignId, req.decode.uid],
-      );
+      const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) } }));
 
       if (!broadcast) {
         return res.json({ success: false, msg: "Broadcast not found" });
@@ -454,10 +426,10 @@ router.post(
       }
 
       // Update status
-      await query(
-        `UPDATE wa_call_broadcasts SET status = 'requesting_permissions', started_at = NOW() WHERE campaign_id = ?`,
-        [campaignId],
-      );
+      await prisma.wa_call_broadcasts.updateMany({
+        where: { campaign_id: whereStr(campaignId) },
+        data: { status: "requesting_permissions", started_at: new Date() },
+      });
 
       // Add log
       const logs = JSON.parse(broadcast.logs || "[]");
@@ -467,10 +439,10 @@ router.post(
         message: "Started requesting call permissions from contacts",
       });
 
-      await query(
-        `UPDATE wa_call_broadcasts SET logs = ? WHERE campaign_id = ?`,
-        [JSON.stringify(logs), campaignId],
-      );
+      await prisma.wa_call_broadcasts.updateMany({
+        where: { campaign_id: whereStr(campaignId) },
+        data: { logs: str(JSON.stringify(logs)) },
+      });
 
       // Trigger permission request process (async)
       setImmediate(() => {
@@ -493,10 +465,7 @@ router.post("/start_calling", validateUser, checkPlan, async (req, res) => {
   try {
     const { campaignId } = req.body;
 
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, req.decode.uid],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) } }));
 
     if (!broadcast) {
       return res.json({ success: false, msg: "Broadcast not found" });
@@ -510,10 +479,7 @@ router.post("/start_calling", validateUser, checkPlan, async (req, res) => {
     }
 
     // Update status
-    await query(
-      `UPDATE wa_call_broadcasts SET status = 'running' WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    await prisma.wa_call_broadcasts.updateMany({ where: { campaign_id: whereStr(campaignId) }, data: { status: "running" } });
 
     // Add log
     const logs = JSON.parse(broadcast.logs || "[]");
@@ -523,10 +489,10 @@ router.post("/start_calling", validateUser, checkPlan, async (req, res) => {
       message: "Started making calls to contacts with granted permissions",
     });
 
-    await query(
-      `UPDATE wa_call_broadcasts SET logs = ? WHERE campaign_id = ?`,
-      [JSON.stringify(logs), campaignId],
-    );
+    await prisma.wa_call_broadcasts.updateMany({
+      where: { campaign_id: whereStr(campaignId) },
+      data: { logs: str(JSON.stringify(logs)) },
+    });
 
     // ✅ FIX: Trigger calling process (async)
     setImmediate(() => {
@@ -548,10 +514,10 @@ router.post("/pause_broadcast", validateUser, checkPlan, async (req, res) => {
   try {
     const { campaignId } = req.body;
 
-    await query(
-      `UPDATE wa_call_broadcasts SET status = 'paused' WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, req.decode.uid],
-    );
+    await prisma.wa_call_broadcasts.updateMany({
+      where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) },
+      data: { status: "paused" },
+    });
 
     res.json({ success: true, msg: "Broadcast paused" });
   } catch (err) {
@@ -565,10 +531,10 @@ router.post("/delete_broadcast", validateUser, checkPlan, async (req, res) => {
   try {
     const { campaignId } = req.body;
 
-    const [broadcast] = await query(
-      `SELECT status FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, req.decode.uid],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({
+      where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) },
+      select: { status: true },
+    }));
 
     if (!broadcast) {
       return res.json({ success: false, msg: "Broadcast not found" });
@@ -581,10 +547,7 @@ router.post("/delete_broadcast", validateUser, checkPlan, async (req, res) => {
       });
     }
 
-    await query(
-      `DELETE FROM wa_call_broadcasts WHERE campaign_id = ? AND uid = ?`,
-      [campaignId, req.decode.uid],
-    );
+    await prisma.wa_call_broadcasts.deleteMany({ where: { campaign_id: whereStr(campaignId), uid: whereStr(req.decode.uid) } });
 
     res.json({ success: true, msg: "Broadcast deleted" });
   } catch (err) {
@@ -598,10 +561,7 @@ router.post("/update_broadcast_contact", async (req, res) => {
   try {
     const { campaignId, contactMobile, updates } = req.body;
 
-    const [broadcast] = await query(
-      `SELECT * FROM wa_call_broadcasts WHERE campaign_id = ?`,
-      [campaignId],
-    );
+    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
 
     if (!broadcast) {
       return res.json({ success: false, msg: "Broadcast not found" });
@@ -642,19 +602,16 @@ router.post("/update_broadcast_contact", async (req, res) => {
       statsUpdate.calls_failed = broadcast.calls_failed + 1;
     }
 
-    // Build update query
-    let updateQuery = `UPDATE wa_call_broadcasts SET contacts = ?`;
-    let updateParams = [JSON.stringify(contacts)];
-
+    // statsUpdate only ever holds the integer counter columns set above
+    const data = { contacts: JSON.stringify(contacts) };
     Object.keys(statsUpdate).forEach((key) => {
-      updateQuery += `, ${key} = ?`;
-      updateParams.push(statsUpdate[key]);
+      data[key] = intOrNull(statsUpdate[key]) ?? 0;
     });
 
-    updateQuery += ` WHERE campaign_id = ?`;
-    updateParams.push(campaignId);
-
-    await query(updateQuery, updateParams);
+    await prisma.wa_call_broadcasts.updateMany({
+      where: { campaign_id: whereStr(campaignId) },
+      data,
+    });
 
     res.json({ success: true, msg: "Contact updated" });
   } catch (err) {
@@ -669,9 +626,7 @@ router.post(
   validateUser,
   async (req, res) => {
     try {
-      const [metaAPI] = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-        req.decode.uid,
-      ]);
+      const [metaAPI] = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(req.decode.uid) } }));
 
       if (!metaAPI?.access_token || !metaAPI?.business_phone_number_id) {
         return res.json({
