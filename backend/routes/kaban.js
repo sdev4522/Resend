@@ -1,5 +1,14 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const {
+  plain,
+  idParam,
+  intOrNull,
+  dayRange,
+  dateBetween,
+  lastDays,
+  thisMonth,
+} = require("../database/prismaHelpers");
 const validateUser = require("../middlewares/user.js");
 const { checkPlan } = require("../middlewares/plan.js");
 const logger = require("../utils/logger.js");
@@ -12,25 +21,27 @@ router.post("/move_card", validateUser, checkPlan, async (req, res) => {
 
     if (!chatId) return res.json({ success: false, msg: "chatId is required" });
 
-    const [chat] = await query(
-      `SELECT id, chat_label FROM beta_chats WHERE id = ? AND uid = ?`,
-      [chatId, uid],
-    );
+    const chat = await prisma.beta_chats.findFirst({
+      where: { id: idParam(chatId), uid },
+      select: { id: true, chat_label: true },
+    });
     if (!chat) return res.json({ success: false, msg: "Chat not found" });
 
+    const order = intOrNull(kanban_order) ?? 0;
+
     if (!newLabelId) {
-      await query(
-        `UPDATE beta_chats SET chat_label = ?, kanban_order = ? WHERE id = ? AND uid = ?`,
-        [JSON.stringify([]), kanban_order ?? 0, chatId, uid],
-      );
+      await prisma.beta_chats.updateMany({
+        where: { id: chat.id, uid },
+        data: { chat_label: JSON.stringify([]), kanban_order: order },
+      });
       return res.json({ success: true });
     }
 
-    const [newLabel] = await query(
-      `SELECT * FROM chat_tags WHERE id = ? AND uid = ?`,
-      [newLabelId, uid],
-    );
-    if (!newLabel) return res.json({ success: false, msg: "Label not found" });
+    const labelRow = await prisma.chat_tags.findFirst({
+      where: { id: idParam(newLabelId), uid },
+    });
+    if (!labelRow) return res.json({ success: false, msg: "Label not found" });
+    const newLabel = plain(labelRow);
 
     let existingLabels = [];
     try {
@@ -40,10 +51,10 @@ router.post("/move_card", validateUser, checkPlan, async (req, res) => {
 
     const updatedLabels = [newLabel, ...existingLabels.slice(1)];
 
-    await query(
-      `UPDATE beta_chats SET chat_label = ?, kanban_order = ? WHERE id = ? AND uid = ?`,
-      [JSON.stringify(updatedLabels), kanban_order ?? 0, chatId, uid],
-    );
+    await prisma.beta_chats.updateMany({
+      where: { id: chat.id, uid },
+      data: { chat_label: JSON.stringify(updatedLabels), kanban_order: order },
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -61,10 +72,10 @@ router.post("/update_tag_kanban_visibility", validateUser, async (req, res) => {
     if (!labelId)
       return res.json({ success: false, msg: "labelId is required" });
 
-    await query(
-      `UPDATE chat_tags SET show_on_kanban = ? WHERE id = ? AND uid = ?`,
-      [show_on_kanban ? 1 : 0, labelId, uid],
-    );
+    await prisma.chat_tags.updateMany({
+      where: { id: idParam(labelId), uid },
+      data: { show_on_kanban: Boolean(show_on_kanban) },
+    });
 
     res.json({ success: true });
   } catch (err) {
@@ -87,69 +98,70 @@ router.post("/get_board", validateUser, checkPlan, async (req, res) => {
     } = req.body;
 
     // Only fetch labels that are shown on kanban
-    const labels = await query(
-      `SELECT * FROM chat_tags WHERE uid = ? AND show_on_kanban = 1 ORDER BY id ASC`,
-      [uid],
+    const labels = plain(
+      await prisma.chat_tags.findMany({
+        where: { uid, show_on_kanban: true },
+        orderBy: { id: "asc" },
+      }),
     );
 
-    let searchCondition = `WHERE uid = ?`;
-    const params = [uid];
+    const where = { uid };
 
-    // ── Date filter ──────────────────────────────────────────────────────────
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, "0");
-    const toDateStr = (d) =>
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
+    // ── Date filter (local server time, same as the previous MySQL NOW()/DATE()) ──
     if (dateFilter === "today") {
-      const today = toDateStr(now);
-      searchCondition += ` AND DATE(updatedAt) = ?`;
-      params.push(today);
+      where.updatedAt = dayRange(new Date());
     } else if (dateFilter === "yesterday") {
-      const yest = new Date(now);
+      const yest = new Date();
       yest.setDate(yest.getDate() - 1);
-      searchCondition += ` AND DATE(updatedAt) = ?`;
-      params.push(toDateStr(yest));
+      where.updatedAt = dayRange(yest);
     } else if (dateFilter === "last7") {
-      searchCondition += ` AND updatedAt >= DATE_SUB(NOW(), INTERVAL 7 DAY)`;
+      where.updatedAt = lastDays(7);
     } else if (dateFilter === "last30") {
-      searchCondition += ` AND updatedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)`;
+      where.updatedAt = lastDays(30);
     } else if (dateFilter === "thisMonth") {
-      searchCondition += ` AND MONTH(updatedAt) = MONTH(NOW()) AND YEAR(updatedAt) = YEAR(NOW())`;
+      where.updatedAt = thisMonth();
     } else if (dateFilter === "custom" && dateFrom && dateTo) {
-      searchCondition += ` AND DATE(updatedAt) BETWEEN ? AND ?`;
-      params.push(dateFrom, dateTo);
+      where.updatedAt = dateBetween(dateFrom, dateTo);
     }
     // lifetime → no date filter
 
     if (search) {
-      searchCondition += ` AND (
-        sender_name LIKE ? OR
-        sender_mobile LIKE ? OR
-        last_message LIKE ? OR
-        chat_label LIKE ?
-      )`;
-      params.push(
-        `%${search}%`,
-        `%${search}%`,
-        `%${search}%`,
-        `%"title":"%${search}%"%`,
-      );
+      const term = String(search);
+      where.OR = [
+        { sender_name: { contains: term } },
+        { sender_mobile: { contains: term } },
+        { last_message: { contains: term } },
+        // label titles live inside the JSON chat_label column
+        { AND: [{ chat_label: { contains: '"title":"' } }, { chat_label: { contains: term } }] },
+      ];
     }
 
-    const [{ total }] = await query(
-      `SELECT COUNT(*) as total FROM beta_chats ${searchCondition}`,
-      params,
-    );
+    const take = Math.max(0, parseInt(limit, 10) || 20);
+    const skip = Math.max(0, parseInt(offset, 10) || 0);
 
-    const chats = await query(
-      `SELECT id, chat_id, sender_name, sender_mobile, last_message,
-              origin, unread_count, assigned_agent, chat_label, kanban_order, updatedAt
-       FROM beta_chats ${searchCondition}
-       ORDER BY kanban_order ASC, updatedAt DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
-    );
+    const [total, chatRows] = await Promise.all([
+      prisma.beta_chats.count({ where }),
+      prisma.beta_chats.findMany({
+        where,
+        select: {
+          id: true,
+          chat_id: true,
+          sender_name: true,
+          sender_mobile: true,
+          last_message: true,
+          origin: true,
+          unread_count: true,
+          assigned_agent: true,
+          chat_label: true,
+          kanban_order: true,
+          updatedAt: true,
+        },
+        orderBy: [{ kanban_order: "asc" }, { updatedAt: "desc" }],
+        take,
+        skip,
+      }),
+    ]);
+    const chats = plain(chatRows);
 
     const parsedChats = chats.map((chat) => {
       try {

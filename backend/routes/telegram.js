@@ -1,5 +1,5 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
 const {
   createSession,
   verifyCode,
@@ -42,7 +42,9 @@ router.post(
         });
       }
 
-      const [api] = await query(`SELECT * FROM web_private`, []);
+      const api = await prisma.web_private.findFirst({
+        select: { teleAppId: true, teleHash: true },
+      });
       const apiId = api?.teleAppId;
       const apiHash = api?.teleHash;
 

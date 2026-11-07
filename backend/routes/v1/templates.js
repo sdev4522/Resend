@@ -7,7 +7,7 @@ const {
   checkPlanMonthlyQuota,
 } = require("../../middlewares/rateLimiter");
 const { recordUsageEvent } = require("../../services/api/usageService");
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
 const logger = require("../../utils/logger");
 
 /**
@@ -21,17 +21,17 @@ router.get("/templates", requireScope("templates:read"), async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const countRows = await query(
-      `SELECT COUNT(*) as total FROM templets WHERE uid = ?`,
-      [req.workspaceId]
-    );
-    const total = countRows[0]?.total || 0;
-
-    const rows = await query(
-      `SELECT id, title, type, content, createdAt FROM templets 
-       WHERE uid = ? ORDER BY id DESC LIMIT ? OFFSET ?`,
-      [req.workspaceId, limit, offset]
-    );
+    const where = { uid: req.workspaceId };
+    const [total, rows] = await Promise.all([
+      prisma.templets.count({ where }),
+      prisma.templets.findMany({
+        where,
+        select: { id: true, title: true, type: true, content: true, createdAt: true },
+        orderBy: { id: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
 
     const templates = rows.map((r) => {
       let parsedContent = null;

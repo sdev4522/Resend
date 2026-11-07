@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const { requireScope } = require("../../middlewares/publicApiAuth");
-const { query } = require("../../database/dbpromise");
+const { prisma } = require("../../database/prisma");
 const logger = require("../../utils/logger");
 
 /**
@@ -15,26 +15,33 @@ router.get("/contacts", requireScope("contacts:read"), async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    let countSql = `SELECT COUNT(*) as total FROM contact WHERE uid = ?`;
-    let querySql = `SELECT id, name, mobile, phonebook_name, var1, var2, var3, var4, var5, createdAt 
-                    FROM contact WHERE uid = ?`;
-    const countParams = [req.workspaceId];
-    const queryParams = [req.workspaceId];
-
+    const where = { uid: req.workspaceId };
     if (search) {
-      countSql += ` AND (name LIKE ? OR mobile LIKE ?)`;
-      countParams.push(search, search);
-      querySql += ` AND (name LIKE ? OR mobile LIKE ?)`;
-      queryParams.push(search, search);
+      const term = String(req.query.search).trim();
+      where.OR = [{ name: { contains: term } }, { mobile: { contains: term } }];
     }
 
-    querySql += ` ORDER BY id DESC LIMIT ? OFFSET ?`;
-    queryParams.push(limit, offset);
-
-    const countRows = await query(countSql, countParams);
-    const total = countRows[0]?.total || 0;
-
-    const rows = await query(querySql, queryParams);
+    const [total, rows] = await Promise.all([
+      prisma.contact.count({ where }),
+      prisma.contact.findMany({
+        where,
+        select: {
+          id: true,
+          name: true,
+          mobile: true,
+          phonebook_name: true,
+          var1: true,
+          var2: true,
+          var3: true,
+          var4: true,
+          var5: true,
+          createdAt: true,
+        },
+        orderBy: { id: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
 
     const contacts = rows.map((r) => ({
       id: `cnt_${r.id}`,

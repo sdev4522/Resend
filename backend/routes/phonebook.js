@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { plain, idParam, str, idList } = require("../database/prismaHelpers");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -32,24 +33,24 @@ router.post(
       const name = rawName.trim();
 
       // find ext
-      const findExt = await query(
-        `SELECT id FROM phonebook WHERE uid = ? AND name = ?`,
-        [req.decode.uid, name],
-      );
+      const findExt = await prisma.phonebook.findFirst({
+        where: { uid: req.decode.uid, name },
+        select: { id: true },
+      });
 
-      if (findExt && findExt.length > 0) {
+      if (findExt) {
         return res.status(409).json({
           success: false,
           msg: "Duplicate phonebook name found",
         });
       }
 
-      const insertResult = await query(
-        `INSERT INTO phonebook (name, uid) VALUES (?, ?)`,
-        [name, req.decode.uid],
-      );
+      const created = await prisma.phonebook.create({
+        data: { name, uid: req.decode.uid },
+        select: { id: true },
+      });
 
-      if (!insertResult || !insertResult.insertId || insertResult.affectedRows < 1) {
+      if (!created?.id) {
         return res.status(500).json({
           success: false,
           msg: "Failed to create phonebook group in database",
@@ -60,7 +61,7 @@ router.post(
         success: true,
         msg: "Phonebook group created successfully",
         data: {
-          id: insertResult.insertId,
+          id: created.id,
           name,
           uid: req.decode.uid,
           contactCount: 0,
@@ -79,17 +80,28 @@ router.post(
 // get by uid
 router.get("/get_by_uid", validateUser, async (req, res) => {
   try {
-    const data = await query(
-      `SELECT p.*, COUNT(c.id) AS contactCount
-       FROM phonebook p
-       LEFT JOIN contact c ON (c.phonebook_id = p.id AND c.uid = p.uid)
-       WHERE p.uid = ?
-       GROUP BY p.id
-       ORDER BY p.id DESC`,
-      [req.decode.uid],
-    );
+    const [phonebooks, counts] = await Promise.all([
+      prisma.phonebook.findMany({
+        where: { uid: req.decode.uid },
+        orderBy: { id: "desc" },
+      }),
+      prisma.contact.groupBy({
+        by: ["phonebook_id"],
+        where: { uid: req.decode.uid },
+        _count: { id: true },
+      }),
+    ]);
 
-    res.json({ data: data || [], success: true });
+    // contact.phonebook_id is VARCHAR while phonebook.id is INT
+    const countByPhonebook = new Map(
+      counts.map((c) => [String(c.phonebook_id), c._count.id]),
+    );
+    const data = phonebooks.map((p) => ({
+      ...plain(p),
+      contactCount: countByPhonebook.get(String(p.id)) || 0,
+    }));
+
+    res.json({ data, success: true });
   } catch (err) {
     logger.error("Error fetching phonebooks by uid:", err);
     res.status(500).json({ success: false, msg: "Something went wrong" });
@@ -102,23 +114,21 @@ router.put("/edit_contact", validateUser, async (req, res) => {
 
   try {
     // Update contact in the database
-    const result = await query(
-      `UPDATE contact SET name = ?, mobile = ?, var1 = ?, var2 = ?, var3 = ?, var4 = ?, var5 = ?, var6 = ? WHERE id = ? AND uid = ?`,
-      [
-        name,
-        mobile,
-        var1,
-        var2,
-        var3,
-        var4,
-        var5,
-        var6,
-        contactId,
-        req.decode.uid,
-      ],
-    );
+    const result = await prisma.contact.updateMany({
+      where: { id: idParam(contactId), uid: req.decode.uid },
+      data: {
+        name: str(name),
+        mobile: str(mobile),
+        var1: str(var1),
+        var2: str(var2),
+        var3: str(var3),
+        var4: str(var4),
+        var5: str(var5),
+        var6: str(var6),
+      },
+    });
 
-    if (result.affectedRows > 0) {
+    if (result.count > 0) {
       res.json({ success: true, msg: "Contact updated successfully" });
     } else {
       res.json({ success: false, msg: "Contact not found or no changes made" });
@@ -139,18 +149,19 @@ router.post("/del_phonebook", validateUser, async (req, res) => {
       return res.status(400).json({ success: false, msg: "Phonebook ID is required" });
     }
 
-    const [existing] = await query(
-      `SELECT id FROM phonebook WHERE id = ? AND uid = ?`,
-      [id, req.decode.uid]
-    );
+    const existing = await prisma.phonebook.findFirst({
+      where: { id: idParam(id), uid: req.decode.uid },
+      select: { id: true },
+    });
     if (!existing) {
       return res.status(404).json({ success: false, msg: "Phonebook not found or unauthorized" });
     }
 
-    await query(`DELETE FROM phonebook WHERE id = ? AND uid = ?`, [id, req.decode.uid]);
-    await query(`DELETE FROM contact WHERE phonebook_id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
+    await prisma.$transaction([
+      prisma.phonebook.deleteMany({ where: { id: existing.id, uid: req.decode.uid } }),
+      prisma.contact.deleteMany({
+        where: { phonebook_id: String(existing.id), uid: req.decode.uid },
+      }),
     ]);
 
     res.json({ success: true, msg: "Phonebook was deleted" });
@@ -242,10 +253,10 @@ router.post(
       }
 
       // Verify phonebook ownership (Tenant Isolation)
-      const [ownedPhonebook] = await query(
-        `SELECT id, name FROM phonebook WHERE id = ? AND uid = ?`,
-        [id, req.decode.uid],
-      );
+      const ownedPhonebook = await prisma.phonebook.findFirst({
+        where: { id: idParam(id), uid: req.decode.uid },
+        select: { id: true, name: true },
+      });
       if (!ownedPhonebook) {
         return res.status(404).json({
           success: false,
@@ -304,27 +315,23 @@ router.post(
         });
       }
 
-      const values = csvData.map((item) => [
-        req.decode.uid,
-        id,
-        phonebook_name || ownedPhonebook.name,
-        item.name,
-        String(item.mobile).trim(),
-        item.var1,
-        item.var2,
-        item.var3,
-        item.var4,
-        item.var5,
-      ]);
+      const values = csvData.map((item) => ({
+        uid: req.decode.uid,
+        phonebook_id: String(ownedPhonebook.id),
+        phonebook_name: str(phonebook_name || ownedPhonebook.name),
+        name: str(item.name),
+        mobile: String(item.mobile).trim(),
+        var1: str(item.var1),
+        var2: str(item.var2),
+        var3: str(item.var3),
+        var4: str(item.var4),
+        var5: str(item.var5),
+      }));
 
       // Chunk inserts in batches of 1,000 to prevent packet limit exhaustion and memory spikes
       const CHUNK_SIZE = 1000;
       for (let i = 0; i < values.length; i += CHUNK_SIZE) {
-        const chunk = values.slice(i, i + CHUNK_SIZE);
-        await query(
-          `INSERT INTO contact (uid, phonebook_id, phonebook_name, name, mobile, var1, var2, var3, var4, var5) VALUES ?`,
-          [chunk],
-        );
+        await prisma.contact.createMany({ data: values.slice(i, i + CHUNK_SIZE) });
       }
 
       res.json({
@@ -361,10 +368,10 @@ router.post(
       }
 
       // Verify phonebook ownership (Tenant Isolation)
-      const [ownedPhonebook] = await query(
-        `SELECT id, name FROM phonebook WHERE id = ? AND uid = ?`,
-        [targetPbId, req.decode.uid],
-      );
+      const ownedPhonebook = await prisma.phonebook.findFirst({
+        where: { id: idParam(targetPbId), uid: req.decode.uid },
+        select: { id: true, name: true },
+      });
       if (!ownedPhonebook) {
         return res.status(404).json({
           success: false,
@@ -388,21 +395,20 @@ router.post(
         });
       }
 
-      await query(
-        `INSERT INTO contact (uid, phonebook_id, phonebook_name, name, mobile, var1, var2, var3, var4, var5) VALUES (?,?,?,?,?,?,?,?,?,?)`,
-        [
-          req.decode.uid,
-          targetPbId,
-          phonebook_name || ownedPhonebook.name,
-          name,
-          cleanedMobile,
-          var1,
-          var2,
-          var3,
-          var4,
-          var5,
-        ],
-      );
+      await prisma.contact.create({
+        data: {
+          uid: req.decode.uid,
+          phonebook_id: String(ownedPhonebook.id),
+          phonebook_name: str(phonebook_name || ownedPhonebook.name),
+          name: str(name),
+          mobile: cleanedMobile,
+          var1: str(var1),
+          var2: str(var2),
+          var3: str(var3),
+          var4: str(var4),
+          var5: str(var5),
+        },
+      });
 
       res.json({
         success: true,
@@ -418,6 +424,17 @@ router.post(
   },
 );
 
+function buildContactWhere(uid, search, phonebook_id) {
+  const where = { uid };
+  if (search) {
+    where.OR = [{ name: { contains: search } }, { mobile: { contains: search } }];
+  }
+  if (phonebook_id) {
+    where.phonebook_id = String(phonebook_id);
+  }
+  return where;
+}
+
 // GET /api/phonebook/get_uid_contacts?page=1&limit=50&search=john&phonebook_id=
 router.get("/get_uid_contacts", validateUser, async (req, res) => {
   try {
@@ -427,39 +444,26 @@ router.get("/get_uid_contacts", validateUser, async (req, res) => {
     const search = (req.query.search || "").trim();
     const phonebook_id = req.query.phonebook_id || "";
 
-    let whereClauses = ["uid = ?"];
-    let params = [req.decode.uid];
+    const where = buildContactWhere(req.decode.uid, search, phonebook_id);
 
-    if (search) {
-      whereClauses.push("(name LIKE ? OR mobile LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (phonebook_id) {
-      whereClauses.push("phonebook_id = ?");
-      params.push(phonebook_id);
-    }
-
-    const whereSQL = "WHERE " + whereClauses.join(" AND ");
-
-    const [countResult] = await query(
-      `SELECT COUNT(*) AS total FROM contact ${whereSQL}`,
-      params,
-    );
-
-    const data = await query(
-      `SELECT * FROM contact ${whereSQL} ORDER BY id DESC LIMIT ? OFFSET ?`,
-      [...params, limit, offset],
-    );
+    const [total, rows] = await Promise.all([
+      prisma.contact.count({ where }),
+      prisma.contact.findMany({
+        where,
+        orderBy: { id: "desc" },
+        take: limit,
+        skip: offset,
+      }),
+    ]);
 
     res.json({
       success: true,
-      data,
+      data: plain(rows),
       pagination: {
-        total: countResult.total,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(countResult.total / limit),
+        totalPages: Math.ceil(total / limit),
       },
     });
   } catch (err) {
@@ -475,7 +479,9 @@ router.post("/del_contacts", validateUser, async (req, res) => {
     if (!Array.isArray(selected) || selected.length === 0) {
       return res.status(400).json({ success: false, msg: "No contacts selected" });
     }
-    await query(`DELETE FROM contact WHERE id IN (?) AND uid = ?`, [selected, req.decode.uid]);
+    await prisma.contact.deleteMany({
+      where: { id: { in: idList(selected) }, uid: req.decode.uid },
+    });
     res.json({ success: true, msg: "Contact(s) was deleted" });
   } catch (err) {
     logger.error("del_contacts error:", err);
@@ -486,10 +492,11 @@ router.post("/del_contacts", validateUser, async (req, res) => {
 // In phonebook.js router — just a simple read, no new logic
 router.get("/get_for_flow", validateUser, async (req, res) => {
   try {
-    const data = await query(
-      `SELECT id, name FROM phonebook WHERE uid = ? ORDER BY name ASC`,
-      [req.decode.uid],
-    );
+    const data = await prisma.phonebook.findMany({
+      where: { uid: req.decode.uid },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    });
     res.json({ success: true, data });
   } catch (err) {
     logger.error("get_for_flow error:", err);
@@ -503,26 +510,21 @@ router.get("/export_contacts_csv", validateUser, async (req, res) => {
     const search = (req.query.search || "").trim();
     const phonebook_id = req.query.phonebook_id || "";
 
-    let whereClauses = ["uid = ?"];
-    let params = [req.decode.uid];
-
-    if (search) {
-      whereClauses.push("(name LIKE ? OR mobile LIKE ?)");
-      params.push(`%${search}%`, `%${search}%`);
-    }
-
-    if (phonebook_id) {
-      whereClauses.push("phonebook_id = ?");
-      params.push(phonebook_id);
-    }
-
-    const whereSQL = "WHERE " + whereClauses.join(" AND ");
-
-    const data = await query(
-      `SELECT name, mobile, phonebook_name, var1, var2, var3, var4, var5, createdAt
-       FROM contact ${whereSQL} ORDER BY id DESC`,
-      params,
-    );
+    const data = await prisma.contact.findMany({
+      where: buildContactWhere(req.decode.uid, search, phonebook_id),
+      select: {
+        name: true,
+        mobile: true,
+        phonebook_name: true,
+        var1: true,
+        var2: true,
+        var3: true,
+        var4: true,
+        var5: true,
+        createdAt: true,
+      },
+      orderBy: { id: "desc" },
+    });
 
     const fields = [
       "name",

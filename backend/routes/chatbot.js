@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const { prisma } = require("../database/prisma");
+const { idParam, str } = require("../database/prismaHelpers");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
 const {
@@ -24,10 +25,9 @@ router.post("/add_beta_chatbot", validateUser, checkPlan, checkChatbot, async (r
     }
 
     const { flow_id } = flow;
-    const [getFlow] = await query(
-      `SELECT * FROM beta_flows WHERE flow_id = ? AND uid = ?`,
-      [flow_id, req.decode.uid],
-    );
+    const getFlow = await prisma.beta_flows.findFirst({
+      where: { flow_id: str(flow_id), uid: req.decode.uid },
+    });
     if (!getFlow) {
       return res.json({ msg: "This flow is not existed" });
     }
@@ -109,10 +109,9 @@ router.post("/add_beta_chatbot", validateUser, checkPlan, checkChatbot, async (r
     }
 
     // ── duplicate check ─────────────────────────────────────────────────────
-    const getAllChatbots = await query(
-      `SELECT * FROM beta_chatbot WHERE uid = ?`,
-      [req.decode.uid],
-    );
+    const getAllChatbots = await prisma.beta_chatbot.findMany({
+      where: { uid: req.decode.uid },
+    });
     const chatbots = getAllChatbots?.map((x) => JSON.parse(x.origin)) || [];
 
     if (origin?.code === "META" && chatbots.find((x) => x.code === "META")) {
@@ -161,17 +160,16 @@ router.post("/add_beta_chatbot", validateUser, checkPlan, checkChatbot, async (r
       source = "wa_chatbot";
     }
 
-    await query(
-      `INSERT INTO beta_chatbot (uid, source, title, flow_id, origin, origin_id) VALUES (?,?,?,?,?,?)`,
-      [
-        req.decode.uid,
+    await prisma.beta_chatbot.create({
+      data: {
+        uid: req.decode.uid,
         source,
-        title,
-        flow_id,
-        JSON.stringify(origin),
-        origin_id,
-      ],
-    );
+        title: str(title),
+        flow_id: str(flow_id),
+        origin: JSON.stringify(origin),
+        origin_id: str(origin_id),
+      },
+    });
 
     res.json({ success: true, msg: "Chatbot was added successfully" });
   } catch (err) {
@@ -184,23 +182,16 @@ router.post("/add_beta_chatbot", validateUser, checkPlan, checkChatbot, async (r
 router.get("/get_beta_chatbots", validateUser, async (req, res) => {
   try {
     const { type, flow_id } = req.query;
-    let data;
+    const where = { uid: req.decode.uid };
     if (flow_id) {
-      data = await query(
-        `SELECT * FROM beta_chatbot WHERE uid = ? AND flow_id = ? ORDER BY id DESC`,
-        [req.decode.uid, flow_id],
-      );
-    } else if (!type || type === "all") {
-      data = await query(
-        `SELECT * FROM beta_chatbot WHERE uid = ? ORDER BY id DESC`,
-        [req.decode.uid],
-      );
-    } else {
-      data = await query(
-        `SELECT * FROM beta_chatbot WHERE uid = ? AND source = ? ORDER BY id DESC`,
-        [req.decode.uid, type],
-      );
+      where.flow_id = str(flow_id);
+    } else if (type && type !== "all") {
+      where.source = str(type);
     }
+    const data = await prisma.beta_chatbot.findMany({
+      where,
+      orderBy: { id: "desc" },
+    });
     res.json({ data, success: true });
   } catch (err) {
     logger.log(err);
@@ -212,11 +203,10 @@ router.get("/get_beta_chatbots", validateUser, async (req, res) => {
 router.post("/change_beta_bot_status", validateUser, checkPlan, checkChatbot, async (req, res) => {
   try {
     const { id, status } = req.body;
-    await query(`UPDATE beta_chatbot SET active = ? WHERE uid = ? AND id = ?`, [
-      status ? 1 : 0,
-      req.decode.uid,
-      id,
-    ]);
+    await prisma.beta_chatbot.updateMany({
+      where: { uid: req.decode.uid, id: idParam(id) },
+      data: { active: status ? 1 : 0 },
+    });
     res.json({ msg: "Satus changed", success: true });
   } catch (err) {
     logger.log(err);
@@ -228,10 +218,9 @@ router.post("/change_beta_bot_status", validateUser, checkPlan, checkChatbot, as
 router.post("/del_beta_chatbot", validateUser, async (req, res) => {
   try {
     const { id } = req.body;
-    await query(`DELETE FROM beta_chatbot WHERE id = ? AND uid = ?`, [
-      id,
-      req.decode.uid,
-    ]);
+    await prisma.beta_chatbot.deleteMany({
+      where: { id: idParam(id), uid: req.decode.uid },
+    });
     res.json({ msg: "Chatbot was deleted", success: true });
   } catch (err) {
     logger.log(err);
