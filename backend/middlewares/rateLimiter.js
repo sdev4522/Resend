@@ -1,4 +1,5 @@
-const { query } = require("../database/dbpromise");
+const dbpromise = require("../database/dbpromise");
+const query = (...args) => dbpromise.query(...args);
 const logger = require("../utils/logger");
 
 const RATE_LIMIT_ENABLED = process.env.API_RATE_LIMIT_ENABLED !== "false";
@@ -14,7 +15,7 @@ const DEFAULT_LIMITS = {
 /**
  * Check and increment an atomic sliding-window counter in the database
  */
-async function checkBucket(bucketKey, limit, windowSizeMs = 60000) {
+async function checkBucket(bucketKey, limit, windowSizeMs = 60000, failClosed = false) {
   const now = Date.now();
   const windowStart = Math.floor(now / windowSizeMs) * windowSizeMs;
 
@@ -50,12 +51,23 @@ async function checkBucket(bucketKey, limit, windowSizeMs = 60000) {
     };
   } catch (err) {
     logger.error("Rate limiter DB error:", err.message);
-    // On DB glitch, fail open to avoid service outage
+    if (failClosed) {
+      // For sensitive auth routes, fail closed to prevent brute force during outages
+      return {
+        exceeded: true,
+        limit,
+        currentCount: limit,
+        remaining: 0,
+        resetTimeSec: Math.ceil((now + windowSizeMs) / 1000),
+        retryAfterSec: 60,
+      };
+    }
+    // On DB glitch for general endpoints, fail open to avoid service outage
     return {
       exceeded: false,
       limit,
       currentCount: 1,
-      remaining: limit - 1,
+      remaining: Math.max(0, limit - 1),
       resetTimeSec: Math.ceil((now + windowSizeMs) / 1000),
       retryAfterSec: 60,
     };
@@ -66,17 +78,23 @@ async function checkBucket(bucketKey, limit, windowSizeMs = 60000) {
  * Extract trusted client IP, prioritizing Cloudflare / Nginx headers over raw X-Forwarded-For
  */
 function getClientIp(req) {
-  if (req.headers["cf-connecting-ip"]) {
-    return req.headers["cf-connecting-ip"].trim();
+  const cfIp = req.headers?.["cf-connecting-ip"];
+  if (cfIp && typeof cfIp === "string") {
+    const trimmed = cfIp.trim();
+    if (trimmed) return trimmed;
   }
-  if (req.headers["x-real-ip"]) {
-    return req.headers["x-real-ip"].trim();
+  const realIp = req.headers?.["x-real-ip"];
+  if (realIp && typeof realIp === "string") {
+    const trimmed = realIp.trim();
+    if (trimmed) return trimmed;
   }
-  if (req.ip && req.ip !== "::1" && req.ip !== "127.0.0.1") {
+  if (req.ip && req.ip !== "::1" && req.ip !== "127.0.0.1" && req.ip !== "::ffff:127.0.0.1") {
     return req.ip;
   }
-  if (req.headers["x-forwarded-for"]) {
-    return req.headers["x-forwarded-for"].split(",")[0].trim();
+  const forwardedFor = req.headers?.["x-forwarded-for"];
+  if (forwardedFor && typeof forwardedFor === "string") {
+    const first = forwardedFor.split(",")[0].trim();
+    if (first) return first;
   }
   return req.socket?.remoteAddress || "unknown_ip";
 }
@@ -217,14 +235,14 @@ async function checkPlanMonthlyQuota(uid, plan) {
 /**
  * Dedicated Rate Limiter for Authentication, Password Reset, and Sensitive Operations
  */
-function authRateLimiter({ limit = 10, windowSizeMs = 60000, prefix = "auth" } = {}) {
+function authRateLimiter({ limit = 10, windowSizeMs = 60000, prefix = "auth", failClosed = true } = {}) {
   return async (req, res, next) => {
     if (!RATE_LIMIT_ENABLED) return next();
 
     const clientIp = getClientIp(req);
 
     const bucketKey = `${prefix}:${clientIp}`;
-    const result = await checkBucket(bucketKey, limit, windowSizeMs);
+    const result = await checkBucket(bucketKey, limit, windowSizeMs, failClosed);
 
     res.setHeader("X-RateLimit-Limit", result.limit);
     res.setHeader("X-RateLimit-Remaining", result.remaining);
@@ -252,6 +270,7 @@ function authRateLimiter({ limit = 10, windowSizeMs = 60000, prefix = "auth" } =
 function signupRateLimiter({
   hourlyLimit = parseInt(process.env.RATE_LIMIT_SIGNUP_HOURLY || "5", 10),
   burstLimit = parseInt(process.env.RATE_LIMIT_SIGNUP_BURST || "2", 10),
+  failClosed = true,
 } = {}) {
   return async (req, res, next) => {
     if (!RATE_LIMIT_ENABLED) return next();
@@ -260,7 +279,7 @@ function signupRateLimiter({
 
     // 1. Burst protection (prevent rapid repeated requests from same IP)
     const burstKey = `signup_burst:${clientIp}`;
-    const burstResult = await checkBucket(burstKey, burstLimit, 60 * 1000);
+    const burstResult = await checkBucket(burstKey, burstLimit, 60 * 1000, failClosed);
     if (burstResult.exceeded) {
       logger.warn(`[Signup RateLimit Burst] IP ${clientIp} exceeded burst limit (${burstLimit}/min).`);
       res.setHeader("Retry-After", burstResult.retryAfterSec);
@@ -272,7 +291,7 @@ function signupRateLimiter({
 
     // 2. Hourly protection (max 5 signup attempts per hour from same IP)
     const hourlyKey = `signup_hourly:${clientIp}`;
-    const hourlyResult = await checkBucket(hourlyKey, hourlyLimit, 60 * 60 * 1000);
+    const hourlyResult = await checkBucket(hourlyKey, hourlyLimit, 60 * 60 * 1000, failClosed);
     if (hourlyResult.exceeded) {
       logger.warn(`[Signup RateLimit Hourly] IP ${clientIp} exceeded hourly limit (${hourlyLimit}/hr).`);
       res.setHeader("Retry-After", hourlyResult.retryAfterSec);
@@ -287,6 +306,7 @@ function signupRateLimiter({
 }
 
 module.exports = {
+  checkBucket,
   getClientIp,
   ipRateLimiter,
   apiRateLimiter,

@@ -1,5 +1,6 @@
 const router = require("express").Router();
-const { query } = require("../database/dbpromise.js");
+const dbpromise = require("../database/dbpromise.js");
+const query = (...args) => dbpromise.query(...args);
 const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
@@ -549,8 +550,8 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
       email: email.toLowerCase().trim(),
     });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -767,8 +768,8 @@ router.post("/resend_verification", async (req, res) => {
       msg: "Verification code sent.",
     });
   } catch (err) {
-    logger.log(err);
-    res.status(500).json({ success: false, msg: "Something went wrong", err });
+    logger.error("Resend verification code error:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong" });
   }
 });
 
@@ -1030,7 +1031,8 @@ router.post("/return_media_url", validateUser, async (req, res) => {
       }
     }
 
-    res.json({ success: false, msg: "Something went wrong", err: err.message });
+    logger.error("Return media URL error:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong" });
   }
 });
 
@@ -1195,8 +1197,8 @@ router.get("/get_me", validateUser, async (req, res) => {
       addon: finalAddon,
     });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1216,8 +1218,8 @@ router.post(
       );
       res.json({ success: true, msg: "Notes were updated" });
     } catch (err) {
-      res.json({ success: false, msg: "something went wrong", err });
-      logger.log(err);
+      logger.error("User route error:", err);
+      res.status(500).json({ success: false, msg: "something went wrong" });
     }
   },
 );
@@ -1256,8 +1258,8 @@ router.post(
 
       res.json({ success: true, msg: "Tag was added" });
     } catch (err) {
-      res.json({ success: false, msg: "something went wrong", err });
-      logger.log(err);
+      logger.error("User route error:", err);
+      res.status(500).json({ success: false, msg: "something went wrong" });
     }
   },
 );
@@ -1290,8 +1292,8 @@ router.post("/del_tag", validateUser, async (req, res) => {
 
     res.json({ success: true, msg: "Tag was deleted" });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1323,8 +1325,8 @@ router.post("/check_contact", validateUser, async (req, res) => {
       contact: findFirst[0],
     });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1378,8 +1380,8 @@ router.post(
 
       res.json({ success: true, msg: "Contact was added" });
     } catch (err) {
-      res.json({ success: false, msg: "something went wrong", err });
-      logger.log(err);
+      logger.error("User route error:", err);
+      res.status(500).json({ success: false, msg: "something went wrong" });
     }
   },
 );
@@ -1394,8 +1396,8 @@ router.post("/del_contact", validateUser, async (req, res) => {
     ]);
     res.json({ success: true, msg: "Contact was deleted" });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1467,8 +1469,8 @@ router.post("/update_meta", validateUser, async (req, res) => {
       msg: "Your meta settings were updated successfully!",
     });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1500,8 +1502,8 @@ router.post("/update_embed_meta", validateUser, async (req, res) => {
       msg: "Your meta settings were updated successfully!",
     });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1517,8 +1519,8 @@ router.get("/get_meta_keys", validateUser, async (req, res) => {
       res.json({ success: true, data: data[0] });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1553,8 +1555,8 @@ router.post("/add_meta_templet", validateUser, checkPlan, async (req, res) => {
       });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1586,8 +1588,8 @@ router.get("/get_my_meta_templets", validateUser, async (req, res) => {
       res.json({ success: true, data: resp?.data || [] });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1626,8 +1628,8 @@ router.post("/del_meta_templet", validateUser, async (req, res) => {
       });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1713,8 +1715,8 @@ router.post("/return_media_url_meta", validateUser, async (req, res) => {
       res.json({ success: true, url, hash: uploadFile?.data?.h });
     }, 1000);
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1730,8 +1732,8 @@ router.post("/get_plan_details", validateUser, async (req, res) => {
       res.json({ success: true, data: data[0] });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -1966,8 +1968,8 @@ router.get("/get_dashboard_old", validateUser, async (req, res) => {
       totalTemplets: totalTemplets?.length,
     });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "Something went wrong", success: false });
   }
 });
 
@@ -2343,8 +2345,8 @@ router.get("/fetch_profile", validateUser, async (req, res) => {
 
     res.json(fetchProfile);
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2367,8 +2369,8 @@ router.post("/add_task_for_agent", validateUser, async (req, res) => {
 
     res.json({ success: true, msg: "Task was added" });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2387,8 +2389,8 @@ router.get("/get_my_agent_tasks", validateUser, async (req, res) => {
 
     res.json({ data, success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2403,8 +2405,8 @@ router.post("/del_task_for_agent", validateUser, async (req, res) => {
 
     res.json({ msg: "Task was deleted", success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2446,8 +2448,8 @@ router.post("/add_widget", validateUser, async (req, res) => {
 
       file.mv(`${__dirname}/../client/public/media/${filename}`, (err) => {
         if (err) {
-          logger.log(err);
-          return res.json({ err });
+          logger.error("File upload error:", err);
+          return res.status(500).json({ success: false, msg: "Failed to upload file" });
         }
       });
     } else {
@@ -2474,8 +2476,8 @@ router.post("/add_widget", validateUser, async (req, res) => {
       success: true,
     });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2488,8 +2490,8 @@ router.get("/get_my_widget", validateUser, async (req, res) => {
 
     res.json({ data, success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2505,8 +2507,8 @@ router.post("/del_widget", validateUser, async (req, res) => {
 
     res.json({ msg: "Widget was deleted", success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2541,8 +2543,8 @@ router.get("/widget", async (req, res) => {
       ),
     );
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2667,8 +2669,8 @@ router.post("/add_warmer_message", validateUser, async (req, res) => {
 
     res.json({ msg: "Warmer message was added", success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2680,8 +2682,8 @@ router.get("/get_warmer_script", validateUser, async (req, res) => {
     ]);
     res.json({ data, success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2695,8 +2697,8 @@ router.post("/del_warmer_msg", validateUser, async (req, res) => {
     ]);
     res.json({ msg: "Message was deleted", success: true });
   } catch (err) {
-    logger.log(err);
-    res.json({ msg: "something went wrong", err });
+    logger.error("User route error:", err);
+    res.status(500).json({ msg: "something went wrong" });
   }
 });
 
@@ -2736,8 +2738,8 @@ router.post(
         success: true,
       });
     } catch (err) {
-      logger.log(err);
-      res.json({ msg: "something went wrong", err });
+      logger.error("User route error:", err);
+      res.status(500).json({ msg: "something went wrong" });
     }
   },
 );
@@ -2766,8 +2768,8 @@ router.get("/get_my_warmer", validateUser, async (req, res) => {
       res.json({ data: getWarmer[0], success: true });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -2783,8 +2785,8 @@ router.post("/change_warmer_status", validateUser, async (req, res) => {
 
     res.json({ msg: "Status updated", success: true });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -2807,8 +2809,8 @@ router.post("/add_g_auth", validateUser, checkPlan, async (req, res) => {
 
     res.json({ success: true, msg: "Credentials uploaded" });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -2820,8 +2822,8 @@ router.get("/get_my_g_creds", validateUser, async (req, res) => {
     ]);
     res.json({ data, success: true });
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -3313,8 +3315,8 @@ router.get("/get_my_meta_templets_beta", validateUser, async (req, res) => {
       });
     }
   } catch (err) {
-    res.json({ success: false, msg: "something went wrong", err });
-    logger.log(err);
+    logger.error("User route error:", err);
+    res.status(500).json({ success: false, msg: "something went wrong" });
   }
 });
 
@@ -3697,7 +3699,8 @@ router.post("/exchange_embed_token", validateUser, async (req, res) => {
     res.json(genToken);
   } catch (err) {
     logger.error("❌ /exchange_embed_token error:", err);
-    res.json({ success: false, msg: "Something went wrong", err: err.message });
+    logger.error("Return media URL error:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong" });
   }
 });
 
@@ -3715,8 +3718,8 @@ router.get("/get_embed_keys", validateUser, async (req, res) => {
       },
     });
   } catch (err) {
-    logger.log(err);
-    res.json({ success: false, msg: "Something went wrong", err });
+    logger.error("Meta config error:", err);
+    res.status(500).json({ success: false, msg: "Something went wrong" });
   }
 });
 
@@ -3730,7 +3733,7 @@ router.post("/disconnect_meta", validateUser, async (req, res) => {
     });
   } catch (err) {
     logger.error("disconnect_meta error:", err);
-    res.json({ success: false, msg: "Failed to disconnect Meta account", err });
+    res.status(500).json({ success: false, msg: "Failed to disconnect Meta account" });
   }
 });
 
@@ -4003,10 +4006,10 @@ router.get("/get_plan_details", validateUser, async (req, res) => {
       },
     });
   } catch (err) {
-    logger.log("Error in /get_plan_details:", err);
+    logger.error("Error in /get_plan_details:", err);
     res
       .status(500)
-      .json({ success: false, msg: "Failed to fetch plan details", err });
+      .json({ success: false, msg: "Failed to fetch plan details" });
   }
 });
 

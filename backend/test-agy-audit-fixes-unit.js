@@ -666,6 +666,91 @@ async function request(method, urlPath, { headers = {}, body = null, token = nul
     assert.strictEqual(res2.json.duplicate, true);
   });
 
+  // ----------------------------------------------------
+  // MED-01: Rate Limiter Client IP & Fail-Closed
+  // ----------------------------------------------------
+  await test("MED-01: getClientIp properly extracts and trims proxy headers", async () => {
+    const { getClientIp } = require(path.join(BACKEND, "middlewares/rateLimiter.js"));
+
+    assert.strictEqual(
+      getClientIp({ headers: { "cf-connecting-ip": " 203.0.113.19 " } }),
+      "203.0.113.19",
+      "Should extract trimmed cf-connecting-ip"
+    );
+
+    assert.strictEqual(
+      getClientIp({ headers: { "x-real-ip": " 198.51.100.4 " } }),
+      "198.51.100.4",
+      "Should extract trimmed x-real-ip"
+    );
+
+    assert.strictEqual(
+      getClientIp({ ip: "192.0.2.1", headers: {} }),
+      "192.0.2.1",
+      "Should extract req.ip"
+    );
+
+    assert.strictEqual(
+      getClientIp({ headers: { "x-forwarded-for": " 198.51.100.7 , 10.0.0.1" } }),
+      "198.51.100.7",
+      "Should extract first IP from x-forwarded-for"
+    );
+  });
+
+  await test("MED-01: checkBucket fails closed for auth routes during DB error", async () => {
+    const { checkBucket } = require(path.join(BACKEND, "middlewares/rateLimiter.js"));
+    const dbpromise = require(path.join(BACKEND, "database/dbpromise.js"));
+
+    const originalQuery = dbpromise.query;
+    dbpromise.query = async () => {
+      throw new Error("Simulated DB connection error");
+    };
+
+    try {
+      // Sensitive auth route (failClosed = true)
+      const authResult = await checkBucket("auth:test_ip", 10, 60000, true);
+      assert.strictEqual(authResult.exceeded, true, "Auth route must exceed/block on DB error");
+      assert.strictEqual(authResult.remaining, 0, "Auth route remaining must be 0 on DB error");
+
+      // General endpoint (failClosed = false)
+      const generalResult = await checkBucket("ip:test_ip", 120, 60000, false);
+      assert.strictEqual(generalResult.exceeded, false, "General route should fail open on DB error");
+    } finally {
+      dbpromise.query = originalQuery;
+    }
+  });
+
+  // ----------------------------------------------------
+  // MED-08: Sanitize Error Responses (no err stack/SQL leak)
+  // ----------------------------------------------------
+  await test("MED-08: error responses sanitize internal error details", async () => {
+    const dbpromise = require(path.join(BACKEND, "database/dbpromise.js"));
+    const originalQuery = dbpromise.query;
+    dbpromise.query = async () => {
+      throw new Error("Sensitive internal SQL syntax error in table query");
+    };
+
+    const u = table("user").find((row) => row.uid === "u_valid_1");
+    const activeToken = jwt.sign(
+      { uid: u.uid, role: "user", tokenVersion: u.tokenVersion, email: u.email },
+      process.env.JWTKEY,
+    );
+
+    try {
+      const res = await request("POST", "/api/user/disconnect_meta", {
+        token: activeToken,
+        body: {},
+      });
+
+      assert.strictEqual(res.status, 500);
+      assert.strictEqual(res.json.success, false);
+      assert.strictEqual(res.json.err, undefined, "Response must not leak err object");
+      assert.strictEqual(res.json.msg, "Failed to disconnect Meta account");
+    } finally {
+      dbpromise.query = originalQuery;
+    }
+  });
+
   server.close();
 
   console.log("\n==================================================");
