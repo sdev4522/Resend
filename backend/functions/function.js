@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const moment = require("moment-timezone");
-const { query } = require("../database/dbpromise");
+const { bigOrNull, dateOrNull, intOrNull, plain, str, toData, whereStr } = require("../database/prismaHelpers");
 const { prisma } = require("../database/prisma");
 const { default: axios } = require("axios");
 const randomstring = require("randomstring");
@@ -302,10 +302,10 @@ function chunkArray(array, chunkSize) {
 
 async function checkExistingChat(uid, chatId) {
   try {
-    const [existing] = await query(
-      `SELECT 1 FROM beta_chats WHERE uid = ? AND chat_id = ? LIMIT 1`,
-      [uid, chatId],
-    );
+    const existing = await prisma.beta_chats.findFirst({
+      where: { uid: whereStr(uid), chat_id: whereStr(chatId) },
+      select: { id: true },
+    });
     return !!existing;
   } catch (err) {
     logger.error("Error checking existing chat:", err);
@@ -369,31 +369,17 @@ async function processBatch(batch, batchNumber) {
         return { success: true, id: chat.id, skipped: true };
       }
 
-      await query(
-        `INSERT INTO beta_chats (
-          id,
-          uid,
-          old_chat_id,
-          profile,
-          origin_instance_id,
-          chat_id,
-          last_message,
-          chat_label,
-          chat_note,
-          sender_name,
-          sender_mobile,
-          unread_count,
-          origin,
-          assigned_agent,
-          createdAt
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          chat.id, // auto-generated ID
-          chat.uid,
-          chat.chat_id || null, // old_chat_id
-          chat.profile ? JSON.stringify({ profileImage: chat.profile }) : null,
-          originInstanceId,
-          chatId, // newly generated chat_id
+      await prisma.beta_chats.create({
+        data: {
+          id: intOrNull(chat.id),
+          uid: str(// auto-generated ID
+          chat.uid),
+          old_chat_id: str(chat.chat_id || null),
+          profile: str(// old_chat_id
+          chat.profile ? JSON.stringify({ profileImage: chat.profile }) : null),
+          origin_instance_id: str(originInstanceId),
+          chat_id: str(chatId),
+          last_message: str(// newly generated chat_id
           JSON.stringify({
             type: lastMessage.type || "text",
             metaChatId: lastMessage.metaChatId || "",
@@ -410,17 +396,18 @@ async function processBatch(batch, batchNumber) {
             route: lastMessage.route || "OUTGOING",
             context: lastMessage.context || null,
             origin: chat.origin || "meta",
-          }),
-          chat.chat_tags ? chat.chat_tags : null,
-          chat.chat_note || null,
-          chat.sender_name || "",
-          chat.sender_mobile || "",
-          chat.is_opened === 1 ? 1 : 0,
-          chat.origin || "meta",
-          null, // assigned_agent
-          chat.createdAt ? new Date(chat.createdAt) : new Date(),
-        ],
-      );
+          })),
+          chat_label: str(chat.chat_tags ? chat.chat_tags : null),
+          chat_note: str(chat.chat_note || null),
+          sender_name: str(chat.sender_name || ""),
+          sender_mobile: str(chat.sender_mobile || ""),
+          unread_count: bigOrNull(chat.is_opened === 1 ? 1 : 0),
+          origin: str(chat.origin || "meta"),
+          assigned_agent: str(null),
+          createdAt: dateOrNull(// assigned_agent
+          chat.createdAt ? new Date(chat.createdAt) : new Date()),
+        },
+      });
       return { success: true, id: chat.id };
     } catch (err) {
       logger.log(`Error inserting chat ${chat.id}:`, err);
@@ -438,7 +425,7 @@ async function saveMessageToConversation({
   sentBy = "human",
 }) {
   try {
-    await query(`INSERT INTO beta_conversation SET ?`, {
+    await prisma.beta_conversation.create({ data: toData("beta_conversation", {
       type: messageData.type,
       metaChatId: messageData.metaChatId,
       msgContext: JSON.stringify(messageData.msgContext),
@@ -454,7 +441,7 @@ async function saveMessageToConversation({
       status: "sent",
       chat_id: chatId,
       sentBy,
-    });
+    }) });
     return true;
   } catch (err) {
     logger.log("Error saving message to conversation:", err);
@@ -602,7 +589,7 @@ function updateMetaTempletInMsg(uid, savObj, chatId, msgId) {
   return new Promise(async (resolve, reject) => {
     try {
       logger.log({ thisss: uid });
-      const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+      const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
 
       if (getUser.length < 1) {
         return resolve({ success: false, msg: "user not found" });
@@ -622,19 +609,20 @@ function updateMetaTempletInMsg(uid, savObj, chatId, msgId) {
 
       const io = getIOInstance();
 
-      await query(
-        `UPDATE chats SET last_message_came = ?, last_message = ?, is_opened = ? WHERE chat_id = ?`,
-        [userTimezone, JSON.stringify(savObj), 0, chatId],
-      );
+      await prisma.chats.updateMany({
+        where: { chat_id: whereStr(chatId) },
+        data: {
+          last_message_came: str(userTimezone),
+          last_message: str(JSON.stringify(savObj)),
+          is_opened: intOrNull(0),
+        },
+      });
 
-      const getId = await query(`SELECT * FROM rooms WHERE uid = ?`, [uid]);
+      const getId = plain(await prisma.rooms.findMany({ where: { uid: whereStr(uid) } }));
 
-      await query(`UPDATE chats SET is_opened = ? WHERE chat_id = ?`, [
-        1,
-        chatId,
-      ]);
+      await prisma.chats.updateMany({ where: { chat_id: whereStr(chatId) }, data: { is_opened: intOrNull(1) } });
 
-      const chats = await query(`SELECT * FROM chats WHERE uid = ?`, [uid]);
+      const chats = plain(await prisma.chats.findMany({ where: { uid: whereStr(uid) } }));
 
       io.to(getId[0]?.socket_id).emit("update_conversations", {
         chats: chats,
@@ -694,10 +682,8 @@ function sendAPIMessage(obj, waNumId, waToken) {
 function sendMetaMsg(uid, msgObj, toNumber, savObj, chatId) {
   return new Promise(async (resolve) => {
     try {
-      const getMeta = await query(`SELECT * FROM meta_api WHERE uid = ?`, [
-        uid,
-      ]);
-      const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+      const getMeta = plain(await prisma.meta_api.findMany({ where: { uid: whereStr(uid) } }));
+      const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
 
       if (getMeta.length < 1) {
         return resolve({ success: false, msg: "Unable to to find API " });
@@ -750,15 +736,16 @@ function sendMetaMsg(uid, msgObj, toNumber, savObj, chatId) {
         const chatPath = `${__dirname}/../conversations/inbox/${uid}/${chatId}.json`;
         addObjectToFile(finalSaveMsg, chatPath);
 
-        await query(
-          `UPDATE chats SET last_message_came = ?, last_message = ?, is_opened = ? WHERE chat_id = ?`,
-          [userTimezone, JSON.stringify(finalSaveMsg), 1, chatId],
-        );
+        await prisma.chats.updateMany({
+          where: { chat_id: whereStr(chatId) },
+          data: {
+            last_message_came: str(userTimezone),
+            last_message: str(JSON.stringify(finalSaveMsg)),
+            is_opened: intOrNull(1),
+          },
+        });
 
-        await query(`UPDATE chats SET is_opened = ? WHERE chat_id = ?`, [
-          1,
-          chatId,
-        ]);
+        await prisma.chats.updateMany({ where: { chat_id: whereStr(chatId) }, data: { is_opened: intOrNull(1) } });
       }
 
       resolve({ success: true });
@@ -911,10 +898,7 @@ async function sendMetatemplet(
 
   // Header component handling - IMAGE
   if (headerFormat === "IMAGE" && getHeader.length > 0) {
-    const getMedia = await query(
-      `SELECT * FROM meta_templet_media WHERE templet_name = ?`,
-      [template?.name],
-    );
+    const getMedia = plain(await prisma.meta_templet_media.findMany({ where: { templet_name: whereStr(template?.name) } }));
 
     templ.components.unshift({
       type: "header",
@@ -935,10 +919,7 @@ async function sendMetatemplet(
 
   // Header component handling - VIDEO
   if (headerFormat === "VIDEO" && getHeader.length > 0) {
-    const getMedia = await query(
-      `SELECT * FROM meta_templet_media WHERE templet_name = ?`,
-      [template?.name],
-    );
+    const getMedia = plain(await prisma.meta_templet_media.findMany({ where: { templet_name: whereStr(template?.name) } }));
 
     templ.components.unshift({
       type: "header",
@@ -959,10 +940,7 @@ async function sendMetatemplet(
 
   // Header component handling - DOCUMENT
   if (headerFormat === "DOCUMENT" && getHeader.length > 0) {
-    const getMedia = await query(
-      `SELECT * FROM meta_templet_media WHERE templet_name = ?`,
-      [template?.name],
-    );
+    const getMedia = plain(await prisma.meta_templet_media.findMany({ where: { templet_name: whereStr(template?.name) } }));
 
     templ.components.unshift({
       type: "header",
@@ -1471,7 +1449,7 @@ function getNumberOfDaysFromTimestamp(timestamp) {
 }
 
 async function getUserPlayDays(uid) {
-  const getUser = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+  const getUser = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
   if (getUser.length < 1) {
     return 0;
   }
@@ -1850,7 +1828,7 @@ function extractFileName(url) {
 
 async function checkWarmerPlan({ uid }) {
   try {
-    const [user] = await query(`SELECT * FROM user WHERE uid = ?`, [uid]);
+    const [user] = plain(await prisma.user.findMany({ where: { uid: whereStr(uid) } }));
     const warmer = user?.plan ? JSON.parse(user?.plan)?.wa_warmer : 0;
     return parseInt(warmer) > 0 ? true : false;
   } catch (err) {
@@ -2187,12 +2165,11 @@ async function sendTemplateMessage(
 // Helper function to get recent messages for context
 async function getRecentMessages(chatId, uid, limit = 5) {
   try {
-    const messages = await query(
-      `SELECT * FROM beta_conversation 
-       WHERE chat_id = ? AND uid = ? 
-       ORDER BY timestamp DESC LIMIT ?`,
-      [chatId, uid, limit],
-    );
+    const messages = plain(await prisma.beta_conversation.findMany({
+      where: { chat_id: whereStr(chatId), uid: whereStr(uid) },
+      orderBy: { timestamp: "desc" },
+      take: Math.max(0, parseInt(limit, 10) || 0),
+    }));
 
     return messages
       .map((msg) => {
@@ -2670,7 +2647,7 @@ let firebaseApp = null;
 async function getFirebaseApp() {
   if (firebaseApp) return firebaseApp;
 
-  const [mb] = await query(`SELECT * FROM mobile_app`, []);
+  const [mb] = plain(await prisma.mobile_app.findMany());
   const serviceAccount = JSON.parse(mb.fcmJson);
 
   firebaseApp = admin.initializeApp({
@@ -2726,10 +2703,10 @@ async function sendFCMNotification({
 
 async function removeTokenFromAll(token) {
   // Remove from users
-  const users = await query(
-    `SELECT uid, fcm_data FROM user WHERE fcm_data LIKE ?`,
-    [`%${token}%`],
-  );
+  const users = await prisma.user.findMany({
+    where: { fcm_data: { contains: String(token ?? "") } },
+    select: { uid: true, fcm_data: true },
+  });
 
   for (const u of users) {
     let data;
@@ -2741,17 +2718,14 @@ async function removeTokenFromAll(token) {
 
     data.tokens = (data.tokens || []).filter((t) => t !== token);
 
-    await query(`UPDATE user SET fcm_data = ? WHERE uid = ?`, [
-      JSON.stringify(data),
-      u.uid,
-    ]);
+    await prisma.user.updateMany({ where: { uid: whereStr(u.uid) }, data: { fcm_data: str(JSON.stringify(data)) } });
   }
 
   // Remove from agents
-  const agents = await query(
-    `SELECT uid, fcm_data FROM agents WHERE fcm_data LIKE ?`,
-    [`%${token}%`],
-  );
+  const agents = await prisma.agents.findMany({
+    where: { fcm_data: { contains: String(token ?? "") } },
+    select: { uid: true, fcm_data: true },
+  });
 
   for (const a of agents) {
     let data;
@@ -2763,10 +2737,7 @@ async function removeTokenFromAll(token) {
 
     data.tokens = (data.tokens || []).filter((t) => t !== token);
 
-    await query(`UPDATE agents SET fcm_data = ? WHERE uid = ?`, [
-      JSON.stringify(data),
-      a.uid,
-    ]);
+    await prisma.agents.updateMany({ where: { uid: whereStr(a.uid) }, data: { fcm_data: str(JSON.stringify(data)) } });
   }
 }
 
@@ -3072,9 +3043,7 @@ async function handleWAFormSubmission(change, userUID) {
         const flowToken = payload?.flow_token || "";
 
         // ── Match form ────────────────────────────────────────────────────────
-        const forms = await query(`SELECT * FROM wa_forms WHERE uid = ?`, [
-          userUID,
-        ]);
+        const forms = plain(await prisma.wa_forms.findMany({ where: { uid: whereStr(userUID) } }));
 
         let matchedForm = null;
         for (const f of forms) {
@@ -3125,18 +3094,16 @@ async function handleWAFormSubmission(change, userUID) {
         }
 
         // ── Save resolved payload ─────────────────────────────────────────────
-        await query(
-          `INSERT INTO wa_form_submissions 
-            (uid, flow_id, form_name, from_phone, raw_payload, createdAt)
-           VALUES (?, ?, ?, ?, ?, NOW())`,
-          [
-            userUID,
-            matchedForm?.flow_id || null,
-            matchedForm?.name || null,
-            fromPhone,
-            JSON.stringify(resolvedPayload), // ✅ resolved titles, not IDs
-          ],
-        );
+        await prisma.wa_form_submissions.create({
+          data: {
+            uid: str(userUID),
+            flow_id: matchedForm?.flow_id || null,
+            form_name: matchedForm?.name || null,
+            from_phone: str(fromPhone),
+            raw_payload: JSON.stringify(resolvedPayload), // ✅ resolved titles, not IDs
+            createdAt: new Date(),
+          },
+        });
       }
     }
   } catch (err) {

@@ -22,7 +22,12 @@ const smoke = require("./test-support/prismaSmoke");
 
   for (const f of files) {
     const isRouter = /(^|\/)routes\//.test(f);
-    const statuses = isRouter ? await smoke.exerciseRouter(f) : await smoke.exerciseModule(f);
+    const isSocketDispatcher = /helper\/socket\/index\.js$/.test(f);
+    const statuses = isRouter
+      ? await smoke.exerciseRouter(f)
+      : isSocketDispatcher
+      ? await smoke.exerciseSocketDispatcher(f)
+      : await smoke.exerciseModule(f);
     console.log(`\n# ${f}: ${statuses.length} route calls`);
     if (verbose) statuses.forEach((s) => console.log("  " + s));
   }

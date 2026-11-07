@@ -337,4 +337,41 @@ async function exerciseModule(relFile) {
   return statuses;
 }
 
-module.exports = { installStubs, exerciseRouter, exerciseModule, report, prisma, store, BACKEND, backendRequire };
+// ---------------- socket "message" dispatcher exerciser ----------------
+async function exerciseSocketDispatcher(relFile) {
+  const abs = path.join(BACKEND, relFile);
+  const src = fs.readFileSync(abs, "utf8");
+  const types = [...new Set([...src.matchAll(/case "([a-z_]+)":/g)].map((m) => m[1]))];
+  const mod = backendRequire(abs);
+  const payload = new Proxy({}, {
+    get: (t, k) => {
+      if (typeof k === "symbol" || k === "then" || k === "toJSON") return undefined;
+      if (/^(chat|msg|message|contact|agent|label|chatData|template|filters|dateRange)$/.test(k)) {
+        return { id: 1, chat_id: "c1", uid: "u1", sender_mobile: "919999999999", origin: "qr", title: "t", name: "n", type: "text", text: { body: "hi" }, msgContext: { type: "text", text: { body: "hi" } } };
+      }
+      if (/(ids|Ids|chats|list|selected)$/.test(k)) return ["c1"];
+      if (/(limit|offset|page)$/i.test(k)) return 1;
+      if (/^(unreadOnly|assignedOnly|hasNote)$/.test(k)) return true;
+      return guessValue(k);
+    },
+    ownKeys: () => [],
+    getOwnPropertyDescriptor: () => undefined,
+  });
+  const statuses = [];
+  for (const userData of [{ uid: "u1", isAgent: false, id: 1 }, { uid: "agent1", isAgent: true, owner_uid: "u1", id: 7 }]) {
+    let handler = null;
+    const socket = { userData, id: "s1", on: (ev, fn) => { if (ev === "message") handler = fn; }, emit: () => {}, join: () => {}, to: () => socket };
+    const noop = () => {};
+    mod.processSocketEvent({ socket, initializeSocket: noop, sendToUid: noop, sendToSocket: noop, sendToAll: noop, getConnectedUsers: () => [], getConnectionsByUid: () => [], getConnectionBySocketId: () => null, getAllSocketData: () => [] });
+    for (const type of types) {
+      const outcome = await Promise.race([
+        Promise.resolve().then(() => handler({ type, payload }, () => {})).then(() => "ok", (e) => `threw: ${String(e?.message || e).slice(0, 60)}`),
+        new Promise((r) => setTimeout(() => r("timeout"), 8000)),
+      ]);
+      statuses.push(`${userData.isAgent ? "agent" : "user"} ${type} ${outcome}`);
+    }
+  }
+  return statuses;
+}
+
+module.exports = { installStubs, exerciseRouter, exerciseModule, exerciseSocketDispatcher, report, prisma, store, BACKEND, backendRequire };

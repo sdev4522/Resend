@@ -1,6 +1,6 @@
-const { query } = require("../../database/dbpromise");
 const { prisma } = require("../../database/prisma");
-const { bigOrNull, idParam, plain, str, whereStr } = require("../../database/prismaHelpers");
+const { Prisma } = require("@prisma/client");
+const { bigOrNull, idParam, plain, str, strList, whereStr } = require("../../database/prismaHelpers");
 const {
   mergeArraysWithPhonebook,
   deleteMediaFromConversation,
@@ -67,145 +67,139 @@ function processSocketEvent({
             labelFilter = "",
           } = payload;
 
-          // Base query
-          let queryStr = `FROM beta_chats WHERE `;
-          const queryParams = [];
-          let conditions = [];
+          // Every entry is ANDed (former `conditions.join(" AND ")`)
+          const and = [];
 
           if (labelFilter) {
-            conditions.push(`chat_label LIKE ?`);
-            queryParams.push(`%"title":"${labelFilter}"%`);
+            and.push({ chat_label: { contains: `"title":"${labelFilter}"` } });
           }
 
           // Agent vs user filtering
           if (isAgent) {
             // First restrict chats to the owner account.
-            // This makes the assigned_agent LIKE scan much smaller.
-            conditions.push(`uid = ?`);
-            queryParams.push(socket?.userData?.owner_uid);
+            and.push({ uid: whereStr(socket?.userData?.owner_uid) });
 
-            // Then filter chats assigned to this agent.
-            conditions.push(`(
-              assigned_agent LIKE ? OR 
-              assigned_agent LIKE ?
-            )`);
-
-            queryParams.push(
-              `%"id":${socket.userData.id}%`,
-              `%"id":"${socket.userData.id}"%`,
-            );
+            // Then filter chats assigned to this agent (id stored as number or string).
+            and.push({
+              OR: [
+                { assigned_agent: { contains: `"id":${socket.userData.id}` } },
+                { assigned_agent: { contains: `"id":"${socket.userData.id}"` } },
+              ],
+            });
           } else {
-            conditions.push(`uid = ?`);
-            queryParams.push(uid);
+            and.push({ uid: whereStr(uid) });
           }
 
           // Enhanced search to include chat tags
           if (search) {
-            conditions.push(`(
-            sender_name LIKE ? OR 
-            sender_mobile LIKE ? OR 
-            last_message LIKE ? OR
-            chat_label LIKE ?
-        )`);
-            queryParams.push(
-              `%${search}%`,
-              `%${search}%`,
-              `%${search}%`,
-              `%"title":"${search}%`,
-            );
-
-            // Also search for partial matches in tag titles
-            queryParams[queryParams.length - 1] = `%"title":"%${search}%"%`;
+            const term = String(search);
+            and.push({
+              OR: [
+                { sender_name: { contains: term } },
+                { sender_mobile: { contains: term } },
+                { last_message: { contains: term } },
+                // former chat_label LIKE '%"title":"%term%"%'
+                { AND: [{ chat_label: { contains: '"title":"' } }, { chat_label: { contains: term } }] },
+              ],
+            });
           }
 
           if (origin) {
-            conditions.push(`origin = ?`);
-            queryParams.push(origin);
+            and.push({ origin: String(origin) });
           }
 
           if (payload.accountId && payload.accountId !== "all") {
             const cleanAcc = payload.accountId.replace(/[^0-9a-zA-Z]/g, "");
             if (origin === "qr" || cleanAcc.length >= 8) {
-              conditions.push(`(chat_id LIKE ? OR origin_instance_id LIKE ?)`);
-              queryParams.push(`${cleanAcc}_%`, `%"${cleanAcc}%`);
+              and.push({
+                OR: [
+                  { chat_id: { startsWith: `${cleanAcc}_` } },
+                  { origin_instance_id: { contains: `"${cleanAcc}` } },
+                ],
+              });
             } else if (origin === "meta") {
-              conditions.push(`(origin = 'meta' AND (origin_instance_id LIKE ? OR chat_id LIKE 'meta_%'))`);
-              queryParams.push(`%"${cleanAcc}%`);
+              and.push({
+                origin: "meta",
+                OR: [
+                  { origin_instance_id: { contains: `"${cleanAcc}` } },
+                  { chat_id: { startsWith: "meta_" } },
+                ],
+              });
             } else {
-              conditions.push(`(chat_id LIKE ? OR origin_instance_id LIKE ?)`);
-              queryParams.push(`%${cleanAcc}%`, `%"${cleanAcc}%`);
+              and.push({
+                OR: [
+                  { chat_id: { contains: cleanAcc } },
+                  { origin_instance_id: { contains: `"${cleanAcc}` } },
+                ],
+              });
             }
           }
 
           if (unreadOnly) {
-            conditions.push(`unread_count > 0`);
+            and.push({ unread_count: { gt: BigInt(0) } });
           }
 
           if (assignedOnly && isAgent) {
-            conditions.push(
-              `assigned_agent IS NOT NULL AND assigned_agent != 'null' AND assigned_agent != ''`,
-            );
+            and.push({ assigned_agent: { not: null } }, { assigned_agent: { notIn: ["null", ""] } });
           }
 
-          // Updated agent filter to work with both array and single object
+          // Agent filter works with both array and single object
           if (agentFilter) {
-            conditions.push(`(
-            assigned_agent LIKE ? OR 
-            assigned_agent LIKE ?
-        )`);
-            queryParams.push(
-              `%"name":"${agentFilter}"%`, // Matches when agent is in array
-              `%"name":"${agentFilter}%"`, // Matches when agent is single object
-            );
+            and.push({
+              OR: [
+                { assigned_agent: { contains: `"name":"${agentFilter}"` } }, // agent in array
+                {
+                  AND: [
+                    { assigned_agent: { contains: `"name":"${agentFilter}` } },
+                    { assigned_agent: { endsWith: '"' } },
+                  ],
+                }, // single object
+              ],
+            });
           }
 
           if (dateRange.start) {
-            conditions.push(`createdAt >= ?`);
-            queryParams.push(
-              moment(dateRange.start).format("YYYY-MM-DD HH:mm:ss"),
-            );
+            and.push({ createdAt: { gte: moment(dateRange.start).toDate() } });
           }
 
           if (dateRange.end) {
-            conditions.push(`createdAt <= ?`);
-            queryParams.push(
-              moment(dateRange.end).format("YYYY-MM-DD HH:mm:ss"),
-            );
+            and.push({ createdAt: { lte: moment(dateRange.end).toDate() } });
           }
 
           // Status filter
           if (statusFilter === "read") {
-            conditions.push(`unread_count = 0`);
+            and.push({ unread_count: BigInt(0) });
           } else if (statusFilter === "unread") {
-            conditions.push(`unread_count > 0`);
+            and.push({ unread_count: { gt: BigInt(0) } });
           }
 
           // Has Note filter
           if (hasNote) {
-            conditions.push(`(chat_note IS NOT NULL AND chat_note != '')`);
+            and.push({ chat_note: { not: null } }, { chat_note: { not: "" } });
           }
 
-          queryStr += conditions.join(" AND ");
-
-          // Rest of your query execution remains the same
-          const [totalResult] = await query(
-            `SELECT COUNT(*) as total ${queryStr}`,
-            queryParams,
-          );
-          const total = totalResult.total;
-
-          const chats = await query(
-            `SELECT * ${queryStr} ORDER BY updatedAt DESC LIMIT ? OFFSET ?`,
-            [...queryParams, limit, offset],
-          );
+          const chatWhere = { AND: and };
+          const [total, chatRows] = await Promise.all([
+            prisma.beta_chats.count({ where: chatWhere }),
+            prisma.beta_chats.findMany({
+              where: chatWhere,
+              orderBy: { updatedAt: "desc" },
+              take: Math.max(0, parseInt(limit, 10) || 0),
+              skip: Math.max(0, parseInt(offset, 10) || 0),
+            }),
+          ]);
+          const chats = plain(chatRows);
 
           const senderMobiles = Array.from(new Set(chats.map((c) => c.sender_mobile).filter(Boolean)));
           let contacts = [];
           if (senderMobiles.length > 0) {
-            const placeholders = senderMobiles.map(() => "?").join(",");
-            contacts = await query(
-              `SELECT * FROM contact WHERE uid = ? AND mobile IN (${placeholders})`,
-              [isAgent ? socket?.userData?.owner_uid : uid, ...senderMobiles],
+            contacts = plain(
+              await prisma.contact.findMany({
+                where: {
+                  uid: whereStr(isAgent ? socket?.userData?.owner_uid : uid),
+                  mobile: { in: strList(senderMobiles) },
+                },
+              }),
             );
           }
           const chatData = mergeArraysWithPhonebook(chats, contacts);
@@ -231,10 +225,10 @@ function processSocketEvent({
           let chats;
           if (chatIds.length > 0) {
             // Export selected chats
-            const placeholders = chatIds.map(() => "?").join(",");
-            chats = await query(
-              `SELECT * FROM beta_chats WHERE uid = ? AND chat_id IN (${placeholders})`,
-              [ownerUid, ...chatIds],
+            chats = plain(
+              await prisma.beta_chats.findMany({
+                where: { uid: whereStr(ownerUid), chat_id: { in: strList(chatIds) } },
+              }),
             );
           } else {
             // Export ALL chats
@@ -408,41 +402,43 @@ function processSocketEvent({
             data: { unread_count: bigOrNull(0) },
           });
 
-          // Build query for conversations with filters
-          let conversationQueryStr = `FROM beta_conversation WHERE chat_id = ? AND uid = ?`;
-          const conversationParams = [
-            chat.chat_id,
-            isAgent ? socket?.userData?.owner_uid : uid,
+          // Build query for conversations with filters.
+          // Kept as a parameterised Prisma.sql query on purpose: `timestamp` is a VARCHAR holding
+          // both unix seconds and milliseconds, and the old filter relied on MySQL's numeric
+          // comparison (`timestamp >= 1730000000`), which Prisma ORM filters cannot express.
+          const conversationFilters = [
+            Prisma.sql`chat_id = ${String(chat.chat_id)}`,
+            Prisma.sql`uid = ${whereStr(isAgent ? socket?.userData?.owner_uid : uid)}`,
           ];
 
           // Add search filter if provided
           if (msgSearch) {
-            conversationQueryStr += ` AND msgContext LIKE ?`;
-            conversationParams.push(`%${msgSearch}%`);
+            conversationFilters.push(Prisma.sql`msgContext LIKE ${`%${msgSearch}%`}`);
           }
 
           // Add date range filters if provided
           if (msgDateRange.start) {
-            conversationQueryStr += ` AND timestamp >= ?`;
-            conversationParams.push(moment(msgDateRange.start).unix());
+            conversationFilters.push(Prisma.sql`timestamp >= ${moment(msgDateRange.start).unix()}`);
           }
 
           if (msgDateRange.end) {
-            conversationQueryStr += ` AND timestamp <= ?`;
-            conversationParams.push(moment(msgDateRange.end).unix());
+            conversationFilters.push(Prisma.sql`timestamp <= ${moment(msgDateRange.end).unix()}`);
           }
 
+          const conversationWhere = Prisma.join(conversationFilters, " AND ");
+
           // Get total count for pagination
-          const [conversationTotalResult] = await query(
-            `SELECT COUNT(*) as total ${conversationQueryStr}`,
-            conversationParams,
-          );
-          const conversationTotal = conversationTotalResult.total;
+          const [conversationTotalResult] = await prisma.$queryRaw`
+            SELECT COUNT(*) AS total FROM beta_conversation WHERE ${conversationWhere}`;
+          const conversationTotal = Number(conversationTotalResult?.total || 0);
 
           // Get conversations with pagination
-          const conversationData = await query(
-            `SELECT * ${conversationQueryStr} ORDER BY timestamp DESC LIMIT ? OFFSET ?`,
-            [...conversationParams, msgLimit, msgOffset],
+          const conversationData = plain(
+            await prisma.$queryRaw`
+              SELECT * FROM beta_conversation WHERE ${conversationWhere}
+              ORDER BY timestamp DESC
+              LIMIT ${Math.max(0, parseInt(msgLimit, 10) || 0)}
+              OFFSET ${Math.max(0, parseInt(msgOffset, 10) || 0)}`,
           );
 
           const parsedChatList = conversationData.map((row) => ({
@@ -938,25 +934,17 @@ function processSocketEvent({
               String(rawMobile),
             ].filter(Boolean);
 
-            const [chatByPhone] = await query(
-              `SELECT id, chat_id, origin, sender_mobile, sender_name 
-               FROM beta_chats 
-               WHERE uid = ? AND (
-                 chat_id IN (?, ?, ?, ?) OR 
-                 sender_mobile IN (?, ?, ?)
-               )
-               ORDER BY id DESC LIMIT 1`,
-              [
-                targetOwnerUid,
-                candidateChatIds[0],
-                candidateChatIds[1],
-                candidateChatIds[2],
-                candidateChatIds[3],
-                candidateMobiles[0],
-                candidateMobiles[1] || candidateMobiles[0],
-                candidateMobiles[2] || candidateMobiles[0],
-              ],
-            );
+            const chatByPhone = await prisma.beta_chats.findFirst({
+              where: {
+                uid: whereStr(targetOwnerUid),
+                OR: [
+                  { chat_id: { in: strList(candidateChatIds) } },
+                  { sender_mobile: { in: strList(candidateMobiles) } },
+                ],
+              },
+              select: { id: true, chat_id: true, origin: true, sender_mobile: true, sender_name: true },
+              orderBy: { id: "desc" },
+            });
             if (chatByPhone) dbTplChat = chatByPhone;
           }
 
