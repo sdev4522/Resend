@@ -36,6 +36,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import {
   Search,
@@ -58,6 +59,7 @@ import {
   XCircle,
   HelpCircle,
   Filter,
+  X,
 } from 'lucide-react';
 
 export default function AdminUsersPage() {
@@ -68,8 +70,9 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [emailStatusFilter, setEmailStatusFilter] = useState<'all' | 'verified' | 'unverified' | 'pending' | 'unknown'>('all');
+  const [accountStatusFilter, setAccountStatusFilter] = useState<'all' | 'active' | 'blocked'>('all');
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   // Bulk Selection State
   const [selectedUserUids, setSelectedUserUids] = useState<Set<string>>(new Set());
@@ -145,9 +148,29 @@ export default function AdminUsersPage() {
     setTimeout(() => setActionSuccess(null), 5000);
   };
 
-  // Filtered users based on search and email verification status
+  const userCounts = useMemo(() => {
+    let active = 0;
+    let blocked = 0;
+    let verified = 0;
+    let unverified = 0;
+    users.forEach((u) => {
+      if (u.is_blocked === 1 || u.is_blocked === true) blocked++;
+      else active++;
+      if (u.email_status === 'verified' || Boolean(u.email_verified_at)) verified++;
+      else unverified++;
+    });
+    return { total: users.length, active, blocked, verified, unverified };
+  }, [users]);
+
+  // Filtered users based on search, email verification status, and account status
   const filteredUsers = useMemo(() => {
     let result = users;
+
+    if (accountStatusFilter === 'active') {
+      result = result.filter((u) => u.is_blocked !== 1 && u.is_blocked !== true);
+    } else if (accountStatusFilter === 'blocked') {
+      result = result.filter((u) => u.is_blocked === 1 || u.is_blocked === true);
+    }
 
     if (emailStatusFilter !== 'all') {
       result = result.filter((u) => {
@@ -168,14 +191,14 @@ export default function AdminUsersPage() {
     }
 
     return result;
-  }, [users, emailStatusFilter, searchQuery]);
+  }, [users, accountStatusFilter, emailStatusFilter, searchQuery]);
 
   // Paginated users
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const paginatedUsers = useMemo(() => {
     const startIndex = (currentPage - 1) * pageSize;
     return filteredUsers.slice(startIndex, startIndex + pageSize);
-  }, [filteredUsers, currentPage]);
+  }, [filteredUsers, currentPage, pageSize]);
 
   // Selection helpers
   const isAllCurrentPageSelected =
@@ -460,11 +483,18 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">User Management</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              TENANT DIRECTORY
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">{users.length} registered accounts</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">User Management</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Browse, inspect, verify, and manage all registered tenant accounts ({users.length} total users).
+            Browse, inspect, verify, and manage all tenant accounts across the platform.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -473,15 +503,15 @@ export default function AdminUsersPage() {
               variant="destructive"
               size="sm"
               onClick={() => setShowBulkDeleteDialog(true)}
-              className="gap-1.5 shadow-xs"
+              className="gap-1.5 shadow-xs text-xs h-9"
             >
               <Trash2 className="h-3.5 w-3.5" />
               Delete Selected ({selectedUserUids.size})
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading} className="gap-1.5 self-start sm:self-auto">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh Data
+          <Button variant="outline" size="sm" onClick={fetchUsers} disabled={loading} className="gap-1.5 text-xs h-9 self-start sm:self-auto">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
+            Refresh Directory
           </Button>
         </div>
       </div>
@@ -494,17 +524,115 @@ export default function AdminUsersPage() {
         </Alert>
       )}
 
+      {/* Quick Status Metric Strip & Filters */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            setAccountStatusFilter('all');
+            setEmailStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "p-3 rounded-xl border text-left transition-all cursor-pointer",
+            accountStatusFilter === 'all' && emailStatusFilter === 'all'
+              ? "bg-primary/10 border-primary/40 shadow-2xs ring-1 ring-primary/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
+          )}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Total Users</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{userCounts.total}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAccountStatusFilter('active');
+            setEmailStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "p-3 rounded-xl border text-left transition-all cursor-pointer",
+            accountStatusFilter === 'active'
+              ? "bg-emerald-500/10 border-emerald-500/40 shadow-2xs ring-1 ring-emerald-500/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
+          )}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Active Accounts</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{userCounts.active}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setAccountStatusFilter('blocked');
+            setEmailStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "p-3 rounded-xl border text-left transition-all cursor-pointer",
+            accountStatusFilter === 'blocked'
+              ? "bg-destructive/10 border-destructive/40 shadow-2xs ring-1 ring-destructive/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
+          )}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-destructive">Blocked Accounts</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{userCounts.blocked}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setEmailStatusFilter('verified');
+            setAccountStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "p-3 rounded-xl border text-left transition-all cursor-pointer",
+            emailStatusFilter === 'verified'
+              ? "bg-blue-500/10 border-blue-500/40 shadow-2xs ring-1 ring-blue-500/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
+          )}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">Verified Emails</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{userCounts.verified}</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setEmailStatusFilter('unverified');
+            setAccountStatusFilter('all');
+            setCurrentPage(1);
+          }}
+          className={cn(
+            "p-3 rounded-xl border text-left transition-all col-span-2 sm:col-span-1 cursor-pointer",
+            emailStatusFilter === 'unverified'
+              ? "bg-amber-500/10 border-amber-500/40 shadow-2xs ring-1 ring-amber-500/20"
+              : "bg-card border-border/70 hover:bg-muted/40"
+          )}
+        >
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">Unverified</div>
+          <div className="text-xl sm:text-2xl font-bold font-mono text-foreground mt-0.5">{userCounts.unverified}</div>
+        </button>
+      </div>
+
       {selectedUserUids.size > 0 && (
-        <div className="flex items-center justify-between bg-primary/5 border border-primary/20 rounded-lg px-4 py-2.5 text-xs">
-          <span className="font-medium text-foreground">
-            {selectedUserUids.size} user{selectedUserUids.size > 1 ? 's' : ''} selected across pages
-          </span>
+        <div className="flex items-center justify-between bg-primary/10 border border-primary/30 rounded-xl px-4 py-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-primary text-primary-foreground font-mono text-xs px-2 py-0.5">
+              {selectedUserUids.size}
+            </Badge>
+            <span className="font-medium text-foreground">
+              user{selectedUserUids.size > 1 ? 's' : ''} selected across pages
+            </span>
+          </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => setSelectedUserUids(new Set())}
-              className="h-7 text-xs"
+              className="h-8 text-xs"
             >
               Clear Selection
             </Button>
@@ -512,55 +640,102 @@ export default function AdminUsersPage() {
               variant="destructive"
               size="sm"
               onClick={() => setShowBulkDeleteDialog(true)}
-              className="h-7 text-xs gap-1"
+              className="h-8 text-xs gap-1.5"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3.5 w-3.5" />
               Delete Selected
             </Button>
           </div>
         </div>
       )}
 
-      <Card className="shadow-xs">
-        <CardHeader className="pb-3 border-b">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
-              <div className="relative w-full sm:w-72">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+      <Card className="border border-border/70 shadow-2xs bg-card">
+        <CardHeader className="pb-3.5 border-b">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 flex-1">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, email, mobile, or UID..."
-                  className="pl-9 h-9 text-sm"
+                  placeholder="Search name, email, mobile, or UID..."
+                  className="pl-9 pr-8 h-9 text-xs sm:text-sm"
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
                     setCurrentPage(1);
                   }}
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setCurrentPage(1);
+                    }}
+                    className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Account Status Filter */}
+              <div className="flex items-center gap-1.5">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden sm:block" />
+                <select
+                  value={accountStatusFilter}
+                  onChange={(e) => {
+                    setAccountStatusFilter(e.target.value as any);
+                    setCurrentPage(1);
+                  }}
+                  className="h-9 rounded-lg border border-input bg-background px-3 py-1 text-xs shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  aria-label="Filter by account status"
+                >
+                  <option value="all">All Account Statuses</option>
+                  <option value="active">Active Accounts Only</option>
+                  <option value="blocked">Blocked Accounts Only</option>
+                </select>
               </div>
 
               {/* Email Status Filter */}
               <div className="flex items-center gap-1.5">
-                <Filter className="h-3.5 w-3.5 text-muted-foreground shrink-0 hidden sm:block" />
                 <select
                   value={emailStatusFilter}
                   onChange={(e) => {
                     setEmailStatusFilter(e.target.value as any);
                     setCurrentPage(1);
                   }}
-                  className="h-9 rounded-md border border-input bg-background px-2.5 py-1 text-xs shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  className="h-9 rounded-lg border border-input bg-background px-3 py-1 text-xs shadow-2xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   aria-label="Filter by email verification status"
                 >
-                  <option value="all">All Email Statuses</option>
-                  <option value="verified">Verified Only</option>
+                  <option value="all">All Verification Statuses</option>
+                  <option value="verified">Verified Emails Only</option>
                   <option value="unverified">Unverified Only</option>
                   <option value="pending">Pending Only</option>
-                  <option value="unknown">Unknown Only</option>
+                  <option value="unknown">Unknown Legacy</option>
                 </select>
               </div>
             </div>
 
-            <div className="text-xs text-muted-foreground font-mono">
-              Showing {paginatedUsers.length} of {filteredUsers.length} users
+            <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-muted-foreground font-mono">
+              <div className="flex items-center gap-1.5">
+                <span>Show:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="h-8 rounded-md border border-input bg-background px-2 py-0.5 text-xs shadow-2xs"
+                  aria-label="Page size"
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+              <span>
+                {filteredUsers.length} total
+              </span>
             </div>
           </div>
         </CardHeader>

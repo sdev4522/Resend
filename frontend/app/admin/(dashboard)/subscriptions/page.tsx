@@ -79,8 +79,14 @@ export default function AdminSubscriptionsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">SaaS Subscriptions</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              SUBSCRIBER REGISTRY
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">{summary.total} total subscriptions</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">SaaS Subscriptions &amp; Mandates</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Real-time subscriber state, billing cycles, Razorpay autopay mandates, and entitlement expiry.
           </p>
         </div>
@@ -91,9 +97,9 @@ export default function AdminSubscriptionsPage() {
             size="sm"
             onClick={fetchSubscriptions}
             disabled={loading}
-            className="gap-1.5 text-xs h-8"
+            className="gap-1.5 text-xs h-9 self-start sm:self-auto"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
             Refresh
           </Button>
 

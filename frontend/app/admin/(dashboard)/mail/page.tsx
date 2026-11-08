@@ -203,7 +203,13 @@ export default function AdminMailTemplatesPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              TRANSACTIONAL EMAILS
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">{templates.length} templates registered</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <Mail className="h-6 w-6 text-primary" />
             Email Templates
           </h1>
@@ -212,12 +218,13 @@ export default function AdminMailTemplatesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Button onClick={openCreateModal} size="sm" className="bg-red-600 hover:bg-red-700 text-white gap-1.5">
+          <Button onClick={openCreateModal} size="sm" className="gap-1.5 text-xs h-9 font-semibold">
             <Plus className="h-4 w-4" />
             New Template
           </Button>
-          <Button variant="outline" size="sm" onClick={fetchTemplates} disabled={loading} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={fetchTemplates} disabled={loading} className="gap-1.5 text-xs h-9">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
+            Refresh
           </Button>
         </div>
       </div>

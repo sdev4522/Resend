@@ -637,11 +637,17 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Global System Settings</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Configure system-wide SaaS integrations, Razorpay billing keys, Autopay, SMTP email, and branding.
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              PLATFORM CONFIGURATION
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">System Parameters</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Global System Settings</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Configure system-wide SaaS integrations, payment gateways, messaging APIs, SMTP mail, and brand styles.
           </p>
         </div>
 
@@ -650,46 +656,55 @@ export default function AdminSettingsPage() {
           size="sm"
           onClick={fetchSettings}
           disabled={loading || saving}
-          className="gap-1.5 text-xs h-8"
+          className="gap-1.5 text-xs h-9 self-start sm:self-auto"
         >
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
+          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
+          <span>Reload Config</span>
         </Button>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-muted p-1 rounded-xl flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="theme" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Palette className="h-3.5 w-3.5 text-primary" />
-            Global Theme
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-muted/60 border border-border/50 p-1.5 rounded-xl flex flex-wrap h-auto gap-1.5 shadow-2xs">
+          {/* 1. Payment & Monetization */}
+          <TabsTrigger value="razorpay" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <CreditCard className="h-3.5 w-3.5 text-emerald-500" />
+            Razorpay &amp; Autopay
           </TabsTrigger>
-          <TabsTrigger value="smtp" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Mail className="h-3.5 w-3.5 text-primary" />
-            SMTP & Email
+          <TabsTrigger value="currency" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Coins className="h-3.5 w-3.5 text-amber-500" />
+            Multi-Currency
           </TabsTrigger>
-          <TabsTrigger value="branding" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Globe className="h-3.5 w-3.5 text-primary" />
-            Platform Branding
+
+          {/* 2. WhatsApp Cloud API */}
+          <TabsTrigger value="meta" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Cloud className="h-3.5 w-3.5 text-blue-500" />
+            Meta WhatsApp API
           </TabsTrigger>
-          <TabsTrigger value="fcm" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Bell className="h-3.5 w-3.5 text-primary" />
+
+          {/* 3. Messaging & Push */}
+          <TabsTrigger value="smtp" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Mail className="h-3.5 w-3.5 text-violet-500" />
+            SMTP &amp; Email
+          </TabsTrigger>
+          <TabsTrigger value="fcm" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Bell className="h-3.5 w-3.5 text-pink-500" />
             Web Push (FCM)
           </TabsTrigger>
-          <TabsTrigger value="google" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+
+          {/* 4. Branding & Visuals */}
+          <TabsTrigger value="branding" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Globe className="h-3.5 w-3.5 text-teal-500" />
+            Platform Branding
+          </TabsTrigger>
+          <TabsTrigger value="theme" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <Palette className="h-3.5 w-3.5 text-primary" />
+            Theme Studio
+          </TabsTrigger>
+
+          {/* 5. Security & Auth */}
+          <TabsTrigger value="google" className="text-xs gap-1.5 font-medium px-3.5 py-2 rounded-lg data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
             Google OAuth
-          </TabsTrigger>
-          <TabsTrigger value="razorpay" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <CreditCard className="h-3.5 w-3.5 text-primary" />
-            Razorpay & Autopay
-          </TabsTrigger>
-          <TabsTrigger value="currency" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Coins className="h-3.5 w-3.5 text-primary" />
-            Currency
-          </TabsTrigger>
-          <TabsTrigger value="meta" className="text-xs gap-1.5 font-semibold px-3 py-1.5">
-            <Cloud className="h-3.5 w-3.5 text-primary" />
-            Meta WhatsApp Cloud API
           </TabsTrigger>
         </TabsList>
 

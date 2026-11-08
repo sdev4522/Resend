@@ -6,6 +6,11 @@ export interface NavItem {
   external?: boolean;
 }
 
+export interface AdminNavSection {
+  title: string;
+  items: NavItem[];
+}
+
 function getCanonicalUrl() {
   const envUrl = process.env.NEXT_PUBLIC_APP_URL;
   if (!envUrl) return "https://resend.in";
@@ -42,17 +47,58 @@ export const siteConfig = {
     { title: "Help & Support", href: "/dashboard/support", icon: "LifeBuoy" },
     { title: "Settings", href: "/dashboard/settings", icon: "Settings" },
   ] as NavItem[],
+  adminNavSections: [
+    {
+      title: "Platform Overview",
+      items: [
+        { title: "Admin Overview", href: "/admin", icon: "ShieldAlert" },
+        { title: "Platform Analytics", href: "/admin/analytics", icon: "BarChart3" },
+      ],
+    },
+    {
+      title: "Tenants & Users",
+      items: [
+        { title: "User Management", href: "/admin/users", icon: "Users" },
+        { title: "Workspaces", href: "/admin/workspaces", icon: "Building2" },
+        { title: "Customer Support", href: "/admin/support", icon: "LifeBuoy" },
+      ],
+    },
+    {
+      title: "Fleet & Compute",
+      items: [
+        { title: "WhatsApp Fleet", href: "/admin/whatsapp", icon: "Server" },
+        { title: "Usage & Limits", href: "/admin/usage", icon: "Gauge" },
+      ],
+    },
+    {
+      title: "Plans & Billing",
+      items: [
+        { title: "Subscription Plans", href: "/admin/plans", icon: "Package" },
+        { title: "Active Subscriptions", href: "/admin/subscriptions", icon: "CreditCard" },
+        { title: "Payment Logs", href: "/admin/payments", icon: "Receipt" },
+      ],
+    },
+    {
+      title: "System & Operations",
+      items: [
+        { title: "System Settings", href: "/admin/settings", icon: "Sliders" },
+        { title: "Notifications", href: "/admin/notifications", icon: "Bell" },
+        { title: "Mail Templates", href: "/admin/mail", icon: "Mail" },
+        { title: "Audit & Activity", href: "/admin/audit", icon: "History" },
+      ],
+    },
+  ] as AdminNavSection[],
   adminNav: [
     { title: "Admin Overview", href: "/admin", icon: "ShieldAlert" },
-    { title: "Customer Support", href: "/admin/support", icon: "LifeBuoy" },
     { title: "Platform Analytics", href: "/admin/analytics", icon: "BarChart3" },
     { title: "User Management", href: "/admin/users", icon: "Users" },
     { title: "Workspaces", href: "/admin/workspaces", icon: "Building2" },
+    { title: "Customer Support", href: "/admin/support", icon: "LifeBuoy" },
     { title: "WhatsApp Fleet", href: "/admin/whatsapp", icon: "Server" },
+    { title: "Usage & Limits", href: "/admin/usage", icon: "Gauge" },
     { title: "Subscription Plans", href: "/admin/plans", icon: "Package" },
     { title: "Active Subscriptions", href: "/admin/subscriptions", icon: "CreditCard" },
     { title: "Payment Logs", href: "/admin/payments", icon: "Receipt" },
-    { title: "Usage & Limits", href: "/admin/usage", icon: "Gauge" },
     { title: "System Settings", href: "/admin/settings", icon: "Sliders" },
     { title: "Notifications", href: "/admin/notifications", icon: "Bell" },
     { title: "Mail Templates", href: "/admin/mail", icon: "Mail" },

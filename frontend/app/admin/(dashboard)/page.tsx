@@ -68,21 +68,33 @@ export default function AdminOverviewPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Admin System Overview</h1>
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary flex items-center gap-1.5">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+              </span>
+              SYSTEM LIVE
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">Cluster: node-prod-01</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            System Overview &amp; Health
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Real-time platform metrics, active subscriptions, and user health.
+            Real-time platform telemetry, active tenant subscriptions, message throughput, and fleet status.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Link href="/admin/analytics">
-            <Button variant="outline" size="sm" className="gap-1.5 text-xs">
-              <Activity className="h-3.5 w-3.5" />
-              Detailed Analytics
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-9">
+              <Activity className="h-3.5 w-3.5 text-primary" />
+              Platform Analytics
             </Button>
           </Link>
-          <Button variant="outline" size="sm" onClick={fetchOverviewData} disabled={loading} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+          <Button variant="outline" size="sm" onClick={fetchOverviewData} disabled={loading} className="gap-1.5 text-xs h-9">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
+            Refresh Telemetry
           </Button>
         </div>
       </div>
@@ -102,97 +114,107 @@ export default function AdminOverviewPage() {
       )}
 
       {/* Primary KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-xs p-5 flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <Card className="p-5 flex flex-col justify-between border border-border/70 hover:border-border transition-all bg-card shadow-2xs hover:shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Total Revenue
             </span>
-            <div className="h-9 w-9 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
-              <CreditCard className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+              <CreditCard className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-4">
             {loading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              <div className="text-2xl font-bold font-mono text-foreground">
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground tracking-tight">
                 ${(data?.revenue.totalRevenue || 0).toLocaleString()}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              {data?.revenue.successfulOrders || 0} paid of {data?.revenue.totalOrders || 0} total orders
-            </p>
+            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+              <span>{data?.revenue.successfulOrders || 0} paid orders</span>
+              <span className="font-mono text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                {data?.revenue.totalOrders ? Math.round(((data?.revenue.successfulOrders || 0) / data.revenue.totalOrders) * 100) : 0}% conv
+              </span>
+            </div>
           </div>
         </Card>
 
-        <Card className="shadow-xs p-5 flex flex-col justify-between">
+        <Card className="p-5 flex flex-col justify-between border border-border/70 hover:border-border transition-all bg-card shadow-2xs hover:shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
               Total Tenants
             </span>
-            <div className="h-9 w-9 rounded-lg bg-blue-500/10 text-blue-600 flex items-center justify-center">
-              <Users className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center">
+              <Users className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-4">
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold font-mono text-foreground">
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground tracking-tight">
                 {(data?.users.total || 0).toLocaleString()}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-              <span className="text-emerald-600 font-medium">{data?.users.active || 0} active</span>
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                {data?.users.active || 0} active
+              </span>
               <span>•</span>
-              <span className="text-red-500 font-medium">{data?.users.blocked || 0} blocked</span>
-            </p>
+              <span className="text-destructive font-medium">
+                {data?.users.blocked || 0} blocked
+              </span>
+            </div>
           </div>
         </Card>
 
-        <Card className="shadow-xs p-5 flex flex-col justify-between">
+        <Card className="p-5 flex flex-col justify-between border border-border/70 hover:border-border transition-all bg-card shadow-2xs hover:shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              WhatsApp Sessions
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              WhatsApp Fleet
             </span>
-            <div className="h-9 w-9 rounded-lg bg-violet-500/10 text-violet-600 flex items-center justify-center">
-              <Smartphone className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center justify-center">
+              <Smartphone className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-4">
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold font-mono text-foreground">
-                {data?.whatsapp.active || 0} / {data?.whatsapp.total || 0}
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground tracking-tight">
+                {data?.whatsapp.active || 0} <span className="text-base font-normal text-muted-foreground">/ {data?.whatsapp.total || 0}</span>
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Active connected WhatsApp numbers
-            </p>
+            <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
+              <span>Connected sessions</span>
+              <span className="font-mono text-[11px] text-violet-600 dark:text-violet-400 font-medium">
+                {data?.whatsapp.total ? Math.round(((data?.whatsapp.active || 0) / data.whatsapp.total) * 100) : 0}% online
+              </span>
+            </div>
           </div>
         </Card>
 
-        <Card className="shadow-xs p-5 flex flex-col justify-between">
+        <Card className="p-5 flex flex-col justify-between border border-border/70 hover:border-border transition-all bg-card shadow-2xs hover:shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Platform Messages
+            <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              Network Messages
             </span>
-            <div className="h-9 w-9 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center">
-              <MessageSquare className="h-5 w-5" />
+            <div className="h-9 w-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center">
+              <MessageSquare className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-4">
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
-              <div className="text-2xl font-bold font-mono text-foreground">
+              <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground tracking-tight">
                 {(data?.throughput.messagesInPeriod || 0).toLocaleString()}
               </div>
             )}
-            <p className="text-xs text-muted-foreground mt-1">
-              Network activity in last 30 days
+            <p className="text-xs text-muted-foreground mt-2">
+              Dispatched in last 30-day window
             </p>
           </div>
         </Card>
@@ -367,60 +389,78 @@ export default function AdminOverviewPage() {
           </CardContent>
         </Card>
 
-        {/* Quick God-Mode Navigation & Health */}
-        <Card className="shadow-xs lg:col-span-3">
+        {/* Quick Command Center Navigation */}
+        <Card className="shadow-2xs border border-border/70 lg:col-span-3 bg-card">
           <CardHeader className="pb-3 border-b">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-red-500" />
+              <ShieldCheck className="h-4 w-4 text-primary" />
               Platform Command Center Quick Actions
             </CardTitle>
             <CardDescription className="text-xs">
               Direct access to all platform infrastructure and management domains
             </CardDescription>
           </CardHeader>
-          <CardContent className="pt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-            <Link href="/admin/workspaces" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-blue-500/10 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+          <CardContent className="pt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 sm:gap-4">
+            <Link
+              href="/admin/workspaces"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-blue-500/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Building2 className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">Workspaces</span>
               <span className="text-[10px] text-muted-foreground">Manage Tenants</span>
             </Link>
 
-            <Link href="/admin/whatsapp" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-violet-500/10 text-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Link
+              href="/admin/whatsapp"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-violet-500/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Smartphone className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">WhatsApp Fleet</span>
               <span className="text-[10px] text-muted-foreground">QR &amp; Meta Nodes</span>
             </Link>
 
-            <Link href="/admin/subscriptions" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-emerald-500/10 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Link
+              href="/admin/subscriptions"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-emerald-500/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <CreditCard className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">Subscriptions</span>
               <span className="text-[10px] text-muted-foreground">Active Tiers</span>
             </Link>
 
-            <Link href="/admin/usage" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-amber-500/10 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Link
+              href="/admin/usage"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-amber-500/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Zap className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">Usage &amp; Limits</span>
               <span className="text-[10px] text-muted-foreground">Quota Monitor</span>
             </Link>
 
-            <Link href="/admin/payments" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-pink-500/10 text-pink-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Link
+              href="/admin/payments"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-pink-500/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <CreditCard className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">Payment Logs</span>
               <span className="text-[10px] text-muted-foreground">Razorpay Audit</span>
             </Link>
 
-            <Link href="/admin/audit" className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors flex flex-col items-center text-center gap-2 group">
-              <div className="h-8 w-8 rounded-md bg-slate-500/10 text-slate-600 flex items-center justify-center group-hover:scale-105 transition-transform">
+            <Link
+              href="/admin/audit"
+              className="p-3.5 rounded-xl border border-border/70 bg-card hover:bg-muted/40 hover:border-primary/30 transition-all flex flex-col items-center text-center gap-2 group shadow-2xs"
+            >
+              <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center group-hover:scale-105 transition-transform">
                 <Activity className="h-4 w-4" />
               </div>
               <span className="text-xs font-semibold text-foreground">Audit Logs</span>

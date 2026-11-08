@@ -55,8 +55,14 @@ export default function AdminPaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Payment Logs &amp; Transactions</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary">
+              TRANSACTION AUDIT
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">{orders.length} orders recorded</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Payment Logs &amp; Transactions</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Audit real-time subscription transactions, Razorpay checkout orders, and Autopay billing logs.
           </p>
         </div>
@@ -67,14 +73,14 @@ export default function AdminPaymentsPage() {
             size="sm"
             onClick={fetchOrders}
             disabled={loading}
-            className="gap-1.5 text-xs h-8"
+            className="gap-1.5 text-xs h-9"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
             <span>Refresh</span>
           </Button>
 
           <Link href="/admin/settings">
-            <Button size="sm" className="gap-1.5 text-xs h-8 shadow-2xs font-semibold">
+            <Button size="sm" className="gap-1.5 text-xs h-9 shadow-2xs font-semibold">
               <Settings className="h-3.5 w-3.5" />
               <span>Gateway Settings</span>
             </Button>

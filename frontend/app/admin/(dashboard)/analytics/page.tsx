@@ -104,18 +104,28 @@ export default function AdminAnalyticsPage() {
       {/* Header and Filter */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="text-[10px] font-mono px-2 py-0.5 border-primary/30 bg-primary/10 text-primary flex items-center gap-1.5">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary" />
+              </span>
+              REALTIME METRICS
+            </Badge>
+            <span className="text-xs text-muted-foreground font-mono">Cluster Telemetry</span>
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary" />
-            Platform God-Eye Intelligence
+            Platform Analytics &amp; Telemetry
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
             System-wide operational telemetry, revenue velocity, and tenant distribution strictly from the database.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+        <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-auto">
           {/* Range Selector */}
-          <div className="flex items-center rounded-lg border border-border bg-muted/30 p-0.5 text-xs">
+          <div className="flex items-center rounded-xl border border-border/60 bg-muted/50 p-1 text-xs shadow-2xs">
             {(
               [
                 { key: 'today', label: 'Today' },
@@ -132,9 +142,9 @@ export default function AdminAnalyticsPage() {
                   setRange(item.key);
                   setShowCustomPicker(item.key === 'custom');
                 }}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
                   range === item.key
-                    ? 'bg-background text-foreground shadow-xs'
+                    ? 'bg-background text-foreground shadow-2xs'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -148,9 +158,9 @@ export default function AdminAnalyticsPage() {
             size="sm"
             onClick={fetchAnalytics}
             disabled={loading}
-            className="h-8 gap-1.5 text-xs shadow-2xs"
+            className="h-9 gap-1.5 text-xs shadow-2xs"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-primary' : ''}`} />
             <span>Refresh</span>
           </Button>
         </div>
