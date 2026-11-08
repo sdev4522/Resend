@@ -125,9 +125,9 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
     <div id="pricing" className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
       <div className="text-center max-w-3xl mx-auto">
         {isPageHeading ? (
-          <h1 className="lp-section-title text-4xl md:text-5xl text-foreground">Pricing that grows with your team</h1>
+          <h1 className="lp-display text-balance text-5xl md:text-[4.75rem] text-foreground">Pricing that grows with your team</h1>
         ) : (
-          <h2 className="lp-section-title text-4xl md:text-5xl text-foreground">Pricing that grows with your team</h2>
+          <h2 className="lp-display text-balance text-5xl md:text-[4.75rem] text-foreground">Pricing that grows with your team</h2>
         )}
         <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
           Every plan includes the shared inbox, team seats, contacts and automation. Start with 14 days free, no card

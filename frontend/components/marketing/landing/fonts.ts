@@ -1,9 +1,12 @@
-import { Schibsted_Grotesk } from 'next/font/google';
+import { Anek_Latin } from 'next/font/google';
 
-/** Display face for landing headlines only (body stays Golos Text, matching the app). */
-export const lpDisplay = Schibsted_Grotesk({
+/**
+ * Display face for landing headlines only (body stays Golos Text, matching the app).
+ * Anek is from Ek Type (Mumbai); its width axis lets headlines run condensed and heavy.
+ */
+export const lpDisplay = Anek_Latin({
   variable: '--font-lp-display',
   subsets: ['latin'],
-  weight: ['600', '700', '800'],
+  axes: ['wdth'],
   display: 'swap',
 });

@@ -237,19 +237,29 @@
 /* ───────────────────────── Landing page (scoped to .lp) ─────────────────────────
    Surface/ink tokens only. --primary stays controlled by the admin theme engine. */
 .lp {
-  --lp-paper: #f4f7f5;
-  --lp-ink: #0f231d;
-  --lp-mute: #5e716a;
-  --lp-bubble: #dcf8c6;
-  --lp-read: #34b7f1;
-  --lp-line: #dce5e0;
+  /* Content surfaces: true white and a near-black green ink, so type has real contrast */
+  --lp-paper: #ffffff;
+  --lp-ink: #0a1f1a;
+  --lp-mute: #43564f;
+  --lp-line: #c9d6d0;
   --lp-raised: #ffffff;
+  --lp-sunk: #eef3f0;
+  /* WhatsApp's own vocabulary: header teal, outgoing bubble, read-tick blue */
+  --lp-deep: #0b3b33;
+  --lp-deep-ink: #f2fbf6;
+  --lp-deep-mute: #a6c8bc;
+  --lp-deep-line: #1d5a4e;
+  --lp-bubble: #d9fdd3;
+  --lp-read: #2fa6de;
+  /* Marigold: used only where money changes hands */
+  --lp-money: #f2a93b;
+  --lp-money-ink: #3a2500;
 
   --background: var(--lp-paper);
   --foreground: var(--lp-ink);
   --card: var(--lp-raised);
   --card-foreground: var(--lp-ink);
-  --muted: #e8eeeb;
+  --muted: var(--lp-sunk);
   --muted-foreground: var(--lp-mute);
   --border: var(--lp-line);
   --input: var(--lp-line);
@@ -259,26 +269,36 @@
 }
 
 .dark .lp {
-  --lp-paper: #0f231d;
-  --lp-ink: #e9f1ed;
-  --lp-mute: #9db2aa;
-  --lp-bubble: #1f4a3c;
-  --lp-line: #24423a;
-  --lp-raised: #163129;
-  --muted: #183a31;
+  --lp-paper: #0a1513;
+  --lp-ink: #ecf5f0;
+  --lp-mute: #a3b8b0;
+  --lp-line: #24413a;
+  --lp-raised: #10221e;
+  --lp-sunk: #132a25;
+  --lp-deep: #072a24;
+  --lp-deep-line: #184a40;
+  --lp-bubble: #1d4a3d;
+}
+
+/* A band that sits on the deep teal field */
+.lp-deep {
+  background: var(--lp-deep);
+  color: var(--lp-deep-ink);
 }
 
 .lp-display {
   font-family: var(--font-lp-display), var(--font-golos-text), system-ui, sans-serif;
-  letter-spacing: -0.035em;
-  line-height: 0.98;
-  font-weight: 700;
+  font-stretch: 78%;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 0.92;
 }
 
 .lp-section-title {
   font-family: var(--font-lp-display), var(--font-golos-text), system-ui, sans-serif;
-  letter-spacing: -0.025em;
-  line-height: 1.05;
+  font-stretch: 84%;
+  letter-spacing: -0.015em;
+  line-height: 1;
   font-weight: 700;
 }
 

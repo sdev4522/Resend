@@ -53,19 +53,17 @@ export function LandingNav() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 w-full transition-[background-color,border-color] duration-300',
-        scrolled
-          ? 'border-b border-[var(--lp-line)] bg-[color-mix(in_oklab,var(--lp-paper)_86%,transparent)] backdrop-blur-md'
-          : 'border-b border-transparent',
+        'lp-deep sticky top-0 z-50 w-full border-b transition-[border-color] duration-300',
+        scrolled ? 'border-[var(--lp-deep-line)]' : 'border-transparent',
       )}
     >
       <nav
         aria-label="Main"
         className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-6 px-4 sm:px-6 lg:px-8"
       >
-        <Link href="/" className="flex items-center gap-2 text-[var(--lp-ink)]">
+        <Link href="/" className="flex items-center gap-2 text-[var(--lp-deep-ink)]">
           <ResendMark className="h-8 w-8 text-primary" />
-          <span className="lp-section-title text-xl">Resend</span>
+          <span className="lp-section-title text-2xl">Resend</span>
         </Link>
 
         <ul className="hidden items-center gap-1 md:flex">
@@ -73,7 +71,7 @@ export function LandingNav() {
             <li key={l.href}>
               <a
                 href={l.href}
-                className="rounded-full px-3.5 py-2 text-sm text-[var(--lp-mute)] transition-colors hover:bg-[var(--muted)] hover:text-[var(--lp-ink)]"
+                className="rounded-full px-3.5 py-2 text-sm text-[var(--lp-deep-mute)] transition-colors hover:bg-white/5 hover:text-[var(--lp-deep-ink)]"
               >
                 {l.label}
               </a>
@@ -82,11 +80,13 @@ export function LandingNav() {
         </ul>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <span className="text-[var(--lp-deep-ink)] [&_button]:text-inherit [&_button:hover]:bg-white/5 [&_button:hover]:text-[var(--lp-deep-ink)]">
+            <ThemeToggle />
+          </span>
           {isAuthenticated ? (
             <Link
               href={dashboardHref}
-              className="inline-flex h-10 items-center rounded-full bg-[var(--lp-ink)] px-5 text-sm font-medium text-[var(--lp-paper)] transition-opacity hover:opacity-90"
+              className="inline-flex h-10 items-center whitespace-nowrap rounded-full bg-[var(--lp-deep-ink)] px-4 text-sm sm:px-5 font-medium text-[var(--lp-deep)] transition-opacity hover:opacity-90"
             >
               Open dashboard
             </Link>
@@ -95,14 +95,14 @@ export function LandingNav() {
               <button
                 type="button"
                 onClick={openLogin}
-                className="hidden h-10 rounded-full px-4 text-sm font-medium text-[var(--lp-ink)] hover:bg-[var(--muted)] sm:inline-flex sm:items-center"
+                className="hidden h-10 rounded-full px-4 text-sm font-medium text-[var(--lp-deep-ink)] hover:bg-white/5 sm:inline-flex sm:items-center"
               >
                 Sign in
               </button>
               <button
                 type="button"
                 onClick={openRegister}
-                className="hidden h-10 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-95 sm:inline-flex"
+                className="hidden h-10 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-[filter] hover:brightness-110 sm:inline-flex"
               >
                 Start free trial
               </button>
@@ -110,7 +110,7 @@ export function LandingNav() {
           )}
           <button
             type="button"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--lp-ink)] hover:bg-[var(--muted)] md:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full text-[var(--lp-deep-ink)] hover:bg-white/5 md:hidden"
             aria-expanded={open}
             aria-controls="lp-mobile-menu"
             aria-label={open ? 'Close menu' : 'Open menu'}
@@ -124,7 +124,7 @@ export function LandingNav() {
       {open && (
         <div
           id="lp-mobile-menu"
-          className="border-t border-[var(--lp-line)] bg-[var(--lp-paper)] px-4 pb-6 pt-2 md:hidden"
+          className="border-t border-[var(--lp-deep-line)] px-4 pb-6 pt-2 md:hidden"
         >
           <ul className="flex flex-col">
             {links.map((l) => (
@@ -132,7 +132,7 @@ export function LandingNav() {
                 <a
                   href={l.href}
                   onClick={() => setOpen(false)}
-                  className="block py-3 text-base text-[var(--lp-ink)]"
+                  className="block py-3 text-base text-[var(--lp-deep-ink)]"
                 >
                   {l.label}
                 </a>
@@ -147,7 +147,7 @@ export function LandingNav() {
                   setOpen(false);
                   openLogin();
                 }}
-                className="h-11 rounded-full border border-[var(--lp-line)] text-sm font-medium"
+                className="h-11 rounded-full border border-[var(--lp-deep-line)] text-sm font-medium"
               >
                 Sign in
               </button>

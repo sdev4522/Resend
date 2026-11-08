@@ -25,35 +25,37 @@ const STEPS = [
 
 export function MarketingHowItWorks() {
   return (
-    <section id="how-it-works" aria-labelledby="hiw-title" className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-      <div className="max-w-2xl">
-        <h2 id="hiw-title" className="lp-section-title text-4xl text-foreground md:text-5xl">
-          Set up in an afternoon
-        </h2>
-        <p className="mt-4 text-lg leading-relaxed text-muted-foreground">
-          No developer needed. Three steps from sign-up to your first reply.
-        </p>
-      </div>
+    <section id="how-it-works" aria-labelledby="hiw-title" className="bg-[var(--lp-bubble)]">
+      <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-28">
+        <div className="max-w-2xl">
+          <h2 id="hiw-title" className="lp-display text-[clamp(3rem,6vw,4.75rem)] text-[var(--lp-ink)]">
+            Set up in an afternoon
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-[var(--lp-ink)]/75">
+            No developer needed. Three steps from sign-up to your first reply.
+          </p>
+        </div>
 
-      <ol className="mt-14 grid gap-px overflow-hidden rounded-[28px] border border-border bg-border lg:grid-cols-3">
-        {STEPS.map((s, i) => (
-          <li key={s.title} className="flex flex-col bg-card p-7 sm:p-9">
-            <span
-              aria-hidden="true"
-              className="lp-display text-6xl text-primary/90"
-              style={{ fontFeatureSettings: '"tnum"' }}
-            >
-              {i + 1}
-            </span>
-            <h3 className="mt-8 text-xl font-semibold text-foreground">
-              <span className="sr-only">Step {i + 1}: </span>
-              {s.title}
-            </h3>
-            <p className="mt-3 leading-relaxed text-muted-foreground">{s.description}</p>
-            <p className="mt-auto pt-8 text-sm text-muted-foreground/90">{s.note}</p>
-          </li>
-        ))}
-      </ol>
+        <ol className="mt-16 grid gap-10 md:grid-cols-3 md:gap-8">
+          {STEPS.map((s, i) => (
+            <li key={s.title} className="flex flex-col border-t-[3px] border-[var(--lp-ink)] pt-6">
+              <span
+                aria-hidden="true"
+                className="lp-display text-[5.5rem] leading-[0.8] text-[var(--lp-ink)]"
+                style={{ fontFeatureSettings: '"tnum"' }}
+              >
+                {i + 1}
+              </span>
+              <h3 className="mt-6 text-xl font-semibold text-[var(--lp-ink)]">
+                <span className="sr-only">Step {i + 1}: </span>
+                {s.title}
+              </h3>
+              <p className="mt-3 leading-relaxed text-[var(--lp-ink)]/80">{s.description}</p>
+              <p className="mt-auto pt-6 text-sm text-[var(--lp-ink)]/65">{s.note}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
     </section>
   );
 }

@@ -208,7 +208,7 @@ export function MessageJourney() {
       <div className={cn('lp-journey-pin min-h-screen items-center', pinned ? 'flex' : 'hidden')}>
         <div className="mx-auto grid w-full max-w-7xl grid-cols-12 gap-10 px-8">
           <div className="col-span-5 flex flex-col justify-center">
-            <h2 id="lp-journey-title" className="lp-section-title max-w-md text-5xl text-[var(--lp-ink)]">
+            <h2 id="lp-journey-title" className="lp-display max-w-md text-[4.25rem] text-[var(--lp-ink)]">
               What happens after a customer says hi
             </h2>
             <ol className="mt-10 space-y-2">
@@ -216,7 +216,7 @@ export function MessageJourney() {
                 <li key={c.id}>
                   <div
                     className={cn(
-                      'border-l-2 py-3 pl-5 transition-colors duration-300',
+                      'border-l-[3px] py-3 pl-5 transition-colors duration-300',
                       i === active ? 'border-primary' : 'border-[var(--lp-line)]',
                     )}
                     aria-current={i === active ? 'step' : undefined}
@@ -243,13 +243,13 @@ export function MessageJourney() {
             </ol>
           </div>
           <div className="col-span-7">
-            <div className="relative h-[520px] overflow-hidden rounded-[28px] border border-[var(--lp-line)] bg-[var(--lp-raised)]">
+            <div className="relative h-[540px] overflow-hidden rounded-[30px] bg-[var(--lp-deep)]">
               {chapters.map((c, i) => (
                 <div
                   key={c.id}
                   aria-hidden={i !== active}
                   className={cn(
-                    'absolute inset-0 flex flex-col justify-center transition-[opacity,transform]',
+                    'absolute inset-3 flex flex-col justify-center overflow-hidden rounded-[22px] bg-[var(--lp-raised)] transition-[opacity,transform]',
                     // outgoing panel leaves quickly, incoming one waits for it: no overlapping text
                     i === active
                       ? 'translate-y-0 opacity-100 delay-150 duration-500'
@@ -266,14 +266,14 @@ export function MessageJourney() {
 
       {/* Mobile / tablet: simple stacked chapters */}
       <div className={cn('mx-auto max-w-2xl px-4 py-20 sm:px-6', pinned && 'hidden')}>
-        <h2 className="lp-section-title text-4xl text-[var(--lp-ink)]">What happens after a customer says hi</h2>
+        <h2 className="lp-display text-5xl text-[var(--lp-ink)]">What happens after a customer says hi</h2>
         <div className="mt-10 space-y-12">
           {chapters.map((c) => (
             <article key={c.id}>
               <h3 className="text-xl font-semibold text-[var(--lp-ink)]">{c.title}</h3>
               <p className="mt-2 leading-relaxed text-[var(--lp-mute)]">{c.body}</p>
-              <div className="mt-5 overflow-hidden rounded-3xl border border-[var(--lp-line)] bg-[var(--lp-raised)]">
-                {c.visual}
+              <div className="mt-5 rounded-3xl bg-[var(--lp-deep)] p-2">
+                <div className="overflow-hidden rounded-[18px] bg-[var(--lp-raised)]">{c.visual}</div>
               </div>
             </article>
           ))}
