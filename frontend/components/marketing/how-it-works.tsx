@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { RevealText, trackSpot } from '@/components/marketing/landing/reveal-text';
 
 const STEPS = [
   {
@@ -32,9 +33,11 @@ export function MarketingHowItWorks() {
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 id="hiw-title" className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]">
-            Set up in an afternoon
-          </h2>
+          <RevealText
+            id="hiw-title"
+            text="Set up in an afternoon"
+            className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]"
+          />
           <p className="mt-5 text-lg leading-relaxed text-[var(--lp-mute)]">
             No developer needed. Three steps from sign-up to your first reply.
           </p>
@@ -44,11 +47,12 @@ export function MarketingHowItWorks() {
           {STEPS.map((s, i) => (
             <li
               key={s.title}
-              className="flex flex-col rounded-[28px] border border-white/80 bg-white/75 p-8 shadow-[var(--lp-shadow)] backdrop-blur-md dark:border-white/10 dark:bg-[var(--lp-raised)]/80"
+              onMouseMove={trackSpot}
+              className="lp-spot group flex flex-col rounded-[28px] border border-white/80 bg-white/75 p-8 shadow-[var(--lp-shadow)] backdrop-blur-md dark:border-white/10 dark:bg-[var(--lp-raised)]/80"
             >
               <span
                 aria-hidden="true"
-                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--lp-ink)] text-base font-semibold text-[var(--lp-paper)]"
+                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--lp-ink)] text-base font-semibold text-[var(--lp-paper)] transition-[background-color,transform] duration-300 group-hover:-rotate-6 group-hover:bg-primary group-hover:text-primary-foreground"
               >
                 {i + 1}
               </span>

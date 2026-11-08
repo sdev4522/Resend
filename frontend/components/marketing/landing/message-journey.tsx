@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { RevealText, trackSpot } from './reveal-text';
 
 type Chapter = {
   id: string;
@@ -181,9 +182,11 @@ export function MessageJourney() {
       </div>
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 id="lp-journey-title" className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]">
-            What happens after a customer says hi
-          </h2>
+          <RevealText
+            id="lp-journey-title"
+            text="What happens after a customer says hi"
+            className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]"
+          />
           <p className="mt-5 text-lg leading-relaxed text-[var(--lp-mute)]">
             Inbox, chatbots, broadcasts and reports share the same contacts, so nothing gets lost between them.
           </p>
@@ -193,8 +196,9 @@ export function MessageJourney() {
           {chapters.map((c) => (
             <article
               key={c.id}
+              onMouseMove={trackSpot}
               className={cn(
-                'flex flex-col overflow-hidden rounded-[28px] border border-[var(--lp-line)] bg-[var(--lp-raised)] shadow-[var(--lp-shadow)]',
+                'lp-spot flex flex-col overflow-hidden rounded-[28px] border border-[var(--lp-line)] bg-[var(--lp-raised)] shadow-[var(--lp-shadow)]',
                 c.span,
               )}
             >
@@ -206,7 +210,7 @@ export function MessageJourney() {
                 className="mx-3 mb-3 flex flex-1 flex-col justify-center rounded-[20px] p-3"
                 style={{ background: `linear-gradient(160deg, color-mix(in oklab, ${c.tint} 55%, transparent), color-mix(in oklab, ${c.tint} 15%, transparent))` }}
               >
-                <div className="overflow-hidden rounded-2xl border border-white/70 bg-[var(--lp-raised)] shadow-[var(--lp-shadow)] dark:border-white/10">
+                <div className="lp-spot-zoom overflow-hidden rounded-2xl border border-white/70 bg-[var(--lp-raised)] shadow-[var(--lp-shadow)] dark:border-white/10">
                   {c.visual}
                 </div>
               </div>

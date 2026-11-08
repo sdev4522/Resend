@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
+import { RevealText } from './reveal-text';
 
 export function FinalCta() {
   const { openRegister } = useAuthDialog();
@@ -13,9 +14,11 @@ export function FinalCta() {
           <div className="lp-glow -right-24 -bottom-24 h-[380px] w-[480px] bg-[var(--lp-glow-lilac)]" />
           <div className="lp-glow left-1/3 top-1/3 h-[260px] w-[360px] bg-[var(--lp-glow-peach)] opacity-60" />
         </div>
-        <h2 id="lp-final-title" className="lp-display mx-auto max-w-3xl text-balance text-[clamp(2.25rem,5vw,3.75rem)] text-[var(--lp-ink)]">
-          Your customers are already on WhatsApp. Meet them there.
-        </h2>
+        <RevealText
+          id="lp-final-title"
+          text="Your customers are already on WhatsApp. Meet them there."
+          className="lp-display mx-auto max-w-3xl text-balance text-[clamp(2.25rem,5vw,3.75rem)] text-[var(--lp-ink)]"
+        />
         <p className="mx-auto mt-6 max-w-xl text-lg leading-relaxed text-[var(--lp-mute)]">
           Scan a QR code or connect the Cloud API, invite your team, and send your first reply today.
         </p>
@@ -23,7 +26,7 @@ export function FinalCta() {
           <button
             type="button"
             onClick={openRegister}
-            className="inline-flex h-12 items-center justify-center rounded-full bg-[var(--lp-ink)] px-8 text-[15px] font-semibold text-[var(--lp-paper)] shadow-[0_10px_24px_-10px_rgba(15,23,42,0.6)] transition-transform hover:-translate-y-px"
+            className="lp-shine inline-flex h-12 items-center justify-center rounded-full bg-[var(--lp-ink)] px-8 text-[15px] font-semibold text-[var(--lp-paper)] shadow-[0_10px_24px_-10px_rgba(15,23,42,0.6)] transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-12px_rgba(0,168,132,0.7)]"
           >
             Start free trial
           </button>

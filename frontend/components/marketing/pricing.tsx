@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { RevealText, trackSpot } from '@/components/marketing/landing/reveal-text';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -124,11 +125,11 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
   return (
     <div id="pricing" className="flex flex-col items-center justify-center py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
       <div className="text-center max-w-3xl mx-auto">
-        {isPageHeading ? (
-          <h1 className="lp-section-title text-balance text-4xl md:text-[3.25rem] text-foreground">Pricing that grows with your team</h1>
-        ) : (
-          <h2 className="lp-section-title text-balance text-4xl md:text-[3.25rem] text-foreground">Pricing that grows with your team</h2>
-        )}
+        <RevealText
+          as={isPageHeading ? 'h1' : 'h2'}
+          text="Pricing that grows with your team"
+          className="lp-section-title text-balance text-4xl md:text-[3.25rem] text-foreground"
+        />
         <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
           Every plan includes the shared inbox, team seats, contacts and automation. Start with 14 days free, no card
           needed.
@@ -252,7 +253,8 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
               return (
                 <div
                   key={plan.id}
-                  className={`relative flex flex-col justify-between rounded-2xl p-6 sm:p-8 transition-all duration-200 ${isHighlighted
+                  onMouseMove={trackSpot}
+                  className={`lp-spot flex flex-col justify-between rounded-2xl p-6 sm:p-8 ${isHighlighted
                     ? 'border-2 border-primary bg-card/90 shadow-xl shadow-primary/5'
                     : 'border border-border/70 bg-card hover:border-foreground/30'
                     }`}

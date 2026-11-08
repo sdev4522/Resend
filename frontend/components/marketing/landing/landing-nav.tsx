@@ -72,7 +72,7 @@ export function LandingNav() {
               <li key={l.href}>
                 <a
                   href={l.href}
-                  className="rounded-full px-3.5 py-2 text-sm font-medium text-[var(--lp-mute)] transition-colors hover:bg-[var(--lp-sunk)] hover:text-[var(--lp-ink)]"
+                  className="lp-navlink rounded-full px-3.5 py-2 text-sm font-medium text-[var(--lp-mute)] transition-colors hover:text-[var(--lp-ink)]"
                 >
                   {l.label}
                 </a>
@@ -101,7 +101,7 @@ export function LandingNav() {
                 <button
                   type="button"
                   onClick={openRegister}
-                  className="hidden h-10 items-center rounded-full bg-[var(--lp-ink)] px-5 text-sm font-semibold text-[var(--lp-paper)] transition-opacity hover:opacity-90 sm:inline-flex"
+                  className="lp-shine hidden h-10 items-center rounded-full bg-[var(--lp-ink)] px-5 text-sm font-semibold text-[var(--lp-paper)] sm:inline-flex"
                 >
                   Start free trial
                 </button>

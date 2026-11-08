@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { RevealText } from '@/components/marketing/landing/reveal-text';
 import {
   Accordion,
   AccordionItem,
@@ -82,11 +83,11 @@ export function MarketingFAQ({ isPageHeading = false }: { isPageHeading?: boolea
     <section id="faq" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-border/50">
       <div className="max-w-4xl mx-auto">
         <div className="mb-14 text-center">
-          {isPageHeading ? (
-            <h1 className="lp-section-title text-4xl text-foreground md:text-[3.25rem]">Questions, answered</h1>
-          ) : (
-            <h2 className="lp-section-title text-4xl text-foreground md:text-[3.25rem]">Questions, answered</h2>
-          )}
+          <RevealText
+            as={isPageHeading ? 'h1' : 'h2'}
+            text="Questions, answered"
+            className="lp-section-title text-4xl text-foreground md:text-[3.25rem]"
+          />
           <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Connecting your number, working as a team, and how billing works.
           </p>

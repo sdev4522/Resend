@@ -22,6 +22,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { WorkspaceSwitcher } from './workspace-switcher';
+import { ResendMark } from '@/components/marketing/landing/landing-nav';
 import {
   LayoutDashboard,
   MessageSquare,
@@ -37,7 +38,6 @@ import {
   Settings,
   Code2,
   LifeBuoy,
-  MessageSquareQuote,
   LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +58,13 @@ const iconMap: Record<string, LucideIcon> = {
   Settings,
 };
 
+/** Sidebar sections, by route. Anything not listed falls into the last group. */
+const GROUPS: { label: string; hrefs: string[] }[] = [
+  { label: 'Messaging', hrefs: ['/dashboard', '/dashboard/inbox', '/dashboard/contacts', '/dashboard/campaigns', '/dashboard/templates'] },
+  { label: 'Automation', hrefs: ['/dashboard/automation', '/dashboard/flows', '/dashboard/analytics'] },
+  { label: 'Workspace', hrefs: [] },
+];
+
 export function DashboardSidebar() {
   const pathname = usePathname();
   const { role } = useAuth();
@@ -74,10 +81,8 @@ export function DashboardSidebar() {
       <SidebarHeader className="p-3 gap-3">
         {/* Brand Header */}
         <div className="flex items-center gap-2.5 px-1 py-1">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
-            <MessageSquareQuote className="h-4 w-4" />
-          </div>
-          <span className="font-bold text-base tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          <ResendMark className="h-8 w-8 shrink-0 text-primary" />
+          <span className="text-lg font-bold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             Resend
           </span>
         </div>
@@ -89,57 +94,57 @@ export function DashboardSidebar() {
       </SidebarHeader>
 
       <SidebarContent className="px-2">
-        <SidebarGroup>
-          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
-            Platform
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
-              {siteConfig.dashboardNav.filter((item) => item.href !== '/dashboard/support').map((item) => {
-                if (!canAccessRoute(role, item.href)) {
-                  return null;
-                }
+        {GROUPS.map((group, gi) => {
+          const items = siteConfig.dashboardNav.filter((item) => {
+            if (item.href === '/dashboard/support' || !canAccessRoute(role, item.href)) return false;
+            const listed = GROUPS.some((g) => g.hrefs.includes(item.href));
+            return gi === GROUPS.length - 1 ? !listed || group.hrefs.includes(item.href) : group.hrefs.includes(item.href);
+          });
+          if (items.length === 0) return null;
+          return (
+            <SidebarGroup key={group.label} className="py-1.5">
+              <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
+                {group.label}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="gap-0.5">
+                  {items.map((item) => {
+                    const Icon = iconMap[item.icon] || LayoutDashboard;
+                    const isActive =
+                      pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
 
-                const Icon = iconMap[item.icon] || LayoutDashboard;
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== '/dashboard' && pathname.startsWith(item.href));
-
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton
-                      render={
-                        <Link
-                          href={item.href}
-                          onClick={handleNavClick}
-                          className={`${isActive
-                            ? 'border border-primary/30 bg-primary/8 text-primary'
-                            : 'font-medium text-smss'
-                            }`}
-                        />
-                      }
-                      isActive={isActive}
-                      tooltip={item.title}
-                      // className="cursor-pointer font-medium text-sm transition-colors"
-                      className={`cursor-pointer ${isActive
-                        ? 'border border-primary/30 bg-primary/8 text-primary'
-                        : 'font-medium text-sms'
-                        }`}
-                    >
-                      <Icon className="h-4 w-4 shrink-0" />
-                      <span>{item.title}</span>
-                    </SidebarMenuButton>
-                    {item.badge && (
-                      <SidebarMenuBadge className="text-[10px] bg-primary/10 text-primary font-semibold group-data-[collapsible=icon]:hidden">
-                        {item.badge}
-                      </SidebarMenuBadge>
-                    )}
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                    return (
+                      <SidebarMenuItem key={item.href}>
+                        <SidebarMenuButton
+                          render={<Link href={item.href} onClick={handleNavClick} />}
+                          isActive={isActive}
+                          tooltip={item.title}
+                          className={`relative h-9 cursor-pointer rounded-lg font-medium transition-colors ${
+                            isActive
+                              ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary data-[active]:bg-primary/10 data-[active]:text-primary'
+                              : 'text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                          }`}
+                        >
+                          {isActive && (
+                            <span aria-hidden="true" className="absolute -left-2 top-1.5 bottom-1.5 w-1 rounded-r-full bg-primary group-data-[collapsible=icon]:hidden" />
+                          )}
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                        {item.badge && (
+                          <SidebarMenuBadge className="gap-1 text-[10px] font-semibold text-primary group-data-[collapsible=icon]:hidden">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
+                            {item.badge}
+                          </SidebarMenuBadge>
+                        )}
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
       </SidebarContent>
 
       {/* Bottom-pinned: Help & Support widget */}

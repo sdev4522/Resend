@@ -302,6 +302,63 @@
 .lp-float { animation: lp-float 6s ease-in-out infinite; }
 .lp-float-slow { animation: lp-float 8s ease-in-out infinite; animation-delay: -3s; }
 
+/* Primary CTA: a light sweep crosses the button on hover */
+.lp-shine {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.lp-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.7s ease;
+}
+.lp-shine:hover::after { transform: translateX(120%); }
+
+/* Card that lifts on hover and shows a soft spotlight following the pointer (--mx/--my set in JS) */
+.lp-spot {
+  position: relative;
+  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+}
+.lp-spot::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklab, var(--primary) 12%, transparent), transparent 60%);
+  z-index: 1;
+}
+.lp-spot:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--lp-shadow-lg);
+  border-color: color-mix(in oklab, var(--primary) 35%, var(--lp-line));
+}
+.lp-spot:hover::before { opacity: 1; }
+.lp-spot .lp-spot-zoom { transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.lp-spot:hover .lp-spot-zoom { transform: scale(1.02); }
+
+/* Nav link underline that grows from the centre */
+.lp-navlink { position: relative; }
+.lp-navlink::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  right: 50%;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--primary);
+  transition: left 0.3s ease, right 0.3s ease;
+}
+.lp-navlink:hover::after { left: 14px; right: 14px; }
+
 .lp-display {
   font-family: var(--font-lp-display), var(--font-golos-text), system-ui, sans-serif;
   font-weight: 700;
@@ -341,4 +398,14 @@ html.lenis body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Dashboard chart series (validated with the dataviz palette checker, light + dark) */
+:root {
+  --dash-in: #00957a;
+  --dash-out: #7c6cf2;
+}
+.dark {
+  --dash-in: #13a684;
+  --dash-out: #8576f0;
 }

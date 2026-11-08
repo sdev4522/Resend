@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { BarChart3, Bot, Clock3, Inbox, Megaphone, RotateCcw, Users } from 'lucide-react';
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
+import { CountUp } from './reveal-text';
 
 /* ---------------------------------------------------------------------------
  * Hero: centred headline over soft gradient light, then a product window where
@@ -55,7 +56,7 @@ function FloatCard({ className, children }: { className: string; children: React
   return (
     <div
       aria-hidden="true"
-      className={`absolute z-10 hidden rounded-2xl border border-white/70 bg-white/85 p-3.5 shadow-[var(--lp-shadow)] backdrop-blur-md lg:block dark:border-white/10 dark:bg-[var(--lp-raised)]/85 ${className}`}
+      className={`lp-fc absolute z-10 hidden rounded-2xl border border-white/70 bg-white/85 p-3.5 shadow-[var(--lp-shadow)] backdrop-blur-md lg:block dark:border-white/10 dark:bg-[var(--lp-raised)]/85 ${className}`}
     >
       {children}
     </div>
@@ -84,11 +85,18 @@ export function HeroDesk() {
     t.set(q('.lp-stage-label'), { color: 'var(--lp-mute)' });
     t.set(q('.lp-ticks[data-read="true"]'), { color: 'var(--lp-mute)' });
     t.set(q('.lp-hero-copy'), { autoAlpha: 0, y: 16 });
+    t.set(q('.lp-hw'), { yPercent: 115, rotate: 4 });
+    t.set(q('.lp-underline'), { strokeDashoffset: 1 });
     t.set(q('.lp-window'), { autoAlpha: 0, y: 40 });
+    t.set(q('.lp-fc'), { autoAlpha: 0 });
     t.set(q('.lp-stamp'), { autoAlpha: 0, scale: 1.9, rotate: -24 });
 
-    t.to(q('.lp-hero-copy'), { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.6 })
-      .to(q('.lp-window'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power4.out' }, '-=0.3');
+    t.to(q('.lp-hero-copy')[0], { autoAlpha: 1, y: 0, duration: 0.5 })
+      .to(q('.lp-hw'), { yPercent: 0, rotate: 0, duration: 0.9, ease: 'power4.out', stagger: 0.07 }, '-=0.2')
+      .to(q('.lp-underline'), { strokeDashoffset: 0, duration: 0.7, ease: 'power2.inOut' }, '-=0.35')
+      .to(q('.lp-hero-copy').slice(1), { autoAlpha: 1, y: 0, stagger: 0.08, duration: 0.6 }, '-=0.5')
+      .to(q('.lp-window'), { autoAlpha: 1, y: 0, duration: 0.9, ease: 'power4.out' }, '-=0.3')
+      .to(q('.lp-fc'), { autoAlpha: 1, duration: 0.5, stagger: 0.15 }, '-=0.4');
 
     const steps = q('.lp-step');
     const side = q('.lp-side-item');
@@ -147,23 +155,62 @@ export function HeroDesk() {
             <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
             QR scan or official Cloud API, in one inbox
           </p>
-          <h1 id="lp-hero-title" className="lp-hero-copy lp-display mt-6 text-[clamp(2.6rem,6vw,4.6rem)] text-[var(--lp-ink)]">
-            Turn every WhatsApp chat into a sale
+          <h1
+            id="lp-hero-title"
+            aria-label="Get WhatsApp Business API in 5 minutes"
+            className="lp-display mt-6 text-[clamp(2.6rem,6.4vw,5rem)] text-[var(--lp-ink)]"
+          >
+            <span aria-hidden="true" className="block">
+              {['Get', 'WhatsApp', 'Business', 'API'].map((w) => (
+                <span key={w} className="inline-block overflow-hidden pb-[0.1em] align-bottom">
+                  <span className="lp-hw inline-block origin-bottom-left">{w}&nbsp;</span>
+                </span>
+              ))}
+            </span>
+            <span aria-hidden="true" className="block">
+              <span className="inline-block overflow-hidden pb-[0.1em] align-bottom">
+                <span className="lp-hw inline-block origin-bottom-left">in&nbsp;</span>
+              </span>
+              <span className="relative inline-block">
+                <span className="inline-block overflow-hidden pb-[0.1em] align-bottom">
+                  <span className="lp-hw inline-block origin-bottom-left bg-gradient-to-r from-primary via-[#14b8a6] to-[#6d5cf0] bg-clip-text text-transparent">
+                    5 minutes
+                  </span>
+                </span>
+                <svg
+                  viewBox="0 0 300 16"
+                  preserveAspectRatio="none"
+                  className="pointer-events-none absolute -bottom-1 left-0 h-[0.28em] w-full"
+                >
+                  <path
+                    className="lp-underline"
+                    d="M3 11 C 70 3, 170 2, 297 9"
+                    fill="none"
+                    stroke="var(--primary)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    pathLength={1}
+                    strokeDasharray="1"
+                  />
+                </svg>
+              </span>
+            </span>
           </h1>
-          <p className="lp-hero-copy mx-auto mt-6 max-w-[38rem] text-lg leading-relaxed text-[var(--lp-mute)]">
-            One shared inbox for your team, chatbots that reply at 2 a.m., and broadcasts that reach every customer.
+          <p className="lp-hero-copy mx-auto mt-7 max-w-[38rem] text-lg leading-relaxed text-[var(--lp-mute)]">
+            Then turn every chat into a sale: one shared inbox for your team, chatbots that reply at 2 a.m., and
+            broadcasts that reach every customer.
           </p>
           <div className="lp-hero-copy mt-9 flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={openRegister}
-              className="inline-flex h-12 items-center rounded-full bg-[var(--lp-ink)] px-7 text-[15px] font-semibold text-[var(--lp-paper)] shadow-[0_10px_24px_-10px_rgba(15,23,42,0.6)] transition-transform hover:-translate-y-px active:translate-y-0"
+              className="lp-shine inline-flex h-12 items-center rounded-full bg-[var(--lp-ink)] px-7 text-[15px] font-semibold text-[var(--lp-paper)] shadow-[0_10px_24px_-10px_rgba(15,23,42,0.6)] transition-[transform,box-shadow] duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_32px_-12px_rgba(0,168,132,0.7)] active:translate-y-0"
             >
               Start free trial
             </button>
             <a
               href="#pricing"
-              className="inline-flex h-12 items-center rounded-full border border-[var(--lp-line)] bg-white/70 px-6 text-[15px] font-medium text-[var(--lp-ink)] backdrop-blur transition-colors hover:bg-white dark:bg-white/5 dark:hover:bg-white/10"
+              className="inline-flex h-12 items-center rounded-full border border-[var(--lp-line)] bg-white/70 px-6 text-[15px] font-medium text-[var(--lp-ink)] backdrop-blur transition-[background-color,border-color,transform] duration-300 hover:-translate-y-0.5 hover:border-[var(--lp-ink)]/25 hover:bg-white dark:bg-white/5 dark:hover:bg-white/10"
             >
               See pricing
             </a>
@@ -201,12 +248,12 @@ export function HeroDesk() {
               <span className="flex items-center gap-1.5">
                 <Megaphone className="h-3.5 w-3.5" /> Festive broadcast
               </span>
-              <span>96%</span>
+              <CountUp to={96} suffix="%" />
             </div>
             <div className="mt-2 h-1.5 rounded-full bg-[var(--lp-sunk)]">
               <div className="h-1.5 w-[96%] rounded-full bg-primary" />
             </div>
-            <p className="mt-1.5 text-xs text-[var(--lp-mute)]">delivered to 4,812 customers</p>
+            <p className="mt-1.5 text-xs text-[var(--lp-mute)]">delivered to <CountUp to={4812} /> customers</p>
           </FloatCard>
 
           <div className="lp-window relative rounded-[28px] border border-white/80 bg-white/55 p-2 shadow-[var(--lp-shadow-lg)] backdrop-blur-xl dark:border-white/10 dark:bg-white/5">
