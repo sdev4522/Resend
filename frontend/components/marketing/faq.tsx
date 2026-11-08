@@ -83,9 +83,9 @@ export function MarketingFAQ({ isPageHeading = false }: { isPageHeading?: boolea
       <div className="max-w-4xl mx-auto">
         <div className="mb-14 text-center">
           {isPageHeading ? (
-            <h1 className="lp-display text-5xl text-foreground md:text-[4.75rem]">Questions, answered</h1>
+            <h1 className="lp-section-title text-4xl text-foreground md:text-[3.25rem]">Questions, answered</h1>
           ) : (
-            <h2 className="lp-display text-5xl text-foreground md:text-[4.75rem]">Questions, answered</h2>
+            <h2 className="lp-section-title text-4xl text-foreground md:text-[3.25rem]">Questions, answered</h2>
           )}
           <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
             Connecting your number, working as a team, and how billing works.

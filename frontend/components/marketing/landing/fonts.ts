@@ -1,12 +1,9 @@
-import { Anek_Latin } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 
-/**
- * Display face for landing headlines only (body stays Golos Text, matching the app).
- * Anek is from Ek Type (Mumbai); its width axis lets headlines run condensed and heavy.
- */
-export const lpDisplay = Anek_Latin({
+/** Display face for landing headlines only (body stays Golos Text, matching the app). */
+export const lpDisplay = Plus_Jakarta_Sans({
   variable: '--font-lp-display',
   subsets: ['latin'],
-  axes: ['wdth'],
+  weight: ['600', '700', '800'],
   display: 'swap',
 });

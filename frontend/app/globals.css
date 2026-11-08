@@ -237,23 +237,24 @@
 /* ───────────────────────── Landing page (scoped to .lp) ─────────────────────────
    Surface/ink tokens only. --primary stays controlled by the admin theme engine. */
 .lp {
-  /* Content surfaces: true white and a near-black green ink, so type has real contrast */
+  /* Light, airy: white paper, slate ink with real contrast, saturated pastel light */
   --lp-paper: #ffffff;
-  --lp-ink: #0a1f1a;
-  --lp-mute: #43564f;
-  --lp-line: #c9d6d0;
+  --lp-ink: #0f172a;
+  --lp-mute: #475467;
+  --lp-line: #e3e7ef;
   --lp-raised: #ffffff;
-  --lp-sunk: #eef3f0;
-  /* WhatsApp's own vocabulary: header teal, outgoing bubble, read-tick blue */
-  --lp-deep: #0b3b33;
-  --lp-deep-ink: #f2fbf6;
-  --lp-deep-mute: #a6c8bc;
-  --lp-deep-line: #1d5a4e;
+  --lp-sunk: #f4f6fa;
   --lp-bubble: #d9fdd3;
   --lp-read: #2fa6de;
-  /* Marigold: used only where money changes hands */
   --lp-money: #f2a93b;
   --lp-money-ink: #3a2500;
+  /* Gradient light */
+  --lp-glow-mint: #b6f2d6;
+  --lp-glow-lilac: #d6d0ff;
+  --lp-glow-sky: #c9e6ff;
+  --lp-glow-peach: #ffe1cc;
+  --lp-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 32px -12px rgba(15, 23, 42, 0.14);
+  --lp-shadow-lg: 0 2px 4px rgba(15, 23, 42, 0.04), 0 40px 80px -30px rgba(31, 41, 92, 0.28);
 
   --background: var(--lp-paper);
   --foreground: var(--lp-ink);
@@ -269,37 +270,50 @@
 }
 
 .dark .lp {
-  --lp-paper: #0a1513;
-  --lp-ink: #ecf5f0;
-  --lp-mute: #a3b8b0;
-  --lp-line: #24413a;
-  --lp-raised: #10221e;
-  --lp-sunk: #132a25;
-  --lp-deep: #072a24;
-  --lp-deep-line: #184a40;
+  --lp-paper: #0a0e1a;
+  --lp-ink: #eef2fb;
+  --lp-mute: #a4adc2;
+  --lp-line: #222a3d;
+  --lp-raised: #121829;
+  --lp-sunk: #161d30;
   --lp-bubble: #1d4a3d;
+  --lp-glow-mint: #0f5a45;
+  --lp-glow-lilac: #3b3477;
+  --lp-glow-sky: #1b3f66;
+  --lp-glow-peach: #5a3524;
+  --lp-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 12px 32px -12px rgba(0, 0, 0, 0.6);
+  --lp-shadow-lg: 0 40px 80px -30px rgba(0, 0, 0, 0.7);
 }
 
-/* A band that sits on the deep teal field */
-.lp-deep {
-  background: var(--lp-deep);
-  color: var(--lp-deep-ink);
+/* Soft blurred light behind a section; place inside a relative, overflow-hidden parent */
+.lp-glow {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(80px);
+  opacity: 0.9;
+  pointer-events: none;
 }
+
+/* Gentle float for decorative cards (disabled by the reduced-motion rule below) */
+@keyframes lp-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.lp-float { animation: lp-float 6s ease-in-out infinite; }
+.lp-float-slow { animation: lp-float 8s ease-in-out infinite; animation-delay: -3s; }
 
 .lp-display {
   font-family: var(--font-lp-display), var(--font-golos-text), system-ui, sans-serif;
-  font-stretch: 78%;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 0.92;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
 }
 
 .lp-section-title {
   font-family: var(--font-lp-display), var(--font-golos-text), system-ui, sans-serif;
-  font-stretch: 84%;
-  letter-spacing: -0.015em;
-  line-height: 1;
   font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
 }
 
 .lp :focus-visible {

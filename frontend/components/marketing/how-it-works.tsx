@@ -25,33 +25,39 @@ const STEPS = [
 
 export function MarketingHowItWorks() {
   return (
-    <section id="how-it-works" aria-labelledby="hiw-title" className="bg-[var(--lp-bubble)]">
-      <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8 lg:py-28">
-        <div className="max-w-2xl">
-          <h2 id="hiw-title" className="lp-display text-[clamp(3rem,6vw,4.75rem)] text-[var(--lp-ink)]">
+    <section id="how-it-works" aria-labelledby="hiw-title" className="relative isolate overflow-hidden py-24 lg:py-28">
+      <div aria-hidden="true" className="absolute inset-0 -z-10 bg-[var(--lp-sunk)]">
+        <div className="lp-glow -left-40 top-10 h-[380px] w-[520px] bg-[var(--lp-glow-mint)] opacity-60" />
+        <div className="lp-glow -right-40 bottom-0 h-[380px] w-[520px] bg-[var(--lp-glow-sky)] opacity-60" />
+      </div>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 id="hiw-title" className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]">
             Set up in an afternoon
           </h2>
-          <p className="mt-5 text-lg leading-relaxed text-[var(--lp-ink)]/75">
+          <p className="mt-5 text-lg leading-relaxed text-[var(--lp-mute)]">
             No developer needed. Three steps from sign-up to your first reply.
           </p>
         </div>
 
-        <ol className="mt-16 grid gap-10 md:grid-cols-3 md:gap-8">
+        <ol className="mt-16 grid gap-5 md:grid-cols-3">
           {STEPS.map((s, i) => (
-            <li key={s.title} className="flex flex-col border-t-[3px] border-[var(--lp-ink)] pt-6">
+            <li
+              key={s.title}
+              className="flex flex-col rounded-[28px] border border-white/80 bg-white/75 p-8 shadow-[var(--lp-shadow)] backdrop-blur-md dark:border-white/10 dark:bg-[var(--lp-raised)]/80"
+            >
               <span
                 aria-hidden="true"
-                className="lp-display text-[5.5rem] leading-[0.8] text-[var(--lp-ink)]"
-                style={{ fontFeatureSettings: '"tnum"' }}
+                className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--lp-ink)] text-base font-semibold text-[var(--lp-paper)]"
               >
                 {i + 1}
               </span>
-              <h3 className="mt-6 text-xl font-semibold text-[var(--lp-ink)]">
+              <h3 className="mt-6 text-xl font-semibold tracking-tight text-[var(--lp-ink)]">
                 <span className="sr-only">Step {i + 1}: </span>
                 {s.title}
               </h3>
-              <p className="mt-3 leading-relaxed text-[var(--lp-ink)]/80">{s.description}</p>
-              <p className="mt-auto pt-6 text-sm text-[var(--lp-ink)]/65">{s.note}</p>
+              <p className="mt-3 leading-relaxed text-[var(--lp-mute)]">{s.description}</p>
+              <p className="mt-auto border-t border-[var(--lp-line)] pt-5 text-sm text-[var(--lp-mute)]">{s.note}</p>
             </li>
           ))}
         </ol>

@@ -1,17 +1,15 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { gsap } from 'gsap';
-import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { cn } from '@/lib/utils';
-
-gsap.registerPlugin(ScrollTrigger);
 
 type Chapter = {
   id: string;
   title: string;
   body: string;
   visual: React.ReactNode;
+  /** Grid placement in the bento + the tint of its illustration well */
+  span: string;
+  tint: string;
 };
 
 /* ----------------------------- Illustrations ----------------------------- */
@@ -146,134 +144,71 @@ const chapters: Chapter[] = [
     title: 'One inbox the whole team shares',
     body: 'Every chat from every number lands in one place. Assign conversations, leave private notes and see who replied, so no customer waits twice.',
     visual: <InboxVisual />,
+    span: 'md:col-span-2',
+    tint: 'var(--lp-glow-mint)',
   },
   {
     id: 'automate',
     title: 'Answers while you sleep',
     body: 'Build chatbot flows by dragging blocks: share the catalogue, take orders, and hand the chat to a person when it needs one.',
     visual: <FlowVisual />,
+    span: '',
+    tint: 'var(--lp-glow-lilac)',
   },
   {
     id: 'broadcast',
     title: 'Broadcasts people actually read',
     body: 'Send approved templates to a phonebook or a label, schedule them for later, and watch delivery and read receipts come in.',
     visual: <BroadcastVisual />,
+    span: '',
+    tint: 'var(--lp-glow-sky)',
   },
   {
     id: 'measure',
     title: 'Know what is working',
     body: 'See reply times, campaign results and agent workload for any date range, for each WhatsApp number.',
     visual: <ReportVisual />,
+    span: 'md:col-span-2',
+    tint: 'var(--lp-glow-peach)',
   },
 ];
 
 export function MessageJourney() {
-  const section = useRef<HTMLElement>(null);
-  const [active, setActive] = useState(0);
-  // Pinned scrolling only on large screens with motion allowed; otherwise everything is stacked
-  const [pinned, setPinned] = useState(false);
-
-  // The pinned layout becomes visible only after this state flips; re-measure then
-  useEffect(() => {
-    if (pinned) ScrollTrigger.refresh();
-  }, [pinned]);
-
-  useLayoutEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const mm = gsap.matchMedia();
-    mm.add('(min-width: 1024px)', () => {
-      setPinned(true);
-      const st = ScrollTrigger.create({
-        trigger: section.current,
-        start: 'top top',
-        end: () => `+=${window.innerHeight * (chapters.length - 0.4)}`,
-        pin: '.lp-journey-pin',
-        pinSpacing: true,
-        onUpdate: (self) => {
-          const i = Math.min(chapters.length - 1, Math.floor(self.progress * chapters.length));
-          setActive(i);
-        },
-      });
-      return () => {
-        st.kill();
-        setPinned(false);
-      };
-    });
-    return () => mm.revert();
-  }, []);
-
   return (
-    <section id="journey" ref={section} aria-labelledby="lp-journey-title" className="relative">
-      {/* Desktop: pinned, scroll steps through the chapters */}
-      <div className={cn('lp-journey-pin min-h-screen items-center', pinned ? 'flex' : 'hidden')}>
-        <div className="mx-auto grid w-full max-w-7xl grid-cols-12 gap-10 px-8">
-          <div className="col-span-5 flex flex-col justify-center">
-            <h2 id="lp-journey-title" className="lp-display max-w-md text-[4.25rem] text-[var(--lp-ink)]">
-              What happens after a customer says hi
-            </h2>
-            <ol className="mt-10 space-y-2">
-              {chapters.map((c, i) => (
-                <li key={c.id}>
-                  <div
-                    className={cn(
-                      'border-l-[3px] py-3 pl-5 transition-colors duration-300',
-                      i === active ? 'border-primary' : 'border-[var(--lp-line)]',
-                    )}
-                    aria-current={i === active ? 'step' : undefined}
-                  >
-                    <h3
-                      className={cn(
-                        'text-lg font-semibold transition-colors duration-300',
-                        i === active ? 'text-[var(--lp-ink)]' : 'text-[var(--lp-mute)]',
-                      )}
-                    >
-                      {c.title}
-                    </h3>
-                    <div
-                      className={cn(
-                        'grid transition-[grid-template-rows,opacity] duration-500',
-                        i === active ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0',
-                      )}
-                    >
-                      <p className="overflow-hidden pt-1.5 text-[15px] leading-relaxed text-[var(--lp-mute)]">{c.body}</p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <div className="col-span-7">
-            <div className="relative h-[540px] overflow-hidden rounded-[30px] bg-[var(--lp-deep)]">
-              {chapters.map((c, i) => (
-                <div
-                  key={c.id}
-                  aria-hidden={i !== active}
-                  className={cn(
-                    'absolute inset-3 flex flex-col justify-center overflow-hidden rounded-[22px] bg-[var(--lp-raised)] transition-[opacity,transform]',
-                    // outgoing panel leaves quickly, incoming one waits for it: no overlapping text
-                    i === active
-                      ? 'translate-y-0 opacity-100 delay-150 duration-500'
-                      : 'pointer-events-none translate-y-3 opacity-0 delay-0 duration-150',
-                  )}
-                >
+    <section id="journey" aria-labelledby="lp-journey-title" className="relative isolate overflow-hidden py-24 lg:py-28">
+      <div aria-hidden="true" className="absolute inset-0 -z-10">
+        <div className="lp-glow left-1/2 top-24 h-[420px] w-[820px] -translate-x-1/2 bg-[var(--lp-glow-lilac)] opacity-40" />
+      </div>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 id="lp-journey-title" className="lp-section-title text-4xl text-[var(--lp-ink)] md:text-[3.25rem]">
+            What happens after a customer says hi
+          </h2>
+          <p className="mt-5 text-lg leading-relaxed text-[var(--lp-mute)]">
+            Inbox, chatbots, broadcasts and reports share the same contacts, so nothing gets lost between them.
+          </p>
+        </div>
+
+        <div className="mt-16 grid gap-5 md:grid-cols-3">
+          {chapters.map((c) => (
+            <article
+              key={c.id}
+              className={cn(
+                'flex flex-col overflow-hidden rounded-[28px] border border-[var(--lp-line)] bg-[var(--lp-raised)] shadow-[var(--lp-shadow)]',
+                c.span,
+              )}
+            >
+              <div className="p-7 pb-5">
+                <h3 className="text-xl font-semibold tracking-tight text-[var(--lp-ink)]">{c.title}</h3>
+                <p className="mt-2 max-w-md leading-relaxed text-[var(--lp-mute)]">{c.body}</p>
+              </div>
+              <div
+                className="mx-3 mb-3 flex flex-1 flex-col justify-center rounded-[20px] p-3"
+                style={{ background: `linear-gradient(160deg, color-mix(in oklab, ${c.tint} 55%, transparent), color-mix(in oklab, ${c.tint} 15%, transparent))` }}
+              >
+                <div className="overflow-hidden rounded-2xl border border-white/70 bg-[var(--lp-raised)] shadow-[var(--lp-shadow)] dark:border-white/10">
                   {c.visual}
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile / tablet: simple stacked chapters */}
-      <div className={cn('mx-auto max-w-2xl px-4 py-20 sm:px-6', pinned && 'hidden')}>
-        <h2 className="lp-display text-5xl text-[var(--lp-ink)]">What happens after a customer says hi</h2>
-        <div className="mt-10 space-y-12">
-          {chapters.map((c) => (
-            <article key={c.id}>
-              <h3 className="text-xl font-semibold text-[var(--lp-ink)]">{c.title}</h3>
-              <p className="mt-2 leading-relaxed text-[var(--lp-mute)]">{c.body}</p>
-              <div className="mt-5 rounded-3xl bg-[var(--lp-deep)] p-2">
-                <div className="overflow-hidden rounded-[18px] bg-[var(--lp-raised)]">{c.visual}</div>
               </div>
             </article>
           ))}
