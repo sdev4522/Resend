@@ -128,8 +128,10 @@ function ReportVisual() {
       </div>
       <div className="mt-6 flex h-36 items-end gap-2" role="img" aria-label="Chats per day this week">
         {days.map((d, i) => (
-          <div key={names[i]} className="flex flex-1 flex-col items-center gap-1.5">
-            <div className="w-full rounded-md bg-primary/80" style={{ height: `${(d / max) * 100}%` }} />
+          <div key={names[i]} className="flex h-full flex-1 flex-col items-center gap-1.5">
+            <div className="flex w-full flex-1 items-end">
+              <div className="w-full rounded-md bg-primary/80" style={{ height: `${(d / max) * 100}%` }} />
+            </div>
             <span className="text-[11px] text-[var(--lp-mute)]">{names[i]}</span>
           </div>
         ))}
