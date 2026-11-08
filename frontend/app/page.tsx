@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: 'Resend — WhatsApp Business API, CRM & Automation Platform',
@@ -44,7 +44,7 @@ export const metadata: Metadata = {
     title: 'Resend — WhatsApp Business API, CRM & Automation',
     description:
       'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

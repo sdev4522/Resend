@@ -25,7 +25,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: 'Resend Features — WhatsApp Automation & CRM',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: 'Features — WhatsApp Cloud API, Inbox & Automation | Resend',
     description:
       'Explore official WhatsApp Cloud API broadcasting, visual no-code flow builder, multi-agent shared inbox, and developer APIs.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

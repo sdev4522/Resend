@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: 'Contact Resend Support',
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     title: 'Contact Resend — Sales & Customer Support',
     description:
       'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

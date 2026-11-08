@@ -18,7 +18,7 @@ export const metadata: Metadata = {
       'Review terms of service, acceptable messaging policies, WhatsApp Meta API compliance, and subscription guidelines for Resend.',
     url: `${siteConfig.url}/terms`,
     siteName: siteConfig.name,
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Resend Terms and Conditions' }],
+    images: [{ url: '/newog.png', width: 1200, height: 630, alt: 'Resend Terms and Conditions' }],
     type: 'website',
   },
   twitter: {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: 'Terms and Conditions — Resend',
     description:
       'Review terms of service, acceptable messaging policies, WhatsApp Meta API compliance, and subscription guidelines for Resend.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

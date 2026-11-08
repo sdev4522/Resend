@@ -23,7 +23,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: 'Resend Frequently Asked Questions',
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | Resend',
     description:
       'Answers to common questions regarding WhatsApp Cloud API integration, multi-agent inbox setup, broadcast deliverability, and SaaS billing.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

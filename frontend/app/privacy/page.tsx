@@ -18,7 +18,7 @@ export const metadata: Metadata = {
       'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
     url: `${siteConfig.url}/privacy`,
     siteName: siteConfig.name,
-    images: [{ url: '/og.png', width: 1200, height: 630, alt: 'Resend Privacy Policy' }],
+    images: [{ url: '/newog.png', width: 1200, height: 630, alt: 'Resend Privacy Policy' }],
     type: 'website',
   },
   twitter: {
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     title: 'Privacy Policy — Resend',
     description:
       'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

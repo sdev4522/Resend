@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: 'Resend Pricing Plans',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
     description:
       'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
-    images: ['/og.png'],
+    images: ['/newog.png'],
   },
 };
 

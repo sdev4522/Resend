@@ -67,7 +67,7 @@ export const metadata: Metadata = {
     description: siteConfig.description,
     images: [
       {
-        url: '/og.png',
+        url: '/newog.png',
         width: 1200,
         height: 630,
         alt: `${siteConfig.name} — WhatsApp Business API, CRM & Automation Platform`,
