@@ -664,7 +664,7 @@ function TemplatesContent() {
                 handleDeleteTemplate();
               }}
               disabled={deleteLoading}
-              className="bg-destructive hover:bg-destructive text-white"
+              variant="destructive"
             >
               {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete from Meta

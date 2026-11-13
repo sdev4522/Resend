@@ -1380,7 +1380,7 @@ export default function IntegrationsPage() {
             <AlertDialogAction
               onClick={handleMetaDisconnectConfirm}
               disabled={metaDisconnecting}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              variant="destructive"
             >
               {metaDisconnecting ? (
                 <span className="flex items-center gap-1.5">
@@ -1418,7 +1418,7 @@ export default function IntegrationsPage() {
             <AlertDialogAction
               onClick={handleDeleteConfirm}
               disabled={!!actionLoadingId}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              variant="destructive"
             >
               {actionLoadingId ? (
                 <span className="flex items-center gap-1.5">

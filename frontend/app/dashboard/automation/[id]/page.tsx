@@ -421,7 +421,7 @@ export default function FlowBuilderPage({ params }: PageProps) {
             <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               Delete flow
             </AlertDialogAction>

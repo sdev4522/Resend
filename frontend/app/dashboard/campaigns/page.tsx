@@ -501,7 +501,7 @@ export default function CampaignsPage() {
             <AlertDialogAction
               onClick={handleDeleteCampaign}
               disabled={actionLoading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {actionLoading ? 'Deleting...' : 'Delete Campaign'}
             </AlertDialogAction>

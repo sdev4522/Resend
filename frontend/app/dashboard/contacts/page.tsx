@@ -1342,7 +1342,7 @@ export default function ContactsPage() {
             <AlertDialogAction
               onClick={handleDeleteContacts}
               disabled={actionLoading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {actionLoading ? 'Deleting...' : 'Delete Permanently'}
             </AlertDialogAction>
@@ -1367,7 +1367,7 @@ export default function ContactsPage() {
             <AlertDialogAction
               onClick={handleDeletePhonebook}
               disabled={actionLoading}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               {actionLoading ? 'Deleting...' : 'Delete Phonebook & Contacts'}
             </AlertDialogAction>

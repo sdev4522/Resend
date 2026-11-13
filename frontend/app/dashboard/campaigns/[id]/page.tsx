@@ -243,7 +243,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                <AlertDialogAction onClick={handleDelete} variant="destructive">
                   {deleting ? 'Deleting...' : 'Delete Campaign'}
                 </AlertDialogAction>
               </AlertDialogFooter>

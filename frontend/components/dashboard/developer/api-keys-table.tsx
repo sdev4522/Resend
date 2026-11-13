@@ -212,7 +212,7 @@ export function ApiKeysTable({
             <AlertDialogAction
               onClick={handleRevoke}
               disabled={isRevoking}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              variant="destructive"
             >
               {isRevoking ? 'Revoking...' : 'Revoke Key'}
             </AlertDialogAction>

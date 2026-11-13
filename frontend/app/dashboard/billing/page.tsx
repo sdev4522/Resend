@@ -68,6 +68,18 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
+// Symbol for a given ISO currency (history rows keep the currency they were paid in)
+const symbolFor = (currency: string, fallback: string) => {
+  try {
+    return (
+      new Intl.NumberFormat('en', { style: 'currency', currency }).formatToParts(0).find((p) => p.type === 'currency')
+        ?.value ?? fallback
+    );
+  } catch {
+    return fallback;
+  }
+};
+
 const fmtMode = (m?: string | null) =>
   m ? m.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '—';
 
@@ -130,6 +142,7 @@ function OptionCard({
   description,
   icon: Icon,
   tag,
+  disabled,
 }: {
   selected: boolean;
   onSelect: () => void;
@@ -137,15 +150,17 @@ function OptionCard({
   description: string;
   icon?: React.ElementType;
   tag?: string;
+  disabled?: boolean;
 }) {
   return (
     <button
       type="button"
       role="radio"
       aria-checked={selected}
+      disabled={disabled}
       onClick={onSelect}
       className={cn(
-        'group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/35',
+        'group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/35 disabled:cursor-not-allowed disabled:opacity-60',
         selected
           ? 'border-primary bg-primary/[0.04] shadow-[0_0_0_1px_var(--primary)]'
           : 'border-border bg-background hover:border-foreground/20 hover:bg-accent/40'
@@ -229,6 +244,7 @@ export default function BillingPage() {
     isActive: boolean;
   }>({ subscriptionId: null, status: null, isActive: false });
   const [isOrdersLoading, setIsOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState(false);
   const [isCancellingAutopay, setIsCancellingAutopay] = useState(false);
 
   // Checkout Modal state
@@ -282,6 +298,7 @@ export default function BillingPage() {
   const fetchOrders = useCallback(async () => {
     try {
       setIsOrdersLoading(true);
+      setOrdersError(false);
       const res = await billingApi.getOrders();
       if (res && res.orders) {
         setOrders(res.orders);
@@ -291,6 +308,7 @@ export default function BillingPage() {
       }
     } catch (err: any) {
       console.error('Failed to load order history:', err);
+      setOrdersError(true);
     } finally {
       setIsOrdersLoading(false);
     }
@@ -302,8 +320,12 @@ export default function BillingPage() {
   }, [fetchPlans, fetchOrders]);
 
   // Recalculate price whenever checkout plan or applied coupon changes
+  // Only the newest price request may update the summary (term/coupon/currency can change mid-flight)
+  const priceRequestRef = React.useRef(0);
+  const checkoutHeadingRef = React.useRef<HTMLDivElement>(null);
   const recalculateCheckoutPrice = useCallback(
     async (planId: number, coupon?: string | null, targetCurrencyOverride?: string) => {
+      const requestId = ++priceRequestRef.current;
       try {
         setIsCalculatingPrice(true);
         const res = await billingApi.calculatePrice({
@@ -313,6 +335,7 @@ export default function BillingPage() {
           currency: targetCurrencyOverride || selectedCurrency,
         });
 
+        if (requestId !== priceRequestRef.current) return;
         const summary = (res as any).pricing || (res as any).data;
         if (summary) {
           setPriceSummary(summary);
@@ -326,10 +349,11 @@ export default function BillingPage() {
           }
         }
       } catch (err: any) {
+        if (requestId !== priceRequestRef.current) return;
         console.error('Price calculation failed:', err);
         setCouponError(err.response?.data?.msg || err.message || 'Price calculation failed');
       } finally {
-        setIsCalculatingPrice(false);
+        if (requestId === priceRequestRef.current) setIsCalculatingPrice(false);
       }
     },
     [selectedCurrency, durationMonths]
@@ -353,7 +377,8 @@ export default function BillingPage() {
     setAppliedCoupon(null);
     setCouponError(null);
     setMockOrderPayload(null);
-    recalculateCheckoutPrice(targetPlan.id, null, selectedCurrency);
+    setPriceSummary(null);
+    // Price is fetched by the sync effect once the new plan/term state has applied
   };
 
   // Arriving from pricing/onboarding: /dashboard/billing?plan=<id>&months=<1|12> opens that checkout once
@@ -367,7 +392,6 @@ export default function BillingPage() {
     window.history.replaceState(null, '', '/dashboard/billing');
     const target = plans.find((p) => Number(p.id) === planId && !p.is_trial);
     if (target) handleOpenCheckout(target, params.get('months') === '12' ? 12 : 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plans]);
 
   // Handle coupon application
@@ -410,9 +434,7 @@ export default function BillingPage() {
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError(null);
-    if (selectedCheckoutPlan) {
-      recalculateCheckoutPrice(selectedCheckoutPlan.id, null);
-    }
+    // The sync effect re-prices when appliedCoupon changes
   };
 
   // Handle Cancel Autopay
@@ -606,6 +628,10 @@ export default function BillingPage() {
     if (explicit !== undefined) return Number(explicit);
     return p.price_strike ? Math.round(Number(p.price_strike) * activeCurrencyRate * 100) / 100 : null;
   };
+  const orderMoney = (v: number | string | null | undefined, cur?: string | null) => {
+    const c = cur || selectedCurrency;
+    return formatCurrencyAmount(v, c, c === selectedCurrency ? currencySymbol : symbolFor(c, currencySymbol));
+  };
   const money = (v: number | undefined | null) => formatCurrencyAmount(v ?? 0, priceSummary?.currency || selectedCurrency, currencySymbol);
 
   const currentPrice = plan ? Number((plans.find((p) => p.id === plan.id) || plan).price || 0) : 0;
@@ -618,6 +644,8 @@ export default function BillingPage() {
       ? priceSummary.finalAmount
       : priceFor(selectedCheckoutPlan)
     : 0;
+  // Once an order exists (or is being created) its term/autopay/coupon are fixed
+  const checkoutLocked = isProcessingPayment || !!mockOrderPayload;
   const isRenewal = Boolean(selectedCheckoutPlan && plan?.id === selectedCheckoutPlan.id);
   const isTrial = Number(plan?.is_trial) === 1;
   const isActive = isValid && !isExpired;
@@ -951,6 +979,20 @@ export default function BillingPage() {
                   <Skeleton className="h-10 w-full" />
                   <Skeleton className="h-10 w-full" />
                 </div>
+              ) : ordersError ? (
+                <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                    <AlertCircle className="size-5" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">Couldn&apos;t load payment history</p>
+                    <p className="text-[13px] text-muted-foreground">Check your connection and try again.</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={fetchOrders}>
+                    <RefreshCw />
+                    Try again
+                  </Button>
+                </div>
               ) : orders.length === 0 ? (
                 <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
                   <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
@@ -974,7 +1016,7 @@ export default function BillingPage() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-semibold tabular-nums text-foreground">
-                              {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
+                              {orderMoney(ord.amount, ord.currency)}
                             </p>
                             <Badge variant={statusVariant(ord.status)} className="mt-1 capitalize">
                               {ord.status?.toLowerCase()}
@@ -1010,7 +1052,7 @@ export default function BillingPage() {
                             <TableCell className="pl-6 text-muted-foreground">{fmtDate(ord.createdAt)}</TableCell>
                             <TableCell className="font-medium text-foreground">{ord.planTitle}</TableCell>
                             <TableCell className="font-medium tabular-nums text-foreground">
-                              {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
+                              {orderMoney(ord.amount, ord.currency)}
                             </TableCell>
                             <TableCell className="text-muted-foreground">
                               <span>{fmtMode(ord.paymentMode)}</span>
@@ -1024,7 +1066,7 @@ export default function BillingPage() {
                               {ord.couponCode ? (
                                 <span className="font-mono text-xs">
                                   {ord.couponCode}
-                                  <span className="ml-1 text-success">−{currencySymbol}{ord.couponDiscount}</span>
+                                  <span className="ml-1 text-success">−{orderMoney(ord.couponDiscount, ord.currency)}</span>
                                 </span>
                               ) : (
                                 '—'
@@ -1055,10 +1097,10 @@ export default function BillingPage() {
               if (!open && !isProcessingPayment) closeCheckout();
             }}
           >
-            <DialogContent className="gap-0 sm:max-w-[520px]">
+            <DialogContent className="gap-0 sm:max-w-[520px]" initialFocus={checkoutHeadingRef}>
               {selectedCheckoutPlan && (
                 <>
-                  <DialogHeader className="pb-5">
+                  <DialogHeader ref={checkoutHeadingRef} tabIndex={-1} className="pb-5 outline-none">
                     <p className="text-xs font-medium uppercase tracking-[0.08em] text-primary">
                       {isRenewal ? 'Renew' : 'Upgrade'}
                     </p>
@@ -1086,6 +1128,7 @@ export default function BillingPage() {
                               type="button"
                               role="radio"
                               aria-checked={durationMonths === m}
+                              disabled={checkoutLocked}
                               onClick={() => {
                                 setDurationMonths(m);
                                 if (m === 12) setEnableAutopay(false);
@@ -1093,7 +1136,7 @@ export default function BillingPage() {
                                 setCouponInput('');
                               }}
                               className={cn(
-                                'flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all',
+                                'flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-60',
                                 durationMonths === m
                                   ? 'bg-background text-foreground shadow-[0_1px_3px_rgb(16_24_40/0.12)]'
                                   : 'text-muted-foreground hover:text-foreground'
@@ -1113,6 +1156,7 @@ export default function BillingPage() {
                         <div role="radiogroup" aria-label="Payment type" className="grid gap-2">
                           <OptionCard
                             selected={enableAutopay}
+                            disabled={checkoutLocked}
                             onSelect={() => setEnableAutopay(true)}
                             title="Autopay"
                             tag="Recommended"
@@ -1120,6 +1164,7 @@ export default function BillingPage() {
                           />
                           <OptionCard
                             selected={!enableAutopay}
+                            disabled={checkoutLocked}
                             onSelect={() => setEnableAutopay(false)}
                             title="Pay once"
                             description="Pay for one cycle. You'll renew manually before it ends."
@@ -1140,7 +1185,7 @@ export default function BillingPage() {
                             <CircleCheck className="size-4" />
                             <span className="font-mono">{appliedCoupon}</span> applied
                           </span>
-                          <Button variant="ghost" size="icon-xs" onClick={handleRemoveCoupon} aria-label="Remove coupon">
+                          <Button variant="ghost" size="icon-xs" onClick={handleRemoveCoupon} disabled={checkoutLocked} aria-label="Remove coupon">
                             <X />
                           </Button>
                         </div>
@@ -1152,14 +1197,14 @@ export default function BillingPage() {
                             value={couponInput}
                             onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                             onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
-                            disabled={isApplyingCoupon || isCalculatingPrice}
+                            disabled={checkoutLocked || isApplyingCoupon || isCalculatingPrice}
                             aria-invalid={!!couponError || undefined}
                             className="font-mono uppercase placeholder:font-sans placeholder:normal-case"
                           />
                           <Button
                             variant="outline"
                             onClick={handleApplyCoupon}
-                            disabled={!couponInput.trim() || isApplyingCoupon || isCalculatingPrice}
+                            disabled={checkoutLocked || !couponInput.trim() || isApplyingCoupon || isCalculatingPrice}
                             className="min-w-20"
                           >
                             {isApplyingCoupon ? <RefreshCw className="animate-spin" /> : 'Apply'}

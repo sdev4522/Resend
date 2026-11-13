@@ -403,7 +403,7 @@ export function AutomationList() {
             <AlertDialogCancel className="text-xs">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDelete}
-              className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              variant="destructive"
             >
               Delete
             </AlertDialogAction>
