@@ -118,15 +118,15 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
   const getNodeMeta = useCallback((type?: string) => {
     switch (type) {
       case 'INITIAL':
-        return { label: 'Initial Trigger', badgeClass: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' };
+        return { label: 'Initial Trigger', badgeClass: 'bg-success/10 text-success border-success/30' };
       case 'SEND_MESSAGE':
-        return { label: 'Send Message', badgeClass: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30' };
+        return { label: 'Send Message', badgeClass: 'bg-info/10 text-info border-info/30' };
       case 'CONDITION':
-        return { label: 'Branch Condition', badgeClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30' };
+        return { label: 'Branch Condition', badgeClass: 'bg-warning/10 text-warning border-warning/30' };
       case 'DELAY':
-        return { label: 'Delay Timer', badgeClass: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30' };
+        return { label: 'Delay Timer', badgeClass: 'bg-warning/10 text-warning border-warning/30' };
       case 'MAKE_REQUEST':
-        return { label: 'Webhook Request', badgeClass: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/30' };
+        return { label: 'Webhook Request', badgeClass: 'bg-info/10 text-info border-info/30' };
       case 'AI_TRANSFER':
         return { label: 'AI Agent Transfer', badgeClass: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30' };
       default:
@@ -358,10 +358,10 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
         <Button
           size="sm"
           onClick={() => setMobilePaletteOpen(true)}
-          className="h-8 text-xs gap-1.5 px-3 touch-manipulation font-semibold"
+          className="h-8 gap-1.5 px-3"
         >
           <Plus className="h-3.5 w-3.5" />
-          <span>Add Step</span>
+          <span>Add step</span>
         </Button>
       </div>
 
@@ -372,7 +372,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
           <div className="md:hidden flex-1 overflow-y-auto p-4 space-y-3 bg-muted/10">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-foreground">Automation Flow Steps</h3>
+                <h3 className="text-sm font-semibold text-foreground">Automation flow steps</h3>
                 <p className="text-xs text-muted-foreground">
                   Tap any step to edit its WhatsApp message content, conditions, and parameters.
                 </p>
@@ -398,11 +398,11 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
                         <>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2">
-                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs shrink-0">
+                              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold text-xs shrink-0">
                                 {index + 1}
                               </span>
                               <div>
-                                <Badge variant="outline" className={`text-[10px] font-medium ${meta.badgeClass}`}>
+                                <Badge variant="outline" className={`text-xs font-medium ${meta.badgeClass}`}>
                                   {meta.label}
                                 </Badge>
                                 <h4 className="text-xs font-semibold text-foreground mt-0.5">
@@ -416,7 +416,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => handleDuplicateNode(node as FlowNode)}
-                                className="h-8 w-8 text-muted-foreground hover:text-foreground touch-manipulation"
+                                className="h-8 w-8 text-muted-foreground hover:text-foreground"
                                 title="Duplicate step"
                               >
                                 <Copy className="h-3.5 w-3.5" />
@@ -426,7 +426,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => handleDeleteNode(node.id)}
-                                  className="h-8 w-8 text-destructive hover:bg-destructive/10 touch-manipulation"
+                                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
                                   title="Delete step"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
@@ -445,7 +445,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
                       );
                     })()}
 
-                    <div className="flex items-center justify-between pt-1 border-t border-border/40 text-[11px] text-muted-foreground">
+                    <div className="flex items-center justify-between pt-1 border-t border-border/40 text-xs text-muted-foreground">
                       <span>{outEdges.length} next {outEdges.length === 1 ? 'branch' : 'branches'}</span>
                       <Button
                         size="sm"
@@ -454,10 +454,10 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
                           setSelectedNode(node as FlowNode);
                           setIsConfigOpen(true);
                         }}
-                        className="h-7 text-xs gap-1 text-primary hover:text-primary font-semibold touch-manipulation"
+                        className="h-7 gap-1 text-primary hover:text-primary"
                       >
                         <Settings2 className="h-3 w-3" />
-                        <span>Configure Step</span>
+                        <span>Configure step</span>
                       </Button>
                     </div>
                   </div>
@@ -468,7 +468,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
             <Button
               variant="outline"
               onClick={() => setMobilePaletteOpen(true)}
-              className="w-full h-10 border-dashed text-xs gap-2 text-primary font-medium touch-manipulation mt-4"
+              className="w-full h-10 border-dashed gap-2 text-primary font-medium mt-4"
             >
               <Plus className="h-4 w-4" />
               <span>Add New Step to Flow</span>
@@ -529,18 +529,18 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 gap-1.5 shadow-xs bg-card"
+                className="h-8 gap-1.5 bg-card"
                 onClick={() => setIsPaletteOpen((prev) => !prev)}
               >
                 {isPaletteOpen ? (
                   <>
                     <PanelLeftClose className="h-3.5 w-3.5" />
-                    <span className="text-xs">Hide Palette</span>
+                    <span className="text-xs">Hide palette</span>
                   </>
                 ) : (
                   <>
                     <PanelLeftOpen className="h-3.5 w-3.5" />
-                    <span className="text-xs">Show Palette</span>
+                    <span className="text-xs">Show palette</span>
                   </>
                 )}
               </Button>
@@ -553,7 +553,7 @@ export function FlowCanvas({ initialData, onChange, origin }: FlowCanvasProps) {
       <Sheet open={mobilePaletteOpen} onOpenChange={setMobilePaletteOpen}>
         <SheetContent side="bottom" className="p-0 max-h-[80vh] rounded-t-2xl overflow-y-auto">
           <SheetHeader className="p-4 pb-2 border-b">
-            <SheetTitle className="text-sm font-bold">Add Step to Automation</SheetTitle>
+            <SheetTitle className="text-sm font-semibold">Add Step to Automation</SheetTitle>
           </SheetHeader>
           <div className="p-2">
             <NodePalette

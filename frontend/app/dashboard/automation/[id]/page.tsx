@@ -340,9 +340,9 @@ export default function FlowBuilderPage({ params }: PageProps) {
       <Dialog open={isOriginModalOpen} onOpenChange={setIsOriginModalOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
-              <Play className="h-4 w-4 text-emerald-600" />
-              <span>Connect WhatsApp & Activate</span>
+            <DialogTitle className="text-base font-semibold flex items-center gap-2">
+              <Play className="h-4 w-4 text-success" />
+              <span>Connect WhatsApp & activate</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
               Select the active WhatsApp channel that will trigger this automation.
@@ -351,7 +351,7 @@ export default function FlowBuilderPage({ params }: PageProps) {
 
           <div className="space-y-4 py-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Active WhatsApp Account</Label>
+              <Label className="text-xs font-semibold">Active WhatsApp account</Label>
               <Select
                 value={selectedOriginCode}
                 onValueChange={(val) => {
@@ -370,12 +370,12 @@ export default function FlowBuilderPage({ params }: PageProps) {
                     >
                       <div className="flex items-center gap-2">
                         {orig.code === 'QR' ? (
-                          <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                          <QrCode className="h-3.5 w-3.5 text-success" />
                         ) : (
-                          <Cloud className="h-3.5 w-3.5 text-blue-600" />
+                          <Cloud className="h-3.5 w-3.5 text-info" />
                         )}
                         <span>{orig.title}</span>
-                        <span className="text-[10px] text-muted-foreground">({orig.code})</span>
+                        <span className="text-xs text-muted-foreground">({orig.code})</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -395,7 +395,7 @@ export default function FlowBuilderPage({ params }: PageProps) {
             </Button>
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5"
+              className="bg-success hover:bg-success text-white gap-1.5"
               onClick={handleConfirmOriginActivation}
               disabled={isActivating}
             >
@@ -410,7 +410,7 @@ export default function FlowBuilderPage({ params }: PageProps) {
       <AlertDialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-base font-bold">
+            <AlertDialogTitle className="text-base font-semibold">
               Delete &quot;{flowName}&quot;?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs leading-relaxed">
@@ -423,7 +423,7 @@ export default function FlowBuilderPage({ params }: PageProps) {
               onClick={handleDelete}
               className="text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Delete Flow
+              Delete flow
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

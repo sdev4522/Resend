@@ -118,7 +118,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
           <Button variant="ghost" size="icon" render={<Link href="/dashboard/campaigns" />}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold">Campaign Not Found</h1>
+          <h1 className="text-lg font-semibold text-foreground">Campaign not found</h1>
         </div>
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -148,19 +148,19 @@ export default function CampaignDetailPage({ params }: PageProps) {
     switch (campaign.status) {
       case 'COMPLETED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success/15 text-success border border-success/30">
             <CheckCircle2 className="h-3.5 w-3.5" /> Completed
           </span>
         );
       case 'IN_PROGRESS':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-400 border border-sky-500/30 animate-pulse">
-            <PlayCircle className="h-3.5 w-3.5" /> In Progress
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-info/15 text-info border border-info/30 animate-pulse">
+            <PlayCircle className="h-3.5 w-3.5" /> In progress
           </span>
         );
       case 'PENDING':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning/15 text-warning border border-warning/30">
             <Clock className="h-3.5 w-3.5" /> Scheduled
           </span>
         );
@@ -172,7 +172,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
         );
       case 'FAILED':
         return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/30">
             <XCircle className="h-3.5 w-3.5" /> Failed
           </span>
         );
@@ -196,7 +196,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
           </Button>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
                 {campaign.title}
               </h1>
               {renderStatusBadge()}
@@ -205,7 +205,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
               Template: <span className="font-mono text-foreground">{campaign.template_name}</span> (
               {campaign.template_language}) | Phonebook:{' '}
               <span className="font-semibold text-foreground">{campaign.phonebook_name || 'Audience'}</span> | ID:{' '}
-              <span className="font-mono text-[11px]">{campaign.campaign_id}</span>
+              <span className="font-mono text-xs">{campaign.campaign_id}</span>
             </p>
           </div>
         </div>
@@ -216,16 +216,16 @@ export default function CampaignDetailPage({ params }: PageProps) {
             size="sm"
             onClick={() => loadCampaignData(true)}
             disabled={refreshing}
-            className="gap-1.5 text-xs"
+            className="gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin text-primary' : ''}`} />
-            <span>Refresh Stats</span>
+            <span>Refresh stats</span>
           </Button>
 
           <Button
             variant="destructive"
             size="sm"
-            className="gap-1.5 text-xs"
+            className="gap-1.5"
             disabled={deleting}
             onClick={() => setDeleteDialogOpen(true)}
           >
@@ -257,12 +257,12 @@ export default function CampaignDetailPage({ params }: PageProps) {
         <Card className="shadow-xs">
           <CardContent className="p-4 space-y-1">
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
-              <Users className="h-3.5 w-3.5" /> Total Audience
+              <Users className="h-3.5 w-3.5" /> Total audience
             </span>
-            <div className="text-2xl font-bold tracking-tight text-foreground font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
               {total}
             </div>
-            <span className="text-[10px] text-muted-foreground">Recipients queued</span>
+            <span className="text-xs text-muted-foreground">Recipients queued</span>
           </CardContent>
         </Card>
 
@@ -271,34 +271,34 @@ export default function CampaignDetailPage({ params }: PageProps) {
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
               <Send className="h-3.5 w-3.5 text-primary" /> Dispatched
             </span>
-            <div className="text-2xl font-bold tracking-tight text-primary font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-primary font-mono">
               {sent}
             </div>
-            <span className="text-[10px] text-muted-foreground">{progressPercent}% of audience</span>
+            <span className="text-xs text-muted-foreground">{progressPercent}% of audience</span>
           </CardContent>
         </Card>
 
         <Card className="shadow-xs">
           <CardContent className="p-4 space-y-1">
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
-              <CheckCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> Delivered
+              <CheckCheck className="h-3.5 w-3.5 text-success" /> Delivered
             </span>
-            <div className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-success font-mono">
               {delivered}
             </div>
-            <span className="text-[10px] text-muted-foreground">{deliveredPercent}% deliverability</span>
+            <span className="text-xs text-muted-foreground">{deliveredPercent}% deliverability</span>
           </CardContent>
         </Card>
 
         <Card className="shadow-xs">
           <CardContent className="p-4 space-y-1">
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
-              <Eye className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" /> Read / Opened
+              <Eye className="h-3.5 w-3.5 text-info" /> Read / Opened
             </span>
-            <div className="text-2xl font-bold tracking-tight text-sky-600 dark:text-sky-400 font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-info font-mono">
               {read}
             </div>
-            <span className="text-[10px] text-muted-foreground">{readPercent}% open rate</span>
+            <span className="text-xs text-muted-foreground">{readPercent}% open rate</span>
           </CardContent>
         </Card>
 
@@ -307,10 +307,10 @@ export default function CampaignDetailPage({ params }: PageProps) {
             <span className="text-xs text-muted-foreground flex items-center gap-1 font-medium">
               <XCircle className="h-3.5 w-3.5 text-destructive" /> Failed
             </span>
-            <div className="text-2xl font-bold tracking-tight text-destructive font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-destructive font-mono">
               {failed}
             </div>
-            <span className="text-[10px] text-muted-foreground">Undelivered</span>
+            <span className="text-xs text-muted-foreground">Undelivered</span>
           </CardContent>
         </Card>
       </div>
@@ -319,7 +319,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
       <Card className="shadow-xs">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between text-xs">
-            <CardTitle className="text-sm font-semibold">Broadcast Progress</CardTitle>
+            <CardTitle className="text-sm font-semibold">Broadcast progress</CardTitle>
             <span className="font-mono font-semibold text-foreground">{progressPercent}%</span>
           </div>
         </CardHeader>
@@ -330,7 +330,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>
               {sent + failed} of {total} messages processed by background dispatcher
             </span>
@@ -345,7 +345,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
       <Card className="shadow-xs">
         <CardHeader className="pb-3 flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-base font-semibold">Recipient Delivery Logs</CardTitle>
+            <CardTitle className="text-base font-semibold">Recipient delivery logs</CardTitle>
             <CardDescription className="text-xs">
               Live recipient status tracked via Meta WhatsApp Cloud API webhooks.
             </CardDescription>
@@ -359,7 +359,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
             <div className="py-16 text-center text-muted-foreground flex flex-col items-center justify-center gap-2">
               <FileText className="h-8 w-8 text-muted-foreground/40" />
               <p className="text-xs font-medium">No recipient logs generated yet</p>
-              <p className="text-[11px] text-muted-foreground max-w-sm">
+              <p className="text-xs text-muted-foreground max-w-sm">
                 Logs will populate as the background dispatcher processes recipients.
               </p>
             </div>
@@ -368,12 +368,12 @@ export default function CampaignDetailPage({ params }: PageProps) {
               <Table>
                 <TableHeader>
                   <TableRow className="text-xs bg-muted/40">
-                    <TableHead className="font-semibold">Recipient Name</TableHead>
-                    <TableHead className="font-semibold">Mobile Number</TableHead>
-                    <TableHead className="font-semibold text-center">Dispatch Status</TableHead>
-                    <TableHead className="font-semibold text-center">Delivery Status</TableHead>
+                    <TableHead className="font-semibold">Recipient name</TableHead>
+                    <TableHead className="font-semibold">Mobile number</TableHead>
+                    <TableHead className="font-semibold text-center">Dispatch status</TableHead>
+                    <TableHead className="font-semibold text-center">Delivery status</TableHead>
                     <TableHead className="font-semibold">Timestamp</TableHead>
-                    <TableHead className="font-semibold font-mono">Meta Msg ID</TableHead>
+                    <TableHead className="font-semibold font-mono">Meta msg ID</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -387,7 +387,7 @@ export default function CampaignDetailPage({ params }: PageProps) {
                       </TableCell>
                       <TableCell className="text-center">
                         <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                             log.status === 'SENT'
                               ? 'bg-primary/10 text-primary'
                               : log.status === 'FAILED'
@@ -400,38 +400,38 @@ export default function CampaignDetailPage({ params }: PageProps) {
                       </TableCell>
                       <TableCell className="text-center">
                         {log.delivery_status === 'read' && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs text-info font-medium">
                             <CheckCheck className="h-3.5 w-3.5" /> Read
                           </span>
                         )}
                         {log.delivery_status === 'delivered' && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs text-success font-medium">
                             <CheckCheck className="h-3.5 w-3.5" /> Delivered
                           </span>
                         )}
                         {log.delivery_status === 'sent' && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Sent
                           </span>
                         )}
                         {log.delivery_status === 'failed' && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs text-destructive font-medium">
                             <XCircle className="h-3.5 w-3.5" /> Failed
                           </span>
                         )}
                         {!log.delivery_status && (
-                          <span className="text-[11px] text-muted-foreground/60">—</span>
+                          <span className="text-xs text-muted-foreground/60">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-[11px]">
+                      <TableCell className="text-muted-foreground text-xs">
                         {log.delivery_time
                           ? new Date(log.delivery_time).toLocaleTimeString()
                           : new Date(log.createdAt).toLocaleTimeString()}
                       </TableCell>
-                      <TableCell className="font-mono text-[11px] text-muted-foreground max-w-[140px] truncate">
+                      <TableCell className="font-mono text-xs text-muted-foreground max-w-[140px] truncate">
                         {log.meta_msg_id || (
                           log.error_message ? (
-                            <span className="text-destructive font-sans text-[10px]" title={log.error_message}>
+                            <span className="text-destructive font-sans text-xs" title={log.error_message}>
                               {log.error_message}
                             </span>
                           ) : (

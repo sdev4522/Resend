@@ -102,11 +102,11 @@ export function TemplateModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg p-0 overflow-hidden rounded-2xl gap-0 border shadow-xl">
+      <DialogContent className="sm:max-w-lg p-0 [--dialog-p:0px] overflow-hidden gap-0">
         <DialogHeader className="p-4 px-6 border-b bg-muted/20">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
-            <DialogTitle className="text-base font-bold">Send WhatsApp Template</DialogTitle>
+            <DialogTitle className="text-base font-semibold">Send WhatsApp template</DialogTitle>
           </div>
           <DialogDescription className="text-xs">
             Meta Cloud API verified templates for outbound customer engagement.
@@ -115,10 +115,10 @@ export function TemplateModal({
 
         {isQr ? (
           <div className="p-6 text-center space-y-3">
-            <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+            <div className="w-10 h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center mx-auto">
               <AlertTriangle className="h-5 w-5" />
             </div>
-            <h4 className="text-sm font-bold text-foreground">Feature Restricted</h4>
+            <h4 className="text-sm font-semibold text-foreground">Feature restricted</h4>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
               Templates are available only for <span className="font-semibold text-foreground">Meta Cloud API</span> WhatsApp connections. This conversation is connected via WhatsApp Web (QR).
             </p>
@@ -131,7 +131,7 @@ export function TemplateModal({
         ) : templates.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground space-y-2">
             <p className="text-xs font-semibold text-foreground">No approved templates found</p>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-xs text-muted-foreground">
               Create and sync Meta WhatsApp templates under Dashboard &gt; Templates first.
             </p>
           </div>
@@ -139,7 +139,7 @@ export function TemplateModal({
           <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
             {/* Template Picker */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Select Meta Template</Label>
+              <Label className="text-xs font-semibold">Select Meta template</Label>
               <select
                 value={selectedTemplate?.name || selectedTemplate?.templet_name}
                 onChange={(e) => {
@@ -161,14 +161,14 @@ export function TemplateModal({
             {uniqueVars.length > 0 && (
               <div className="space-y-2 p-3 rounded-xl border bg-muted/20">
                 <p className="text-xs font-semibold flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Template Variables
+                  <Sparkles className="h-3.5 w-3.5 text-primary" /> Template variables
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {uniqueVars.map((v) => {
                     const varNum = v.replace(/[\{\}]/g, "");
                     return (
                       <div key={v} className="space-y-1">
-                        <Label className="text-[11px] font-mono text-muted-foreground">Variable {v}</Label>
+                        <Label className="text-xs font-mono text-muted-foreground">Variable {v}</Label>
                         <Input
                           placeholder={"Value for " + v}
                           value={variables[varNum] || ""}
@@ -185,8 +185,8 @@ export function TemplateModal({
             {/* Live Preview Box */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Message Preview</Label>
-                <Badge variant="outline" className="text-[10px] font-mono">
+                <Label className="text-xs font-semibold">Message preview</Label>
+                <Badge variant="outline" className="text-xs font-mono">
                   {selectedTemplate?.category || "UTILITY"}
                 </Badge>
               </div>
@@ -198,7 +198,7 @@ export function TemplateModal({
         )}
 
         <DialogFooter className="p-4 px-6 border-t bg-muted/20 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="text-xs">
+          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} >
             Cancel
           </Button>
 
@@ -207,10 +207,10 @@ export function TemplateModal({
               onClick={handleSend}
               disabled={sending || !selectedTemplate}
               size="sm"
-              className="gap-1.5 text-xs font-semibold shadow-2xs"
+              className="gap-1.5"
             >
               {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              <span>Send Template</span>
+              <span>Send template</span>
             </Button>
           )}
         </DialogFooter>

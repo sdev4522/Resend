@@ -128,7 +128,7 @@ export default function SettingsPage() {
     <div className="space-y-8">
       <DashboardPageHeader
         title="Settings"
-        description="Manage your user profile, workspace preferences, and security settings."
+        description="Your profile, workspace preferences and security."
         breadcrumbs={[{ title: 'Settings' }]}
       />
 
@@ -152,7 +152,7 @@ export default function SettingsPage() {
         <TabsContent value="profile">
           <Card className="shadow-xs border">
             <CardHeader>
-              <CardTitle className="text-lg">Profile Details</CardTitle>
+              <CardTitle className="text-lg">Profile details</CardTitle>
               <CardDescription className="text-xs">
                 Update your personal contact details and regional timezone.
               </CardDescription>
@@ -168,7 +168,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="prof-name" className="text-xs font-semibold">
-                    Full Name
+                    Full name
                   </Label>
                   <Input
                     id="prof-name"
@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="prof-email" className="text-xs font-semibold">
-                    Email Address
+                    Email address
                   </Label>
                   <Input
                     id="prof-email"
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pt-2">
-                  <Button type="submit" disabled={savingProfile} className="rounded-full text-xs h-9 px-5">
+                  <Button type="submit" disabled={savingProfile} className="rounded-full h-9 px-5">
                     {savingProfile ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
@@ -241,7 +241,7 @@ export default function SettingsPage() {
         <TabsContent value="workspace">
           <Card className="shadow-xs border">
             <CardHeader>
-              <CardTitle className="text-lg">Workspace Overview</CardTitle>
+              <CardTitle className="text-lg">Workspace overview</CardTitle>
               <CardDescription className="text-xs">
                 Metadata and subscription context for your current WhatsApp tenant.
               </CardDescription>
@@ -249,8 +249,8 @@ export default function SettingsPage() {
             <CardContent className="space-y-4 max-w-xl">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="p-3 rounded-xl border bg-muted/20">
-                  <span className="text-[11px] text-muted-foreground uppercase font-semibold">
-                    Workspace Name
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">
+                    Workspace name
                   </span>
                   <p className="text-sm font-semibold mt-1">
                     {workspace?.name || `${user?.name || 'My'}'s Workspace`}
@@ -258,8 +258,8 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="p-3 rounded-xl border bg-muted/20">
-                  <span className="text-[11px] text-muted-foreground uppercase font-semibold">
-                    Your Role
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">
+                    Your role
                   </span>
                   <p className="text-sm font-semibold mt-1 capitalize">
                     {role || 'User'}
@@ -267,8 +267,8 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="p-3 rounded-xl border bg-muted/20">
-                  <span className="text-[11px] text-muted-foreground uppercase font-semibold">
-                    Current Plan
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">
+                    Current plan
                   </span>
                   <div className="mt-1">
                     <Badge variant="secondary">
@@ -278,8 +278,8 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="p-3 rounded-xl border bg-muted/20">
-                  <span className="text-[11px] text-muted-foreground uppercase font-semibold">
-                    Plan Expiry
+                  <span className="text-xs text-muted-foreground uppercase font-semibold">
+                    Plan expiry
                   </span>
                   <p className="text-sm font-semibold mt-1">
                     {user?.plan_expire
@@ -305,7 +305,7 @@ export default function SettingsPage() {
         <TabsContent value="security">
           <Card className="shadow-xs border">
             <CardHeader>
-              <CardTitle className="text-lg">Security & Password</CardTitle>
+              <CardTitle className="text-lg">Security & password</CardTitle>
               <CardDescription className="text-xs">
                 Update your account password to secure your workspace.
               </CardDescription>
@@ -321,7 +321,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="sec-new-pass" className="text-xs font-semibold">
-                    New Password
+                    New password
                   </Label>
                   <Input
                     id="sec-new-pass"
@@ -337,7 +337,7 @@ export default function SettingsPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="sec-confirm-pass" className="text-xs font-semibold">
-                    Confirm New Password
+                    Confirm new password
                   </Label>
                   <Input
                     id="sec-confirm-pass"
@@ -352,7 +352,7 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="pt-2">
-                  <Button type="submit" disabled={savingPassword} className="rounded-full text-xs h-9 px-5">
+                  <Button type="submit" disabled={savingPassword} className="rounded-full h-9 px-5">
                     {savingPassword ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Updating...
@@ -371,7 +371,7 @@ export default function SettingsPage() {
         <TabsContent value="notifications">
           <Card className="shadow-xs border">
             <CardHeader>
-              <CardTitle className="text-lg">Notification Preferences</CardTitle>
+              <CardTitle className="text-lg">Notification preferences</CardTitle>
               <CardDescription className="text-xs">
                 Configure your incoming message and broadcast alert preferences.
               </CardDescription>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-3 rounded-xl border">
                   <div>
-                    <p className="text-sm font-medium">Email Broadcast Reports</p>
+                    <p className="text-sm font-medium">Email broadcast reports</p>
                     <p className="text-xs text-muted-foreground">Receive deliverability summaries after campaigns.</p>
                   </div>
                   <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-border" />
@@ -388,7 +388,7 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between p-3 rounded-xl border">
                   <div>
-                    <p className="text-sm font-medium">WhatsApp Disconnect Alerts</p>
+                    <p className="text-sm font-medium">WhatsApp disconnect alerts</p>
                     <p className="text-xs text-muted-foreground">Get notified immediately if a phone session disconnects.</p>
                   </div>
                   <input type="checkbox" defaultChecked className="h-4 w-4 rounded border-border" />

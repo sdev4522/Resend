@@ -97,13 +97,13 @@ export function MessageComposer() {
 
       {/* Sending Account Indicator Pill */}
       <div className="flex items-center justify-between px-1">
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-mono">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
           <span>Sending from:</span>
           <span className="font-semibold text-foreground flex items-center gap-1">
             {isQr ? (
-              <QrCode className="h-3 w-3 text-emerald-600" />
+              <QrCode className="h-3 w-3 text-success" />
             ) : (
-              <Cloud className="h-3 w-3 text-blue-600" />
+              <Cloud className="h-3 w-3 text-info" />
             )}
             <span>{selectedAccount?.title || (isQr ? "WhatsApp Web (QR)" : "Meta API")}</span>
           </span>
@@ -112,7 +112,7 @@ export function MessageComposer() {
         {/* Templates Button: Enforced only for Meta accounts */}
         {isQr ? (
           <div
-            className="flex items-center gap-1 text-[10px] text-muted-foreground/60 font-mono select-none"
+            className="flex items-center gap-1 text-xs text-muted-foreground/60 font-mono select-none"
             title="Meta WhatsApp templates are not available for QR/Baileys connections"
           >
             <Lock className="h-2.5 w-2.5 text-muted-foreground/60" />
@@ -124,7 +124,7 @@ export function MessageComposer() {
             variant="ghost"
             size="sm"
             onClick={() => setIsTemplateModalOpen(true)}
-            className="h-7 px-2 text-[11px] gap-1 text-primary hover:text-primary font-medium touch-manipulation"
+            className="h-7 px-2 gap-1 text-primary hover:text-primary font-medium"
           >
             <FileCode className="h-3.5 w-3.5" />
             <span>Templates</span>
@@ -150,7 +150,7 @@ export function MessageComposer() {
               </div>
               <div className="min-w-0">
                 <p className="text-xs font-semibold truncate">{selectedFile.name}</p>
-                <p className="text-[10px] text-muted-foreground font-mono">
+                <p className="text-xs text-muted-foreground font-mono">
                   {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
                 </p>
               </div>
@@ -160,7 +160,7 @@ export function MessageComposer() {
               variant="ghost"
               size="icon"
               onClick={() => setSelectedFile(null)}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground touch-manipulation"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
               aria-label="Remove attached file"
             >
               <X className="h-4 w-4" />
@@ -178,10 +178,10 @@ export function MessageComposer() {
               size="sm"
               disabled={isSending}
               onClick={handleSendFile}
-              className="h-8 text-xs gap-1.5 px-3 font-semibold shrink-0 touch-manipulation"
+              className="h-8 gap-1.5 px-3 shrink-0"
             >
               {isSending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              <span>Send Media</span>
+              <span>Send media</span>
             </Button>
           </div>
         </div>
@@ -197,7 +197,7 @@ export function MessageComposer() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground shrink-0 touch-manipulation"
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:text-foreground shrink-0"
                 aria-label="Attach file"
               />
             }
@@ -206,7 +206,7 @@ export function MessageComposer() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-44 p-1 rounded-xl shadow-lg">
             <DropdownMenuItem onClick={() => openFilePicker("image/*")} className="gap-2 text-xs cursor-pointer py-2">
-              <ImageIcon className="h-4 w-4 text-blue-500" />
+              <ImageIcon className="h-4 w-4 text-info" />
               <span>Photo / Image</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => openFilePicker("video/*")} className="gap-2 text-xs cursor-pointer py-2">
@@ -214,14 +214,14 @@ export function MessageComposer() {
               <span>Video</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => openFilePicker("audio/*")} className="gap-2 text-xs cursor-pointer py-2">
-              <Mic className="h-4 w-4 text-amber-500" />
+              <Mic className="h-4 w-4 text-warning" />
               <span>Audio file</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => openFilePicker(".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt")}
               className="gap-2 text-xs cursor-pointer py-2"
             >
-              <FileText className="h-4 w-4 text-emerald-500" />
+              <FileText className="h-4 w-4 text-success" />
               <span>Document</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -243,7 +243,7 @@ export function MessageComposer() {
           onClick={handleSendText}
           disabled={!text.trim() || isSending}
           size="icon"
-          className="h-9 w-9 rounded-xl shrink-0 shadow-2xs font-semibold touch-manipulation"
+          className="h-9 w-9 rounded-xl shrink-0"
           aria-label="Send WhatsApp message"
         >
           {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

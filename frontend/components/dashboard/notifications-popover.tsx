@@ -86,7 +86,7 @@ export function NotificationsPopover() {
               Notifications
             </DropdownMenuLabel>
             {unreadCount > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+              <Badge variant="secondary" className="text-xs px-1.5 py-0 h-4">
                 {unreadCount} unread
               </Badge>
             )}
@@ -95,7 +95,7 @@ export function NotificationsPopover() {
           {unreadCount > 0 && (
             <button
               onClick={handleMarkAllRead}
-              className="text-[11px] text-primary hover:underline font-medium cursor-pointer"
+              className="text-xs text-primary hover:underline font-medium cursor-pointer"
             >
               Mark all read
             </button>
@@ -109,7 +109,7 @@ export function NotificationsPopover() {
                 <CheckCheck className="h-4 w-4" />
               </div>
               <span className="text-xs font-medium text-foreground">You are all caught up!</span>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 No active notifications or alerts for your workspace.
               </p>
             </div>
@@ -124,11 +124,11 @@ export function NotificationsPopover() {
               >
                 <div className="mt-0.5 shrink-0">
                   {item.type === 'ALERT' || item.type === 'WARNING' ? (
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <AlertTriangle className="h-4 w-4 text-warning" />
                   ) : item.type === 'SUCCESS' ? (
-                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                    <CheckCircle2 className="h-4 w-4 text-success" />
                   ) : (
-                    <Info className="h-4 w-4 text-blue-500" />
+                    <Info className="h-4 w-4 text-info" />
                   )}
                 </div>
 
@@ -137,19 +137,19 @@ export function NotificationsPopover() {
                     <span className="text-xs font-semibold text-foreground truncate">
                       {item.title}
                     </span>
-                    <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                    <span className="text-xs text-muted-foreground shrink-0 font-mono">
                       {new Date(item.created_at).toLocaleDateString()}
                     </span>
                   </div>
 
-                  <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
+                  <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                     {item.message}
                   </p>
 
                   {item.action_url && (
                     <Link
                       href={item.action_url}
-                      className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline font-medium mt-1"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline font-medium mt-1"
                     >
                       <span>View details</span>
                       <ExternalLink className="h-3 w-3" />
@@ -165,7 +165,7 @@ export function NotificationsPopover() {
         <div className="p-2 text-center bg-muted/10">
           <Link
             href="/dashboard/settings"
-            className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer block py-1"
+            className="text-xs text-muted-foreground hover:text-foreground cursor-pointer block py-1"
           >
             Manage notification preferences
           </Link>

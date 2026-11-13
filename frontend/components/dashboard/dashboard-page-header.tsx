@@ -29,9 +29,9 @@ export function DashboardPageHeader({
   actions,
 }: DashboardPageHeaderProps) {
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between pb-6 border-b">
-      <div className="space-y-1.5">
-        {breadcrumbs && breadcrumbs.length > 0 && (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0 space-y-1">
+        {breadcrumbs && breadcrumbs.length > 1 && (
           <Breadcrumb className="mb-2">
             <BreadcrumbList>
               <BreadcrumbItem>
@@ -55,18 +55,18 @@ export function DashboardPageHeader({
             </BreadcrumbList>
           </Breadcrumb>
         )}
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+        <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
           {title}
         </h1>
         {description && (
-          <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
             {description}
           </p>
         )}
       </div>
 
       {actions && (
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 w-full sm:w-auto">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto">
           {actions}
         </div>
       )}

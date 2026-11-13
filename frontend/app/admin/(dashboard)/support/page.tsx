@@ -466,7 +466,7 @@ export default function AdminSupportPage() {
           }
         }}
       >
-        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 overflow-hidden">
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col p-0 [--dialog-p:0px] overflow-hidden">
           <DialogHeader className="p-6 border-b border-border/40 pb-4">
             {ticketDetail && (
               <div className="space-y-2">

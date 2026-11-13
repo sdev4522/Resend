@@ -61,14 +61,14 @@ export function BuilderHeader({
     switch (status) {
       case 'active':
         return (
-          <Badge className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 text-xs px-2 py-0.5 gap-1 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          <Badge className="bg-success/15 text-success border-success/30 text-xs px-2 py-0.5 gap-1 font-semibold">
+            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
             Active
           </Badge>
         );
       case 'inactive':
         return (
-          <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs px-2 py-0.5 font-medium">
+          <Badge variant="outline" className="bg-warning/10 text-warning border-warning/30 text-xs px-2 py-0.5 font-medium">
             Paused
           </Badge>
         );
@@ -90,7 +90,7 @@ export function BuilderHeader({
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground touch-manipulation"
+            className="h-9 w-9 shrink-0 text-muted-foreground hover:text-foreground"
             aria-label="Back to Automations"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -101,7 +101,7 @@ export function BuilderHeader({
           <Input
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
-            className="h-8 text-xs sm:text-sm font-bold bg-transparent border-transparent hover:border-border/80 focus:border-primary focus:bg-background px-1.5 w-[110px] xs:w-[160px] sm:w-[240px] truncate transition-colors"
+            className="h-8 text-xs sm:text-sm font-semibold bg-transparent border-transparent hover:border-border/80 focus:border-primary focus:bg-background px-1.5 w-[110px] xs:w-[160px] sm:w-[240px] truncate transition-colors"
             placeholder="Automation Name"
             aria-label="Automation Name"
           />
@@ -109,7 +109,7 @@ export function BuilderHeader({
           <div className="shrink-0">{getStatusBadge()}</div>
 
           {hasUnsavedChanges && (
-            <span className="text-[11px] text-amber-600 dark:text-amber-400 hidden lg:inline font-medium">
+            <span className="text-xs text-warning hidden lg:inline font-medium">
               (Unsaved changes)
             </span>
           )}
@@ -121,9 +121,9 @@ export function BuilderHeader({
         {origin && (
           <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/40 border border-border/60 text-xs text-muted-foreground">
             {origin.code === 'QR' ? (
-              <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+              <QrCode className="h-3.5 w-3.5 text-success" />
             ) : origin.code === 'META' ? (
-              <Cloud className="h-3.5 w-3.5 text-blue-600" />
+              <Cloud className="h-3.5 w-3.5 text-info" />
             ) : null}
             <span className="font-medium text-foreground">{origin.title}</span>
           </div>
@@ -132,7 +132,7 @@ export function BuilderHeader({
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs gap-1.5 hidden sm:inline-flex touch-manipulation"
+          className="h-8 gap-1.5 hidden sm:inline-flex"
           onClick={onViewRuns}
         >
           <Activity className="h-3.5 w-3.5 text-muted-foreground" />
@@ -142,7 +142,7 @@ export function BuilderHeader({
         <Button
           variant="secondary"
           size="sm"
-          className="h-8 text-xs gap-1.5 touch-manipulation px-2 sm:px-3"
+          className="h-8 gap-1.5 px-2 sm:px-3"
           onClick={onSaveDraft}
           disabled={isSaving}
           aria-label="Save Draft"
@@ -155,18 +155,18 @@ export function BuilderHeader({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 text-xs gap-1.5 text-amber-600 border-amber-500/30 hover:bg-amber-500/10 touch-manipulation px-2 sm:px-3"
+            className="h-8 gap-1.5 text-warning border-warning/30 hover:bg-warning/10 px-2 sm:px-3"
             onClick={onDeactivate}
             disabled={isActivating}
             aria-label="Pause Bot"
           >
             <Pause className="h-3.5 w-3.5" />
-            <span className="hidden xs:inline">Pause Bot</span>
+            <span className="hidden xs:inline">Pause bot</span>
           </Button>
         ) : (
           <Button
             size="sm"
-            className="h-8 text-xs gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white touch-manipulation px-2 sm:px-3 font-semibold"
+            className="h-8 gap-1.5 bg-success hover:bg-success text-white px-2 sm:px-3"
             onClick={onActivate}
             disabled={isActivating}
             aria-label="Activate Bot"
@@ -183,7 +183,7 @@ export function BuilderHeader({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-9 w-9 text-muted-foreground hover:text-foreground touch-manipulation"
+                className="h-9 w-9 text-muted-foreground hover:text-foreground"
                 aria-label="More options"
               >
                 <MoreVertical className="h-4 w-4" />
@@ -193,16 +193,16 @@ export function BuilderHeader({
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem onClick={onViewRuns} className="text-xs gap-2 sm:hidden cursor-pointer">
               <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-              View Execution Sessions
+              View execution sessions
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onDuplicate} className="text-xs gap-2 cursor-pointer">
               <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-              Duplicate Flow
+              Duplicate flow
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-xs gap-2 text-destructive focus:text-destructive cursor-pointer">
               <Trash2 className="h-3.5 w-3.5" />
-              Delete Flow
+              Delete flow
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

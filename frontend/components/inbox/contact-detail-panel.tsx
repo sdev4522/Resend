@@ -73,15 +73,15 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
     <div className="w-full lg:w-80 h-full border-l bg-card flex flex-col shrink-0 overflow-y-auto">
       {/* Header */}
       <div className="p-3.5 border-b flex items-center justify-between">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
           <User className="h-3.5 w-3.5 text-primary" />
-          <span>Contact Details</span>
+          <span>Contact details</span>
         </h4>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setShowContactPanel(false)}
-          className="h-8 w-8 text-muted-foreground hover:text-foreground touch-manipulation"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
           aria-label="Close contact details"
         >
           <X className="h-4 w-4" />
@@ -91,17 +91,17 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
       <div className="p-4 space-y-6">
         {/* Profile Card */}
         <div className="text-center space-y-2 pb-4 border-b">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-primary/25 text-primary flex items-center justify-center font-bold text-xl mx-auto shadow-2xs">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary/10 to-primary/25 text-primary flex items-center justify-center font-semibold text-xl mx-auto shadow-2xs">
             {(contactName || "?").slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <h3 className="text-sm font-bold text-foreground">{contactName}</h3>
+            <h3 className="text-sm font-semibold text-foreground">{contactName}</h3>
             <p className="text-xs text-muted-foreground font-mono mt-0.5">{contactPhone}</p>
           </div>
 
           <div className="flex items-center justify-center gap-1.5 pt-1">
-            <Badge variant="outline" className="text-[10px] font-mono flex items-center gap-1">
-              {isQr ? <QrCode className="h-2.5 w-2.5 text-emerald-600" /> : <Cloud className="h-2.5 w-2.5 text-blue-600" />}
+            <Badge variant="outline" className="text-xs font-mono flex items-center gap-1">
+              {isQr ? <QrCode className="h-2.5 w-2.5 text-success" /> : <Cloud className="h-2.5 w-2.5 text-info" />}
               <span>{isQr ? "WhatsApp Web (QR)" : "Meta Cloud API"}</span>
             </Badge>
           </div>
@@ -109,12 +109,12 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
 
         {/* 24-hr Session Window Indicator */}
         {countDownTimer && countDownTimer.timestamp && (
-          <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/20 space-y-1">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+          <div className="p-3 rounded-xl border bg-success/5 border-success/20 space-y-1">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-success">
               <Clock className="h-3.5 w-3.5" />
-              <span>Customer Care Window</span>
+              <span>Customer care window</span>
             </div>
-            <p className="text-[11px] text-muted-foreground leading-relaxed">
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Standard freeform WhatsApp messaging is active within the 24-hour response window.
             </p>
           </div>
@@ -122,8 +122,8 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
 
         {/* Meta / Profile Information */}
         <div className="space-y-2.5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Contact Metadata
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Contact metadata
           </p>
           <div className="space-y-2 text-xs">
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -151,7 +151,7 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
           <div className="pt-1">
             <Link
               href="/dashboard/contacts"
-              className="text-[11px] text-primary hover:underline flex items-center gap-1 font-medium"
+              className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
             >
               <span>View in Contacts directory</span>
               <ExternalLink className="h-3 w-3" />
@@ -162,14 +162,14 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
         {/* Chat Tags / Labels */}
         <div className="space-y-2.5 pt-2 border-t">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
               <Tag className="h-3 w-3 text-primary" /> Tags
             </p>
           </div>
 
           <div className="flex flex-wrap gap-1.5">
             {contactTags.length === 0 ? (
-              <span className="text-[11px] text-muted-foreground italic">No tags assigned.</span>
+              <span className="text-xs text-muted-foreground italic">No tags assigned.</span>
             ) : (
               contactTags.map((tag: any, idx: number) => {
                 const title = typeof tag === "string" ? tag : tag.title;
@@ -177,7 +177,7 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
                   <Badge
                     key={idx}
                     variant="secondary"
-                    className="text-[10px] pl-2 pr-1 py-0.5 flex items-center gap-1 font-mono"
+                    className="text-xs pl-2 pr-1 py-0.5 flex items-center gap-1 font-mono"
                   >
                     <span>{title}</span>
                     <button
@@ -197,7 +197,7 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
             <select
               value={selectedTagToAdd}
               onChange={(e) => setSelectedTagToAdd(e.target.value)}
-              className="h-7 text-[11px] rounded-lg border bg-background px-2 flex-1 font-mono"
+              className="h-7 text-xs rounded-lg border bg-background px-2 flex-1 font-mono"
             >
               <option value="">Select a tag to add...</option>
               {availableTags.map((t) => (
@@ -211,7 +211,7 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
               variant="outline"
               disabled={!selectedTagToAdd}
               onClick={handleAddTag}
-              className="h-7 text-xs px-2 gap-1"
+              className="h-7 px-2 gap-1"
             >
               <Plus className="h-3 w-3" />
               <span>Add</span>
@@ -222,14 +222,14 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
         {/* Internal Notes */}
         <div className="space-y-2.5 pt-2 border-t">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-              <StickyNote className="h-3 w-3 text-primary" /> Internal Notes
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <StickyNote className="h-3 w-3 text-primary" /> Internal notes
             </p>
           </div>
 
           <div className="space-y-2 max-h-48 overflow-y-auto">
             {contactNotes.length === 0 ? (
-              <span className="text-[11px] text-muted-foreground italic block">No notes yet.</span>
+              <span className="text-xs text-muted-foreground italic block">No notes yet.</span>
             ) : (
               contactNotes.map((note: any, idx: number) => {
                 const noteText = typeof note === "string" ? note : note.text;
@@ -240,17 +240,17 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
                     className="p-2.5 rounded-lg border bg-muted/30 text-xs space-y-1 relative group"
                   >
                     <div className="flex items-start justify-between gap-1">
-                      <p className="whitespace-pre-wrap leading-relaxed flex-1 text-[11px]">{noteText}</p>
+                      <p className="whitespace-pre-wrap leading-relaxed flex-1 text-xs">{noteText}</p>
                       <button
                         onClick={() => deleteNoteFromChat(noteId)}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity p-0.5"
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity p-0.5"
                         title="Delete note"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                     {note.timestamp && (
-                      <p className="text-[9px] text-muted-foreground font-mono">
+                      <p className="text-xs text-muted-foreground font-mono">
                         {new Date(note.timestamp).toLocaleDateString([], { month: "short", day: "numeric" })}
                       </p>
                     )}
@@ -272,10 +272,10 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
               type="submit"
               size="sm"
               disabled={!newNoteText.trim()}
-              className="w-full h-7 text-xs font-semibold gap-1"
+              className="w-full h-7 gap-1"
             >
               <Plus className="h-3 w-3" />
-              <span>Save Note</span>
+              <span>Save note</span>
             </Button>
           </form>
         </div>

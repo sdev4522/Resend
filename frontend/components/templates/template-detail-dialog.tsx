@@ -44,7 +44,7 @@ export function TemplateDetailDialog({
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <DialogTitle className="text-lg font-bold tracking-tight">
+            <DialogTitle className="text-lg font-semibold tracking-tight">
               {template.name}
             </DialogTitle>
             <TemplateStatusBadge status={template.status} />
@@ -57,7 +57,7 @@ export function TemplateDetailDialog({
         {template.status === 'REJECTED' && template.rejected_reason && (
           <Alert variant="destructive" className="py-2.5">
             <AlertTriangle className="h-4 w-4" />
-            <AlertTitle className="text-xs font-semibold">Meta Rejection Reason</AlertTitle>
+            <AlertTitle className="text-xs font-semibold">Meta rejection reason</AlertTitle>
             <AlertDescription className="text-xs mt-1">
               {template.rejected_reason}
             </AlertDescription>
@@ -88,7 +88,7 @@ export function TemplateDetailDialog({
                 <span className="text-muted-foreground flex items-center gap-1 font-medium">
                   <Hash className="h-3.5 w-3.5" /> Meta ID
                 </span>
-                <span className="font-mono text-foreground mt-0.5 block text-[11px] truncate">
+                <span className="font-mono text-foreground mt-0.5 block text-xs truncate">
                   {template.id || 'Pending Meta assignment'}
                 </span>
               </div>
@@ -100,7 +100,7 @@ export function TemplateDetailDialog({
                 <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
                   Test Variables ({variableIndices.length})
                 </h4>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Fill in sample values below to preview real message rendering.
                 </p>
                 <div className="space-y-2.5">
@@ -128,11 +128,11 @@ export function TemplateDetailDialog({
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full gap-1.5 text-xs"
+                className="w-full gap-1.5"
                 render={<Link href={`/dashboard/templates/${encodeURIComponent(template.name)}`} />}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Open Full Template Page</span>
+                <span>Open full template page</span>
               </Button>
             </div>
           </div>

@@ -73,14 +73,14 @@ export function ApiKeysTable({
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-semibold tracking-tight">Active API Keys</h3>
+          <h3 className="text-base font-semibold tracking-tight">Active API keys</h3>
           <p className="text-xs text-muted-foreground">
             Manage developer API keys used by external systems and automated workflows.
           </p>
         </div>
         <Button onClick={onCreateOpen} size="sm" className="gap-1.5 shrink-0">
           <Plus className="h-4 w-4" />
-          <span>Create New Key</span>
+          <span>Create new key</span>
         </Button>
       </div>
 
@@ -88,13 +88,13 @@ export function ApiKeysTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Key Name</TableHead>
+              <TableHead>Key name</TableHead>
               <TableHead>Prefix</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Scopes</TableHead>
-              <TableHead>Default Account</TableHead>
+              <TableHead>Default account</TableHead>
               <TableHead>Created</TableHead>
-              <TableHead>Last Used</TableHead>
+              <TableHead>Last used</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -132,17 +132,17 @@ export function ApiKeysTable({
 
                     <TableCell>
                       {isActive && (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/20 text-[11px]">
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/20 text-xs">
                           Active
                         </Badge>
                       )}
                       {isRevoked && (
-                        <Badge variant="outline" className="bg-rose-500/10 text-rose-600 border-rose-500/20 text-[11px]">
+                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-xs">
                           Revoked
                         </Badge>
                       )}
                       {isExpired && (
-                        <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-500/20 text-[11px]">
+                        <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20 text-xs">
                           Expired
                         </Badge>
                       )}
@@ -153,13 +153,13 @@ export function ApiKeysTable({
                         {key.scopes?.slice(0, 3).map((scope) => (
                           <span
                             key={scope}
-                            className="text-[10px] bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-mono"
+                            className="text-xs bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded font-mono"
                           >
                             {scope}
                           </span>
                         ))}
                         {(key.scopes?.length || 0) > 3 && (
-                          <span className="text-[10px] text-muted-foreground px-1 py-0.5">
+                          <span className="text-xs text-muted-foreground px-1 py-0.5">
                             +{key.scopes.length - 3} more
                           </span>
                         )}
@@ -183,7 +183,7 @@ export function ApiKeysTable({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs"
+                          className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/40"
                           onClick={() => setRevokeTarget(key)}
                         >
                           Revoke

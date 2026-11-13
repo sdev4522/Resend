@@ -42,19 +42,19 @@ export function SecretRevealModal({
         <DialogHeader>
           <div className="flex items-center gap-2 text-primary mb-1">
             <Key className="h-5 w-5" />
-            <DialogTitle>Save Your API Key</DialogTitle>
+            <DialogTitle>Save your API key</DialogTitle>
           </div>
           <DialogDescription>
             Here is your new API key for <strong>{keyName}</strong>. Store it securely.
           </DialogDescription>
         </DialogHeader>
 
-        <Alert variant="destructive" className="my-2 border-amber-500/50 bg-amber-500/10 text-amber-900 dark:text-amber-200">
-          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-          <AlertTitle className="text-amber-800 dark:text-amber-300 font-semibold">
+        <Alert variant="destructive" className="my-2 border-warning/50 bg-warning/10 text-warning">
+          <ShieldAlert className="h-4 w-4 text-warning" />
+          <AlertTitle className="text-warning font-semibold">
             This key will only be shown once
           </AlertTitle>
-          <AlertDescription className="text-xs text-amber-700 dark:text-amber-300/90 leading-relaxed">
+          <AlertDescription className="text-xs text-warning dark:text-warning/90 leading-relaxed">
             For security reasons, we do not store the full plaintext secret in our database.
             If you lose this key, you will need to revoke it and generate a new one.
           </AlertDescription>
@@ -62,7 +62,7 @@ export function SecretRevealModal({
 
         <div className="space-y-2 mt-2">
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            API Secret Key
+            API secret key
           </label>
           <div className="flex items-center gap-2 p-3 bg-muted rounded-lg font-mono text-xs break-all select-all border border-border">
             <span className="flex-1 font-semibold">{secret}</span>
@@ -74,7 +74,7 @@ export function SecretRevealModal({
             >
               {copied ? (
                 <>
-                  <Check className="h-3.5 w-3.5 text-green-500" />
+                  <Check className="h-3.5 w-3.5 text-success" />
                   <span>Copied</span>
                 </>
               ) : (
@@ -93,7 +93,7 @@ export function SecretRevealModal({
             className="w-full sm:w-auto"
             onClick={() => onOpenChange(false)}
           >
-            I Have Saved This Key
+            I have saved this key
           </Button>
         </DialogFooter>
       </DialogContent>

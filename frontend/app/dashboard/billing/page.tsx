@@ -10,16 +10,16 @@ import {
   PriceCalculationSummary,
 } from '@/types/billing';
 import { DashboardPageHeader } from '@/components/dashboard/dashboard-page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -33,29 +33,25 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  CheckCircle2,
-  XCircle,
   AlertCircle,
   RefreshCw,
-  Sparkles,
-  ShieldCheck,
   QrCode,
   Users,
-  Zap,
   Check,
+  Minus,
   Tag,
   CreditCard,
   Lock,
-  Calendar,
-  History,
-  Info,
-  CheckCircle,
+  Receipt,
   Repeat,
-  ShieldX,
+  Info,
+  CircleCheck,
+  ArrowRight,
   Globe,
+  X,
 } from 'lucide-react';
-import { SupportedBillingCurrency } from '@/types/billing';
 import { useCurrency } from '@/lib/currency/currency-context';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 // Helper to load Razorpay Checkout SDK dynamically
@@ -72,66 +68,126 @@ function loadRazorpayScript(): Promise<boolean> {
   });
 }
 
-function QuotaCard({
-  title,
+const fmtMode = (m?: string | null) =>
+  m ? m.toLowerCase().replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase()) : '—';
+
+const fmtDate = (v: number | string, withTime = false) =>
+  new Date(typeof v === 'string' && /^\d+$/.test(v) ? Number(v) : v).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
+  });
+
+function UsageMeter({
+  label,
   icon: Icon,
   used,
   limit,
-  remaining,
   percentage,
-  unit,
 }: {
-  title: string;
-  icon: any;
+  label: string;
+  icon: React.ElementType;
   used: number;
   limit: number;
-  remaining: number;
   percentage: number;
-  unit: string;
 }) {
-  const isReached = limit > 0 && used >= limit;
-  const isApproaching = limit > 0 && percentage >= 80 && !isReached;
+  const unlimited = limit === -1 || limit === 0;
+  const pct = unlimited ? 0 : Math.min(100, percentage);
+  const tone = pct >= 100 ? 'bg-destructive' : pct >= 80 ? 'bg-warning' : 'bg-primary';
 
   return (
-    <div className="p-4 rounded-xl border bg-card/60 shadow-2xs space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-primary/10 text-primary">
-            <Icon className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground">{title}</p>
-            <p className="text-[11px] text-muted-foreground">
-              {limit === -1 || limit === 0 ? 'Unlimited available' : `${used.toLocaleString()} of ${limit.toLocaleString()} ${unit} used`}
-            </p>
-          </div>
-        </div>
-        {limit > 0 && (
-          <Badge
-            variant={isReached ? 'destructive' : isApproaching ? 'outline' : 'secondary'}
-            className="text-[10px] font-mono h-5 px-1.5"
-          >
-            {isReached ? 'Exhausted' : `${remaining.toLocaleString()} left`}
-          </Badge>
-        )}
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <Icon className="size-4 text-muted-foreground" />
+          {label}
+        </span>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          <span className="font-semibold text-foreground">{used.toLocaleString()}</span>
+          {unlimited ? ' · Unlimited' : ` / ${limit.toLocaleString()}`}
+        </span>
       </div>
-
-      {limit > 0 && (
-        <div className="space-y-1">
-          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 rounded-full ${
-                isReached ? 'bg-destructive' : isApproaching ? 'bg-amber-500' : 'bg-primary'
-              }`}
-              style={{ width: `${Math.min(100, percentage)}%` }}
-            />
-          </div>
-          <div className="flex justify-between items-center text-[10px] text-muted-foreground">
-            <span>{percentage.toFixed(0)}% utilized</span>
-            <span>Max: {limit.toLocaleString()}</span>
-          </div>
-        </div>
+      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn('h-full rounded-full transition-[width] duration-700', unlimited ? 'bg-primary/30' : tone)}
+          style={{ width: unlimited ? '100%' : `${Math.max(pct, used > 0 ? 2 : 0)}%` }}
+        />
+      </div>
+      {!unlimited && pct >= 80 && (
+        <p className={cn('text-xs', pct >= 100 ? 'text-destructive' : 'text-warning')}>
+          {pct >= 100 ? 'Limit reached. Upgrade to add more.' : `${Math.round(pct)}% used. Consider upgrading soon.`}
+        </p>
       )}
+    </div>
+  );
+}
+
+function OptionCard({
+  selected,
+  onSelect,
+  title,
+  description,
+  icon: Icon,
+  tag,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  title: string;
+  description: string;
+  icon?: React.ElementType;
+  tag?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onSelect}
+      className={cn(
+        'group relative flex w-full cursor-pointer items-start gap-3 rounded-xl border p-3.5 text-left transition-all outline-none focus-visible:ring-3 focus-visible:ring-ring/35',
+        selected
+          ? 'border-primary bg-primary/[0.04] shadow-[0_0_0_1px_var(--primary)]'
+          : 'border-border bg-background hover:border-foreground/20 hover:bg-accent/40'
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors',
+          selected ? 'border-primary bg-primary' : 'border-input bg-background'
+        )}
+      >
+        {selected && <span className="size-1.5 rounded-full bg-primary-foreground" />}
+      </span>
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex flex-wrap items-center gap-2">
+          {Icon && <Icon className="size-4 text-muted-foreground" />}
+          <span className="text-sm font-semibold text-foreground">{title}</span>
+          {tag && <Badge variant="success" className="h-5 px-1.5">{tag}</Badge>}
+        </span>
+        <span className="block text-[13px] leading-snug text-muted-foreground">{description}</span>
+      </span>
+    </button>
+  );
+}
+
+function SummaryRow({ label, value, className }: { label: React.ReactNode; value: React.ReactNode; className?: string }) {
+  return (
+    <div className={cn('flex items-center justify-between gap-4 text-sm', className)}>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium tabular-nums text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function SectionHeading({ title, description, action }: { title: string; description?: string; action?: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <div className="space-y-1">
+        <h2 className="text-lg font-semibold tracking-[-0.01em] text-foreground">{title}</h2>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      {action}
     </div>
   );
 }
@@ -540,11 +596,69 @@ export default function BillingPage() {
 
   const isLoading = isEntitlementsLoading || isPlansLoading;
 
+  // ---- Derived display values -------------------------------------------------
+  const priceFor = (p: SubscriptionPlan) => {
+    const explicit = p.currencyPrices?.[selectedCurrency];
+    return explicit !== undefined ? Number(explicit) : Math.round(Number(p.price || 0) * activeCurrencyRate * 100) / 100;
+  };
+  const strikeFor = (p: SubscriptionPlan) => {
+    const explicit = (p as any).currencyStrikePrices?.[selectedCurrency];
+    if (explicit !== undefined) return Number(explicit);
+    return p.price_strike ? Math.round(Number(p.price_strike) * activeCurrencyRate * 100) / 100 : null;
+  };
+  const money = (v: number | undefined | null) => formatCurrencyAmount(v ?? 0, priceSummary?.currency || selectedCurrency, currencySymbol);
+
+  const currentPrice = plan ? Number((plans.find((p) => p.id === plan.id) || plan).price || 0) : 0;
+  const recommendedId = plans
+    .filter((p) => !Number(p.is_trial) && p.id !== plan?.id && Number(p.price || 0) > currentPrice)
+    .sort((x, y) => Number(x.price) - Number(y.price))[0]?.id;
+
+  const checkoutAmount = selectedCheckoutPlan
+    ? priceSummary?.finalAmount !== undefined
+      ? priceSummary.finalAmount
+      : priceFor(selectedCheckoutPlan)
+    : 0;
+  const isRenewal = Boolean(selectedCheckoutPlan && plan?.id === selectedCheckoutPlan.id);
+  const isTrial = Number(plan?.is_trial) === 1;
+  const isActive = isValid && !isExpired;
+
+  const closeCheckout = () => {
+    setSelectedCheckoutPlan(null);
+    setMockOrderPayload(null);
+  };
+  const scrollToPlans = () => document.getElementById('available-plans-section')?.scrollIntoView({ behavior: 'smooth' });
+
+  const planFeatures = (p: SubscriptionPlan) => [
+    { label: Number(p.contact_limit || 0) === 0 ? 'Unlimited contacts' : `${Number(p.contact_limit).toLocaleString()} contacts`, on: true },
+    { label: `${p.qr_account || 1} WhatsApp ${Number(p.qr_account || 1) === 1 ? 'number' : 'numbers'}`, on: true },
+    { label: 'Chatbots & flows', on: Number(p.allow_chatbot) === 1 },
+    { label: 'REST API & webhooks', on: Number(p.allow_api) === 1 },
+    { label: 'WhatsApp warmer', on: Number((p as any).wa_warmer) === 1 },
+    { label: 'Lead forms', on: Number((p as any).allow_wa_forms) === 1 },
+  ];
+
+  const entitlementList = [
+    { name: 'Chatbot automation', description: 'Interactive flows and auto-replies', enabled: hasFeature('chatbot') },
+    { name: 'REST API', description: 'Send messages from your own systems', enabled: hasFeature('api') },
+    { name: 'Chat tags', description: 'Label and organise conversations', enabled: hasFeature('tags') },
+    { name: 'Chat notes', description: 'Private notes for your team', enabled: hasFeature('notes') },
+    { name: 'WhatsApp warmer', description: 'Warm up new numbers automatically', enabled: hasFeature('wa_warmer') },
+    { name: 'WhatsApp forms', description: 'Collect submissions in chat', enabled: hasFeature('allow_wa_forms') },
+    { name: 'QR sessions via API', description: 'Create and control QR sessions', enabled: hasFeature('rest_api_qr') },
+    { name: 'Instagram inbox', description: 'Reply to Instagram DMs', enabled: hasFeature('instagram_inbox') },
+    { name: 'Telegram inbox', description: 'Reply to Telegram messages', enabled: hasFeature('telegram_inbox') },
+  ];
+
+  const statusVariant = (s?: string) => {
+    const v = s?.toLowerCase();
+    return v === 'paid' ? 'success' : v === 'failed' ? 'destructive' : v === 'pending' || v === 'created' ? 'warning' : 'secondary';
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <DashboardPageHeader
-        title="Subscription & Billing"
-        description="Manage your active subscription plan, entitlements, and Autopay billing settings."
+        title="Billing & plans"
+        description="Your plan, usage and payment history."
         actions={
           <Button
             variant="outline"
@@ -553,12 +667,11 @@ export default function BillingPage() {
               await refresh();
               await fetchPlans();
               await fetchOrders();
-              toast.success('Billing state refreshed');
+              toast.success('Billing refreshed');
             }}
             disabled={isLoading}
-            className="gap-2 text-xs"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={cn(isLoading && 'animate-spin')} />
             Refresh
           </Button>
         }
@@ -566,296 +679,222 @@ export default function BillingPage() {
 
       {isLoading ? (
         <div className="space-y-6">
-          <Skeleton className="h-44 w-full rounded-2xl" />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Skeleton className="h-28 w-full rounded-xl" />
-            <Skeleton className="h-28 w-full rounded-xl" />
+          <Skeleton className="h-52 w-full rounded-xl" />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <Skeleton className="h-96 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-xl" />
+            <Skeleton className="h-96 w-full rounded-xl" />
           </div>
-          <Skeleton className="h-96 w-full rounded-2xl" />
         </div>
       ) : (
         <>
-          {/* Expiration Alert */}
-          {(!isValid || isExpired) && (
-            <Alert variant="destructive" className="border-destructive/40 bg-destructive/5">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle className="text-sm font-semibold">Subscription Inactive</AlertTitle>
-              <AlertDescription className="text-xs">
-                Your subscription has expired or is not active. Select a plan below to activate workspace capabilities.
-              </AlertDescription>
+          {!isActive && (
+            <Alert variant="destructive" className="border-destructive/30 bg-destructive/5">
+              <AlertCircle />
+              <AlertTitle>Your subscription is inactive</AlertTitle>
+              <AlertDescription>Choose a plan below to turn messaging, automation and the inbox back on.</AlertDescription>
             </Alert>
           )}
 
-          {/* 1. Current Plan & Quota Usage Overview */}
-          <Card className="border shadow-2xs rounded-2xl overflow-hidden bg-card">
-            <CardHeader className="p-6 pb-4 border-b bg-muted/30">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <Badge variant="outline" className="px-2 py-0.5 text-xs font-bold bg-primary/10 text-primary border-primary/20">
-                      Current Plan
-                    </Badge>
-                    <span className="text-xl font-black tracking-tight text-foreground">
-                      {plan?.title || 'No Plan Active'}
-                    </span>
-                    {Number(plan?.is_trial) === 1 && (
-                      <Badge variant="secondary" className="text-[10px] bg-amber-500/10 text-amber-600 border-amber-500/20 font-medium">
-                        Free Trial
+          {/* ── Current plan ─────────────────────────────────────────── */}
+          <Card className="gap-0 py-0">
+            <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_1fr]">
+              <div className="flex flex-col justify-between gap-6 p-6 lg:border-r">
+                <div className="space-y-3">
+                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Current plan</p>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="text-[28px] font-semibold leading-none tracking-[-0.02em] text-foreground">
+                      {plan?.title || 'No active plan'}
+                    </h2>
+                    {plan && (
+                      <Badge variant={isActive ? 'success' : 'destructive'}>
+                        <span className={cn('size-1.5 rounded-full', isActive ? 'bg-success' : 'bg-destructive')} />
+                        {isActive ? 'Active' : 'Expired'}
                       </Badge>
                     )}
+                    {isTrial && <Badge variant="warning">Free trial</Badge>}
                     {autopayState.isActive && (
-                      <Badge className="text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold flex items-center gap-1">
-                        <Repeat className="h-3 w-3" />
-                        Autopay Active
+                      <Badge variant="info">
+                        <Repeat />
+                        Autopay on
                       </Badge>
                     )}
                   </div>
-                  <CardDescription className="text-xs text-muted-foreground">
-                    {plan?.short_description || 'Active subscription governing your workspace feature limits and permissions.'}
-                  </CardDescription>
+                  {plan?.short_description && (
+                    <p className="max-w-md text-sm leading-relaxed text-muted-foreground">{plan.short_description}</p>
+                  )}
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-xs font-semibold text-foreground">
-                      {isExpired ? (
-                        <span className="text-destructive font-bold">Expired</span>
-                      ) : (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">Active</span>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="space-y-0.5">
+                    <p className="text-[13px] text-muted-foreground">
+                      {planDetails?.plan_expire
+                        ? autopayState.isActive && isActive
+                          ? 'Renews on'
+                          : isExpired
+                            ? 'Expired on'
+                            : 'Expires on'
+                        : 'Validity'}
+                    </p>
+                    <p className="text-base font-semibold tabular-nums text-foreground">
+                      {planDetails?.plan_expire ? fmtDate(Number(planDetails.plan_expire)) : 'No expiry'}
+                      {planDetails?.plan_expire && !isExpired && daysLeft != null && (
+                        <span
+                          className={cn(
+                            'ml-2 text-sm font-medium',
+                            daysLeft <= 5 ? 'text-warning' : 'text-muted-foreground'
+                          )}
+                        >
+                          · {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
+                        </span>
                       )}
                     </p>
-                    <p className="text-[11px] text-muted-foreground flex items-center gap-1 justify-end">
-                      <Calendar className="h-3 w-3" />
-                      {planDetails?.plan_expire
-                        ? `Expires: ${new Date(Number(planDetails.plan_expire)).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })} (${daysLeft} days)`
-                        : 'Lifetime / No Expiration'}
-                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {autopayState.isActive && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancelAutopay}
-                        disabled={isCancellingAutopay}
-                        className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10 gap-1.5"
-                      >
-                        <ShieldX className="h-3.5 w-3.5" />
-                        {isCancellingAutopay ? 'Cancelling...' : 'Cancel Autopay'}
+                      <Button variant="ghost" size="sm" onClick={handleCancelAutopay} disabled={isCancellingAutopay}>
+                        {isCancellingAutopay ? 'Cancelling…' : 'Cancel autopay'}
                       </Button>
                     )}
-
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => {
-                        const el = document.getElementById('available-plans-section');
-                        el?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className="gap-1.5 text-xs shadow-2xs font-semibold"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" />
-                      Manage Plan
+                    <Button onClick={scrollToPlans}>
+                      {isActive && !isTrial ? 'Change plan' : 'Upgrade now'}
+                      <ArrowRight />
                     </Button>
                   </div>
                 </div>
               </div>
-            </CardHeader>
 
-            <CardContent className="p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <QuotaCard
-                  title="Contacts Storage Quota"
+              <div className="space-y-6 border-t bg-muted/25 p-6 lg:border-t-0">
+                <p className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Usage this cycle</p>
+                <UsageMeter
+                  label="Contacts"
                   icon={Users}
                   used={contactsUsage.used}
                   limit={contactsUsage.limit}
-                  remaining={contactsUsage.remaining}
                   percentage={contactsUsage.percentage}
-                  unit="contacts"
                 />
-                <QuotaCard
-                  title="WhatsApp QR Accounts Quota"
+                <UsageMeter
+                  label="WhatsApp numbers"
                   icon={QrCode}
                   used={qrAccountsUsage.used}
                   limit={qrAccountsUsage.limit}
-                  remaining={qrAccountsUsage.remaining}
                   percentage={qrAccountsUsage.percentage}
-                  unit="instances"
                 />
               </div>
-            </CardContent>
+            </div>
           </Card>
 
-          {/* 2. Available Plans Section (Direct Subscription without month pills) */}
-          <div id="available-plans-section" className="space-y-5 pt-2">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-primary" />
-                  <h3 className="text-base font-bold text-foreground">Available Subscription Plans</h3>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Select a plan to subscribe with instant activation and seamless Autopay renewal.
-                </p>
-              </div>
-
-              {/* Active Currency Badge synced with Header */}
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border text-xs font-mono text-muted-foreground self-start sm:self-auto shadow-2xs">
-                <Globe className="h-3 w-3 text-primary" />
-                <span>Prices in <strong className="text-foreground">{currencySymbol} {selectedCurrency}</strong></span>
-                {isAutoDetected && (
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-primary/10 text-primary border-primary/20">
-                    Auto-detected {detectedCountry ? `(${detectedCountry})` : ''}
-                  </Badge>
-                )}
-              </div>
-            </div>
+          {/* ── Plans ────────────────────────────────────────────────── */}
+          <section id="available-plans-section" className="scroll-mt-6 space-y-5">
+            <SectionHeading
+              title="Plans"
+              description="Upgrade or renew anytime. Changes apply instantly."
+              action={
+                <span className="inline-flex items-center gap-1.5 self-start rounded-full border bg-background px-3 py-1 text-[13px] text-muted-foreground sm:self-auto">
+                  <Globe className="size-3.5" />
+                  Prices in <span className="font-medium text-foreground">{selectedCurrency}</span>
+                  {isAutoDetected && detectedCountry ? <span>· {detectedCountry}</span> : null}
+                </span>
+              }
+            />
 
             {plans.length === 0 ? (
-              <div className="p-8 text-center rounded-2xl border border-dashed text-muted-foreground text-xs">
-                No active purchasable plans found. Please contact workspace administrator.
+              <div className="rounded-xl border border-dashed bg-background px-6 py-12 text-center text-sm text-muted-foreground">
+                No plans are available right now. Please contact support.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {plans.map((p) => {
                   const isCurrent = plan?.id === p.id;
-                  const explicitPrice = (p as any).currencyPrices?.[selectedCurrency];
-                  const price = explicitPrice !== undefined ? Number(explicitPrice) : Math.round(Number(p.price || 0) * activeCurrencyRate * 100) / 100;
-                  const explicitStrike = (p as any).currencyStrikePrices?.[selectedCurrency];
-                  const strikePrice = explicitStrike !== undefined ? Number(explicitStrike) : (p.price_strike ? Math.round(Number(p.price_strike) * activeCurrencyRate * 100) / 100 : null);
+                  const trial = Number(p.is_trial) === 1;
+                  const recommended = p.id === recommendedId;
+                  const price = priceFor(p);
+                  const strike = strikeFor(p);
+                  const days = Number(p.plan_duration_in_days) || (trial ? 14 : 30);
+                  const period = days >= 365 ? 'year' : days >= 28 && days <= 31 ? 'month' : `${days} days`;
 
                   return (
                     <Card
                       key={p.id}
-                      className={`relative flex flex-col justify-between rounded-2xl border transition-all duration-200 overflow-hidden ${
-                        isCurrent
-                          ? 'border-primary ring-1 ring-primary/30 shadow-md bg-card'
-                          : 'border-border hover:border-border/80 hover:shadow-sm bg-card/60'
-                      }`}
-                    >
-                      {isCurrent && (
-                        <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-[10px] font-bold px-3 py-0.5 rounded-bl-xl shadow-2xs flex items-center gap-1">
-                          <Check className="h-3 w-3" />
-                          Current Plan
-                        </div>
+                      className={cn(
+                        'relative gap-0 py-0 transition-shadow',
+                        isCurrent && 'border-primary shadow-[0_0_0_1px_var(--primary)]',
+                        recommended && !isCurrent && 'border-foreground/15 shadow-[0_8px_24px_-12px_rgb(16_24_40/0.18)]'
                       )}
-
-                      <div className="p-5 space-y-4">
-                        <div className="space-y-1 pr-14">
-                          <h4 className="text-base font-bold text-foreground">{p.title}</h4>
-                          <p className="text-xs text-muted-foreground line-clamp-2 min-h-[32px]">
-                            {p.short_description || 'High-capacity WhatsApp CRM tools and feature suite.'}
+                    >
+                      <div className="flex flex-1 flex-col gap-6 p-6">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="text-base font-semibold text-foreground">{p.title}</h3>
+                            {isCurrent ? (
+                              <Badge variant="default">Current</Badge>
+                            ) : recommended ? (
+                              <Badge variant="solid">Recommended</Badge>
+                            ) : null}
+                          </div>
+                          <p className="line-clamp-2 min-h-10 text-[13px] leading-relaxed text-muted-foreground">
+                            {p.short_description || 'Everything you need to run WhatsApp for your business.'}
                           </p>
                         </div>
 
-                        {/* Plan Price */}
-                        <div className="space-y-1 pt-1">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="text-3xl font-black tracking-tight text-foreground font-mono">
-                              {p.is_trial === 1
-                                ? 'Free'
-                                : formatCurrencyAmount(price, selectedCurrency, currencySymbol)}
+                        <div className="space-y-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[32px] font-semibold leading-none tracking-[-0.03em] tabular-nums text-foreground">
+                              {trial ? 'Free' : formatCurrencyAmount(price, selectedCurrency, currencySymbol)}
                             </span>
-                            {strikePrice && strikePrice > price && p.is_trial !== 1 && (
-                              <span className="text-sm font-semibold text-muted-foreground line-through font-mono">
-                                {formatCurrencyAmount(strikePrice, selectedCurrency, currencySymbol)}
-                              </span>
-                            )}
-                            <span className="text-xs text-muted-foreground font-normal">
-                              / {p.plan_duration_in_days || (p.is_trial === 1 ? 14 : 30)} days
-                            </span>
+                            {!trial && <span className="text-sm text-muted-foreground">/ {period}</span>}
                           </div>
-                          <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                            {p.is_trial === 1 ? (
+                          <p className="h-5 text-[13px] text-muted-foreground">
+                            {trial ? (
+                              `${days}-day trial · no card needed`
+                            ) : strike && strike > price ? (
                               <>
-                                <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                                14-day full access &bull; No payment required
+                                <span className="line-through">{formatCurrencyAmount(strike, selectedCurrency, currencySymbol)}</span>
+                                <span className="ml-1.5 font-medium text-success">
+                                  Save {Math.round(((strike - price) / strike) * 100)}%
+                                </span>
                               </>
                             ) : (
-                              <>
-                                <Repeat className="h-3 w-3 text-primary" />
-                                Supports Razorpay Autopay (Cancel anytime)
-                              </>
+                              'Autopay available · cancel anytime'
                             )}
                           </p>
                         </div>
 
-                        {/* Core Quotas Checklist */}
-                        <div className="space-y-2 pt-2 border-t text-xs">
-                          <div className="flex items-center gap-2 text-foreground font-medium">
-                            <Users className="h-3.5 w-3.5 text-primary shrink-0" />
-                            <span>
-                              {Number(p.contact_limit || 0) === 0
-                                ? 'Unlimited Contacts'
-                                : `${Number(p.contact_limit || 0).toLocaleString()} Contacts limit`}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-foreground font-medium">
-                            <QrCode className="h-3.5 w-3.5 text-primary shrink-0" />
-                            <span>{p.qr_account || 1} WhatsApp QR Instance(s)</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            {Number(p.allow_chatbot) === 1 ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                            )}
-                            <span className={Number(p.allow_chatbot) === 1 ? 'text-foreground' : ''}>
-                              Automated Chatbots & Flows
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            {Number(p.allow_api) === 1 ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                            ) : (
-                              <XCircle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />
-                            )}
-                            <span className={Number(p.allow_api) === 1 ? 'text-foreground' : ''}>
-                              Developer REST API
-                            </span>
-                          </div>
-                        </div>
+                        <ul className="space-y-2.5 border-t pt-5">
+                          {planFeatures(p).map((f) => (
+                            <li
+                              key={f.label}
+                              className={cn('flex items-center gap-2.5 text-sm', f.on ? 'text-foreground' : 'text-muted-foreground/70')}
+                            >
+                              {f.on ? (
+                                <span className="flex size-4 items-center justify-center rounded-full bg-primary/12 text-primary">
+                                  <Check className="size-3" strokeWidth={3} />
+                                </span>
+                              ) : (
+                                <span className="flex size-4 items-center justify-center text-muted-foreground/50">
+                                  <Minus className="size-3.5" />
+                                </span>
+                              )}
+                              {f.label}
+                            </li>
+                          ))}
+                        </ul>
                       </div>
 
-                      <div className="p-5 pt-0">
-                        {p.is_trial === 1 ? (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={true}
-                            className="w-full text-xs font-semibold gap-1.5 shadow-2xs cursor-default opacity-85"
-                          >
-                            {isCurrent ? (
-                              <>
-                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                                Current Plan (Free Trial)
-                              </>
-                            ) : (
-                              <>
-                                <ShieldCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                                Trial (Included with Account)
-                              </>
-                            )}
-                          </Button>
+                      <div className="p-6 pt-0">
+                        {trial ? (
+                          <div className="flex h-10 items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground">
+                            {isCurrent && <Check className="size-4 text-primary" />}
+                            {isCurrent ? 'Your current plan' : 'Included with signup'}
+                          </div>
                         ) : (
                           <Button
-                            variant={isCurrent ? 'outline' : 'default'}
-                            size="sm"
+                            variant={isCurrent ? 'outline' : recommended ? 'default' : 'outline'}
+                            size="lg"
+                            className="w-full"
                             onClick={() => handleOpenCheckout(p)}
-                            className="w-full text-xs font-semibold gap-1.5 shadow-2xs"
                           >
-                            {isCurrent ? (
-                              <>
-                                <RefreshCw className="h-3.5 w-3.5" />
-                                Renew / Autopay {p.title}
-                              </>
-                            ) : (
-                              <>
-                                <Zap className="h-3.5 w-3.5" />
-                                Subscribe to {p.title}
-                              </>
-                            )}
+                            {isCurrent ? 'Renew plan' : `Choose ${p.title}`}
                           </Button>
                         )}
                       </div>
@@ -864,747 +903,408 @@ export default function BillingPage() {
                 })}
               </div>
             )}
-          </div>
+          </section>
 
-          {/* 3. Included Features & Entitlements */}
-          <div className="space-y-4 pt-2">
-            <Card className="border shadow-2xs rounded-2xl overflow-hidden bg-card">
-              <CardHeader className="p-5 pb-3 border-b bg-muted/20">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-primary" />
-                  <CardTitle className="text-sm font-bold text-foreground">
-                    Included Features &amp; Entitlements
-                  </CardTitle>
-                </div>
-                <CardDescription className="text-xs text-muted-foreground">
-                  Specific capabilities authorized by your active workspace subscription.
-                </CardDescription>
-              </CardHeader>
-
-              <CardContent className="p-5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {[
-                    {
-                      name: 'Chatbot Automation',
-                      description: 'Build interactive flows and automated conversational responders.',
-                      enabled: hasFeature('chatbot'),
-                    },
-                    {
-                      name: 'REST API Access',
-                      description: 'Integrate external services and trigger outbound messages.',
-                      enabled: hasFeature('api'),
-                    },
-                    {
-                      name: 'Chat Tags',
-                      description: 'Label, categorize, and organize contacts and chats with tags.',
-                      enabled: hasFeature('tags'),
-                    },
-                    {
-                      name: 'Chat Notes',
-                      description: 'Add private internal notes to chat threads for team collaboration.',
-                      enabled: hasFeature('notes'),
-                    },
-                    {
-                      name: 'WhatsApp Warmer',
-                      description: 'Warm up newly registered WhatsApp accounts automatically.',
-                      enabled: hasFeature('wa_warmer'),
-                    },
-                    {
-                      name: 'WhatsApp Forms',
-                      description: 'Collect customer submissions via conversational forms.',
-                      enabled: hasFeature('allow_wa_forms'),
-                    },
-                    {
-                      name: 'REST API QR Sessions',
-                      description: 'Programmatically create and control Baileys WhatsApp QR instances.',
-                      enabled: hasFeature('rest_api_qr'),
-                    },
-                    {
-                      name: 'Instagram Direct Inbox',
-                      description: 'Receive and reply to Instagram DMs inside the unified inbox.',
-                      enabled: hasFeature('instagram_inbox'),
-                    },
-                    {
-                      name: 'Telegram Bot Inbox',
-                      description: 'Manage Telegram messages and subscribers inside unified inbox.',
-                      enabled: hasFeature('telegram_inbox'),
-                    },
-                  ].map((feat, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3.5 rounded-xl border flex items-start gap-3 transition-colors ${
-                        feat.enabled
-                          ? 'bg-card border-border shadow-2xs'
-                          : 'bg-muted/15 border-border/50 opacity-60'
-                      }`}
-                    >
-                      {feat.enabled ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0 mt-0.5" />
-                      ) : (
-                        <XCircle className="h-4 w-4 text-muted-foreground/40 shrink-0 mt-0.5" />
+          {/* ── Included features ───────────────────────────────────── */}
+          <section className="space-y-5">
+            <SectionHeading title="What your plan includes" description="Features unlocked on your current subscription." />
+            <Card className="py-0">
+              <div className="grid grid-cols-1 divide-y sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-3 [&>*]:border-border sm:[&>*]:border-b lg:[&>*:nth-last-child(-n+3)]:border-b-0">
+                {entitlementList.map((feat) => (
+                  <div key={feat.name} className="flex items-start gap-3 px-5 py-4">
+                    <span
+                      className={cn(
+                        'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full',
+                        feat.enabled ? 'bg-success/12 text-success' : 'bg-muted text-muted-foreground'
                       )}
-                      <div className="space-y-0.5 min-w-0">
-                        <p className={`text-xs font-semibold ${feat.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {feat.name}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground leading-tight">
-                          {feat.description}
-                        </p>
-                      </div>
+                    >
+                      {feat.enabled ? <Check className="size-3" strokeWidth={3} /> : <Lock className="size-2.5" />}
+                    </span>
+                    <div className="min-w-0">
+                      <p className={cn('text-sm font-medium', feat.enabled ? 'text-foreground' : 'text-muted-foreground')}>
+                        {feat.name}
+                      </p>
+                      <p className="text-[13px] text-muted-foreground">{feat.enabled ? feat.description : 'Not on your plan'}</p>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
+                  </div>
+                ))}
+              </div>
             </Card>
-          </div>
+          </section>
 
-          {/* 4. Payment & Billing History Section */}
-          <div className="space-y-4 pt-2">
-            <Card className="border shadow-2xs rounded-2xl overflow-hidden bg-card">
-              <CardHeader className="p-5 pb-3 border-b bg-muted/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4 text-primary" />
-                    <div>
-                      <CardTitle className="text-sm font-bold text-foreground">
-                        Billing &amp; Payment History
-                      </CardTitle>
-                      <CardDescription className="text-xs text-muted-foreground">
-                        Verified transactions and receipts for this workspace.
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={fetchOrders}
-                    disabled={isOrdersLoading}
-                    className="h-8 text-xs gap-1.5 text-muted-foreground"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isOrdersLoading ? 'animate-spin' : ''}`} />
-                    Refresh History
-                  </Button>
+          {/* ── Payment history ─────────────────────────────────────── */}
+          <section className="space-y-5">
+            <SectionHeading
+              title="Payment history"
+              description="Receipts for every payment on this workspace."
+              action={
+                <Button variant="ghost" size="sm" onClick={fetchOrders} disabled={isOrdersLoading} className="self-start sm:self-auto">
+                  <RefreshCw className={cn(isOrdersLoading && 'animate-spin')} />
+                  Refresh
+                </Button>
+              }
+            />
+            <Card className="py-0">
+              {isOrdersLoading ? (
+                <div className="space-y-3 p-6">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
                 </div>
-              </CardHeader>
-
-              <CardContent className="p-0">
-                {isOrdersLoading ? (
-                  <div className="p-6 space-y-3">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
+              ) : orders.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+                  <span className="flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                    <Receipt className="size-5" />
+                  </span>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-foreground">No payments yet</p>
+                    <p className="text-[13px] text-muted-foreground">Your receipts will show up here after your first payment.</p>
                   </div>
-                ) : orders.length === 0 ? (
-                  <div className="p-8 text-center text-xs text-muted-foreground">
-                    No billing transactions recorded yet. Completed purchases will be logged here with payment receipts.
-                  </div>
-                ) : (
-                  <>
-                    {/* Mobile Transaction Cards (md:hidden) */}
-                    <div className="md:hidden divide-y divide-border">
-                      {orders.map((ord) => {
-                        const statusLower = ord.status?.toLowerCase();
-                        return (
-                          <div key={ord.id} className="p-3.5 space-y-2 text-xs">
-                            <div className="flex items-start justify-between gap-2">
-                              <div>
-                                <span className="font-semibold text-foreground text-sm block">
-                                  {ord.planTitle}
-                                </span>
-                                <span className="text-[11px] text-muted-foreground">
-                                  {new Date(ord.createdAt).toLocaleDateString('en-US', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </span>
-                              </div>
-                              <div className="text-right">
-                                <span className="font-mono font-bold text-foreground text-sm block">
-                                  {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
-                                </span>
-                                <Badge
-                                  variant={
-                                    statusLower === 'paid'
-                                      ? 'default'
-                                      : statusLower === 'failed'
-                                      ? 'destructive'
-                                      : 'secondary'
-                                  }
-                                  className={`text-[9px] uppercase font-bold px-1.5 py-0 ${
-                                    statusLower === 'paid'
-                                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                      : ''
-                                  }`}
-                                >
-                                  {ord.status}
-                                </Badge>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/40 text-[11px]">
-                              <div className="flex items-center gap-1.5">
-                                <Badge variant="outline" className="text-[10px] font-mono">
-                                  {ord.paymentMode}
-                                </Badge>
-                                {ord.isAutopay && (
-                                  <Badge className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-semibold px-1 py-0">
-                                    Autopay
-                                  </Badge>
-                                )}
-                                {ord.couponCode && (
-                                  <Badge variant="outline" className="text-[9px] font-mono border-emerald-500/30 text-emerald-600 bg-emerald-500/10">
-                                    {ord.couponCode}
-                                  </Badge>
-                                )}
-                              </div>
-                              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[140px]">
-                                {ord.orderId ? ord.orderId.slice(0, 14) + '...' : '—'}
-                              </span>
-                            </div>
+                </div>
+              ) : (
+                <>
+                  {/* Mobile list */}
+                  <div className="divide-y md:hidden">
+                    {orders.map((ord) => (
+                      <div key={ord.id} className="space-y-2 px-4 py-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-medium text-foreground">{ord.planTitle}</p>
+                            <p className="text-xs text-muted-foreground">{fmtDate(ord.createdAt)}</p>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold tabular-nums text-foreground">
+                              {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
+                            </p>
+                            <Badge variant={statusVariant(ord.status)} className="mt-1 capitalize">
+                              {ord.status?.toLowerCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                          <span>{fmtMode(ord.paymentMode)}</span>
+                          {ord.isAutopay && <span>· Autopay</span>}
+                          {ord.couponCode && <span>· {ord.couponCode}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
 
-                    {/* Desktop Table (hidden md:block) */}
-                    <div className="hidden md:block overflow-x-auto">
-                      <Table>
-                        <TableHeader className="bg-muted/40">
-                          <TableRow>
-                            <TableHead className="text-xs font-semibold">Date</TableHead>
-                            <TableHead className="text-xs font-semibold">Plan</TableHead>
-                            <TableHead className="text-xs font-semibold">Amount</TableHead>
-                            <TableHead className="text-xs font-semibold">Payment Mode</TableHead>
-                            <TableHead className="text-xs font-semibold">Coupon</TableHead>
-                            <TableHead className="text-xs font-semibold">Status</TableHead>
-                            <TableHead className="text-xs font-semibold">Reference ID</TableHead>
+                  {/* Desktop table */}
+                  <div className="hidden overflow-x-auto md:block">
+                    <Table>
+                      <TableHeader className="bg-muted/40">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="pl-6">Date</TableHead>
+                          <TableHead>Plan</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Method</TableHead>
+                          <TableHead>Coupon</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="pr-6">Reference</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {orders.map((ord) => (
+                          <TableRow key={ord.id}>
+                            <TableCell className="pl-6 text-muted-foreground">{fmtDate(ord.createdAt)}</TableCell>
+                            <TableCell className="font-medium text-foreground">{ord.planTitle}</TableCell>
+                            <TableCell className="font-medium tabular-nums text-foreground">
+                              {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              <span>{fmtMode(ord.paymentMode)}</span>
+                              {ord.isAutopay && (
+                                <Badge variant="info" className="ml-2">
+                                  Autopay
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {ord.couponCode ? (
+                                <span className="font-mono text-xs">
+                                  {ord.couponCode}
+                                  <span className="ml-1 text-success">−{currencySymbol}{ord.couponDiscount}</span>
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={statusVariant(ord.status)} className="capitalize">
+                                {ord.status?.toLowerCase()}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="pr-6 font-mono text-xs text-muted-foreground" title={ord.orderId || undefined}>
+                              {ord.orderId ? `${ord.orderId.slice(0, 18)}…` : '—'}
+                            </TableCell>
                           </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {orders.map((ord) => {
-                            const statusLower = ord.status?.toLowerCase();
-                            return (
-                              <TableRow key={ord.id} className="text-xs">
-                                <TableCell className="text-muted-foreground whitespace-nowrap">
-                                  {new Date(ord.createdAt).toLocaleDateString('en-US', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </TableCell>
-                                <TableCell className="font-semibold text-foreground">
-                                  {ord.planTitle}
-                                </TableCell>
-                                <TableCell className="font-mono font-bold text-foreground">
-                                  {formatCurrencyAmount(ord.amount, ord.currency || selectedCurrency, currencySymbol)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1.5">
-                                    <Badge variant="outline" className="text-[10px] font-mono">
-                                      {ord.paymentMode}
-                                    </Badge>
-                                    {ord.isAutopay && (
-                                      <Badge className="text-[9px] bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20 font-semibold px-1 py-0">
-                                        Autopay
-                                      </Badge>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {ord.couponCode ? (
-                                    <Badge variant="outline" className="text-[10px] font-mono border-emerald-500/30 text-emerald-600 bg-emerald-500/10">
-                                      {ord.couponCode} (-{currencySymbol}{ord.couponDiscount})
-                                    </Badge>
-                                  ) : (
-                                    <span className="text-muted-foreground/60">—</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Badge
-                                    variant={
-                                      statusLower === 'paid'
-                                        ? 'default'
-                                        : statusLower === 'failed'
-                                        ? 'destructive'
-                                        : 'secondary'
-                                    }
-                                    className={`text-[10px] uppercase font-bold ${
-                                      statusLower === 'paid'
-                                        ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                                        : ''
-                                    }`}
-                                  >
-                                    {ord.status}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="font-mono text-[11px] text-muted-foreground">
-                                  {ord.orderId ? ord.orderId.slice(0, 16) + '...' : '—'}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </>
-                )}
-              </CardContent>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </>
+              )}
             </Card>
-          </div>
+          </section>
 
-          {/* ========================================================================= */}
-          {/* CHECKOUT MODAL                                                            */}
-          {/* ========================================================================= */}
+          {/* ── Checkout dialog ─────────────────────────────────────── */}
           <Dialog
             open={!!selectedCheckoutPlan}
             onOpenChange={(open) => {
-              if (!open && !isProcessingPayment) {
-                setSelectedCheckoutPlan(null);
-                setMockOrderPayload(null);
-              }
+              if (!open && !isProcessingPayment) closeCheckout();
             }}
           >
-            <DialogContent className="sm:max-w-lg p-0 overflow-hidden rounded-2xl border bg-background shadow-2xl">
-              {/* Premium Gradient Header */}
-              <div className="relative p-6 pb-4 border-b bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shadow-xs border border-primary/20 shrink-0">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <DialogTitle className="text-base font-bold text-foreground flex items-center gap-2">
-                        <span>Subscribe to {selectedCheckoutPlan?.title}</span>
-                      </DialogTitle>
-                      <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                        Confirm your plan details and activate your workspace capabilities.
-                      </DialogDescription>
-                    </div>
-                  </div>
-
-                  {selectedCheckoutPlan && (
-                    <Badge variant="outline" className="bg-background/80 backdrop-blur-xs font-mono font-bold text-xs px-2.5 py-1 text-primary border-primary/30 shrink-0">
-                      {formatCurrencyAmount(priceSummary?.finalAmount !== undefined ? priceSummary.finalAmount : ((selectedCheckoutPlan as any).currencyPrices?.[selectedCurrency] ?? Number(selectedCheckoutPlan.price) * activeCurrencyRate), selectedCurrency, currencySymbol)}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
+            <DialogContent className="gap-0 sm:max-w-[520px]">
               {selectedCheckoutPlan && (
-                <div className="p-6 space-y-4 text-xs max-h-[75vh] overflow-y-auto">
-                  {/* Selected Plan Overview Card */}
-                  <div className="p-4 rounded-xl border bg-card/60 relative overflow-hidden space-y-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-foreground">
-                            {selectedCheckoutPlan.title} Tier
-                          </span>
-                          <Badge variant="secondary" className="text-[10px] px-2 py-0 bg-primary/10 text-primary border-primary/20">
-                            {(Number(selectedCheckoutPlan.plan_duration_in_days) || 30) * durationMonths} days
-                          </Badge>
+                <>
+                  <DialogHeader className="pb-5">
+                    <p className="text-xs font-medium uppercase tracking-[0.08em] text-primary">
+                      {isRenewal ? 'Renew' : 'Upgrade'}
+                    </p>
+                    <DialogTitle className="text-xl">{selectedCheckoutPlan.title} plan</DialogTitle>
+                    <DialogDescription>
+                      {planFeatures(selectedCheckoutPlan)
+                        .filter((f) => f.on)
+                        .map((f) => f.label)
+                        .join(' · ')}
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <div className="space-y-6 border-t pt-5">
+                    {Number(selectedCheckoutPlan.plan_duration_in_days) < 365 && (
+                      <div className="space-y-2.5">
+                        <p className="text-sm font-medium text-foreground">Billing period</p>
+                        <div
+                          role="radiogroup"
+                          aria-label="Billing period"
+                          className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1"
+                        >
+                          {([1, 12] as const).map((m) => (
+                            <button
+                              key={m}
+                              type="button"
+                              role="radio"
+                              aria-checked={durationMonths === m}
+                              onClick={() => {
+                                setDurationMonths(m);
+                                if (m === 12) setEnableAutopay(false);
+                                setAppliedCoupon(null);
+                                setCouponInput('');
+                              }}
+                              className={cn(
+                                'flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg text-sm font-medium transition-all',
+                                durationMonths === m
+                                  ? 'bg-background text-foreground shadow-[0_1px_3px_rgb(16_24_40/0.12)]'
+                                  : 'text-muted-foreground hover:text-foreground'
+                              )}
+                            >
+                              {m === 1 ? 'Monthly' : 'Yearly'}
+                              {m === 12 && <Badge variant="success" className="h-5 px-1.5">Save more</Badge>}
+                            </button>
+                          ))}
                         </div>
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          {selectedCheckoutPlan.short_description || "Full-featured WhatsApp marketing and team inbox access."}
+                      </div>
+                    )}
+
+                    {durationMonths === 1 && (
+                      <div className="space-y-2.5">
+                        <p className="text-sm font-medium text-foreground">Payment</p>
+                        <div role="radiogroup" aria-label="Payment type" className="grid gap-2">
+                          <OptionCard
+                            selected={enableAutopay}
+                            onSelect={() => setEnableAutopay(true)}
+                            title="Autopay"
+                            tag="Recommended"
+                            description={`Renews every ${selectedCheckoutPlan.plan_duration_in_days || 30} days. Cancel anytime from Billing.`}
+                          />
+                          <OptionCard
+                            selected={!enableAutopay}
+                            onSelect={() => setEnableAutopay(false)}
+                            title="Pay once"
+                            description="Pay for one cycle. You'll renew manually before it ends."
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Coupon */}
+                    <div className="space-y-2">
+                      <label htmlFor="coupon" className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                        <Tag className="size-3.5 text-muted-foreground" />
+                        Coupon code
+                      </label>
+                      {appliedCoupon ? (
+                        <div className="flex items-center justify-between gap-3 rounded-lg border border-success/25 bg-success/8 px-3 py-2">
+                          <span className="flex items-center gap-2 text-sm font-medium text-success">
+                            <CircleCheck className="size-4" />
+                            <span className="font-mono">{appliedCoupon}</span> applied
+                          </span>
+                          <Button variant="ghost" size="icon-xs" onClick={handleRemoveCoupon} aria-label="Remove coupon">
+                            <X />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <Input
+                            id="coupon"
+                            placeholder="Enter code"
+                            value={couponInput}
+                            onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Enter' && handleApplyCoupon()}
+                            disabled={isApplyingCoupon || isCalculatingPrice}
+                            aria-invalid={!!couponError || undefined}
+                            className="font-mono uppercase placeholder:font-sans placeholder:normal-case"
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={handleApplyCoupon}
+                            disabled={!couponInput.trim() || isApplyingCoupon || isCalculatingPrice}
+                            className="min-w-20"
+                          >
+                            {isApplyingCoupon ? <RefreshCw className="animate-spin" /> : 'Apply'}
+                          </Button>
+                        </div>
+                      )}
+                      {couponError && (
+                        <p className="flex items-center gap-1.5 text-[13px] text-destructive">
+                          <AlertCircle className="size-3.5 shrink-0" />
+                          {couponError}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Summary */}
+                    <div className={cn('space-y-2.5 rounded-xl bg-muted/50 p-4 transition-opacity', isCalculatingPrice && 'opacity-60')}>
+                      <SummaryRow
+                        label={`${selectedCheckoutPlan.title} · ${durationMonths === 12 ? '12 months' : `${selectedCheckoutPlan.plan_duration_in_days || 30} days`}`}
+                        value={money(priceSummary?.baseSubtotal ?? priceFor(selectedCheckoutPlan))}
+                      />
+                      {(priceSummary?.durationDiscount || 0) > 0 && (
+                        <SummaryRow
+                          label="Yearly discount"
+                          value={<span className="text-success">−{money(priceSummary?.durationDiscount)}</span>}
+                        />
+                      )}
+                      {(priceSummary?.couponDiscount || 0) > 0 && (
+                        <SummaryRow
+                          label={`Coupon ${priceSummary?.couponCode ?? ''}`}
+                          value={<span className="text-success">−{money(priceSummary?.couponDiscount)}</span>}
+                        />
+                      )}
+                      {(priceSummary?.taxAmount || 0) > 0 && (
+                        <SummaryRow label={`Tax (${priceSummary?.taxRate}%)`} value={money(priceSummary?.taxAmount)} />
+                      )}
+                      <div className="flex items-end justify-between gap-4 border-t border-border/70 pt-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">Total due today</p>
+                          <p className="text-xs text-muted-foreground">
+                            {enableAutopay && durationMonths === 1 ? 'Then renews automatically' : 'One-time payment'}
+                          </p>
+                        </div>
+                        <p className="text-2xl font-semibold tracking-[-0.02em] tabular-nums text-foreground">
+                          {money(checkoutAmount)}
                         </p>
                       </div>
-
-                      <div className="text-right shrink-0">
-                        <span className="text-xl font-black text-foreground font-mono">
-                          {formatCurrencyAmount(priceSummary?.finalAmount !== undefined ? priceSummary.finalAmount : ((selectedCheckoutPlan as any).currencyPrices?.[selectedCurrency] ?? Number(selectedCheckoutPlan.price) * activeCurrencyRate), selectedCurrency, currencySymbol)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block font-mono">
-                          {priceSummary?.currency || selectedCurrency} / cycle
-                        </span>
-                      </div>
                     </div>
 
-                    {/* Key Entitlements Matrix Pills */}
-                    <div className="pt-2 border-t border-border/50">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block mb-1.5">
-                        Included Quotas & Capabilities
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                          <span>{Number(selectedCheckoutPlan.contact_limit || 0) === 0 ? "Unlimited" : Number(selectedCheckoutPlan.contact_limit).toLocaleString()} Contacts</span>
+                    {mockOrderPayload && (
+                      <div className="space-y-3 rounded-xl border border-warning/30 bg-warning/8 p-4">
+                        <p className="flex items-center gap-2 text-sm font-semibold text-warning">
+                          <Info className="size-4 shrink-0" />
+                          Test mode
+                        </p>
+                        <p className="text-[13px] text-muted-foreground">
+                          Razorpay is in test mode ({mockOrderPayload.isAutopay ? 'autopay' : 'one-time order'}). Simulate the result:
+                        </p>
+                        <div className="flex gap-2">
+                          <Button size="sm" onClick={() => handleSimulateMockVerification(false)} disabled={isProcessingPayment} className="flex-1">
+                            <Check />
+                            Simulate success
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive-outline"
+                            onClick={() => handleSimulateMockVerification(true)}
+                            disabled={isProcessingPayment}
+                          >
+                            Simulate failure
+                          </Button>
                         </div>
-                        <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                          <span>{selectedCheckoutPlan.qr_account || 1} QR WhatsApp {Number(selectedCheckoutPlan.qr_account) === 1 ? "Account" : "Accounts"}</span>
-                        </div>
-                        {Boolean(selectedCheckoutPlan.allow_chatbot) && (
-                          <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                            <span>Visual Chatbot</span>
-                          </div>
-                        )}
-                        {Boolean(selectedCheckoutPlan.allow_api) && (
-                          <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                            <span>REST API & Webhooks</span>
-                          </div>
-                        )}
-                        {Boolean(selectedCheckoutPlan.wa_warmer) && (
-                          <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                            <span>WA Warmer</span>
-                          </div>
-                        )}
-                        {Boolean(selectedCheckoutPlan.allow_wa_forms) && (
-                          <div className="px-2 py-1 rounded-md bg-muted/60 border text-[11px] font-medium flex items-center gap-1.5 text-foreground">
-                            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                            <span>Lead Forms</span>
-                          </div>
-                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  {/* Billing term: monthly plans can be paid for a full year at the annual discount */}
-                  {Number(selectedCheckoutPlan.plan_duration_in_days) < 365 && (
-                    <div role="radiogroup" aria-label="Billing term" className="grid grid-cols-2 gap-2">
-                      {([1, 12] as const).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          role="radio"
-                          aria-checked={durationMonths === m}
-                          onClick={() => {
-                            setDurationMonths(m);
-                            if (m === 12) setEnableAutopay(false);
-                            setAppliedCoupon(null);
-                            setCouponInput('');
-                          }}
-                          className={`rounded-xl border p-3 text-left transition-colors ${
-                            durationMonths === m ? 'border-primary bg-primary/5' : 'border-border hover:border-foreground/30'
-                          }`}
-                        >
-                          <span className="block text-sm font-semibold text-foreground">{m === 1 ? 'Monthly' : 'Yearly'}</span>
-                          <span className="block text-[11px] text-muted-foreground">
-                            {m === 1 ? 'Pay every month, autopay available' : 'One payment for 12 months, discounted'}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Billing Mode: Autopay vs One-Time Interactive Cards */}
-                  {durationMonths === 1 && (
-                    <div className="space-y-2">
-                      <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Repeat className="h-3 w-3 text-primary" />
-                        How to pay
-                      </Label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <div
-                          onClick={() => setEnableAutopay(true)}
-                          className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                            enableAutopay
-                              ? "border-primary bg-primary/5 shadow-2xs"
-                              : "border-border/60 hover:border-primary/40 bg-card/40"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <Repeat className={`h-4 w-4 ${enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
-                              <span className="font-bold text-xs text-foreground">Recurring Autopay</span>
-                            </div>
-                            <Badge className="bg-emerald-600/10 text-emerald-600 dark:text-emerald-400 border-emerald-600/20 text-[9px] px-1.5 py-0 font-semibold">
-                              Recommended
-                            </Badge>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground leading-snug">
-                            Renews automatically every {selectedCheckoutPlan.plan_duration_in_days || 30} days. Cancel anytime in 1-click.
-                          </p>
-                        </div>
-  
-                        <div
-                          onClick={() => setEnableAutopay(false)}
-                          className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-1.5 ${
-                            !enableAutopay
-                              ? "border-primary bg-primary/5 shadow-2xs"
-                              : "border-border/60 hover:border-primary/40 bg-card/40"
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <CreditCard className={`h-4 w-4 ${!enableAutopay ? "text-primary" : "text-muted-foreground"}`} />
-                              <span className="font-bold text-xs text-foreground">One-Time Payment</span>
-                            </div>
-                          </div>
-                          <p className="text-[10px] text-muted-foreground leading-snug">
-                            Pay once for this cycle only. Manually renew before expiry to maintain access.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Coupon Code Section */}
-                  <div className="space-y-1.5">
-                    <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
-                      <Tag className="h-3 w-3 text-primary" />
-                      Promo Code or Coupon
-                    </Label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Input
-                          placeholder="e.g. WELCOME10, SAVE50"
-                          value={couponInput}
-                          onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
-                          disabled={!!appliedCoupon || isApplyingCoupon || isCalculatingPrice}
-                          className="h-9 text-xs font-mono uppercase pl-3 pr-8"
-                        />
-                      </div>
-                      {appliedCoupon ? (
+                  <DialogFooter className="mt-6 items-center sm:justify-between">
+                    <p className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                      <Lock className="size-3.5" />
+                      Secured by Razorpay
+                    </p>
+                    <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+                      <Button variant="ghost" onClick={closeCheckout} disabled={isProcessingPayment}>
+                        Cancel
+                      </Button>
+                      {!mockOrderPayload && (
                         <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleRemoveCoupon}
-                          className="h-9 text-xs text-destructive border-destructive/30 hover:bg-destructive/10 px-3"
+                          onClick={handleProceedPayment}
+                          disabled={isProcessingPayment || isCalculatingPrice}
+                          className="min-w-44"
                         >
-                          Remove
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          onClick={handleApplyCoupon}
-                          disabled={!couponInput.trim() || isApplyingCoupon || isCalculatingPrice}
-                          className="h-9 text-xs font-semibold px-4"
-                        >
-                          {isApplyingCoupon ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                          {isProcessingPayment ? (
+                            <>
+                              <RefreshCw className="animate-spin" />
+                              {paymentStatusText || 'Processing…'}
+                            </>
                           ) : (
-                            "Apply"
+                            <>
+                              {enableAutopay && durationMonths === 1 ? <Repeat /> : <CreditCard />}
+                              {enableAutopay && durationMonths === 1 ? 'Start autopay' : 'Pay'} · {money(checkoutAmount)}
+                            </>
                           )}
                         </Button>
                       )}
                     </div>
-
-                    {/* Coupon status badges */}
-                    {appliedCoupon && (
-                      <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-between text-[11px]">
-                        <span className="flex items-center gap-1.5 font-semibold">
-                          <CheckCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                          <span>Coupon &quot;{appliedCoupon}&quot; applied successfully</span>
-                        </span>
-                        <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                          -{formatCurrencyAmount(priceSummary?.couponDiscount, selectedCurrency, currencySymbol)}
-                        </span>
-                      </div>
-                    )}
-                    {couponError && (
-                      <p className="text-[11px] text-destructive flex items-center gap-1 pt-0.5">
-                        <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                        {couponError}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Server Authoritative Price Breakdown */}
-                  <div className="p-4 rounded-xl border bg-muted/20 space-y-2 text-xs">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Base Plan Price:</span>
-                      <span className="font-mono text-foreground font-medium">
-                        {formatCurrencyAmount(priceSummary?.baseSubtotal !== undefined ? priceSummary.baseSubtotal : (Number(selectedCheckoutPlan.price) * activeCurrencyRate), selectedCurrency, currencySymbol)}
-                      </span>
-                    </div>
-
-                    {(priceSummary?.couponDiscount || 0) > 0 && (
-                      <div className="flex justify-between text-emerald-600 dark:text-emerald-400 font-medium">
-                        <span>Coupon Discount:</span>
-                        <span className="font-mono font-semibold">
-                          -{formatCurrencyAmount(priceSummary?.couponDiscount, selectedCurrency, currencySymbol)}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Tax & Gateway Surcharges:</span>
-                      <span className="font-mono text-foreground">Included (0%)</span>
-                    </div>
-
-                    <div className="pt-3 border-t border-border/80 flex justify-between items-baseline">
-                      <div>
-                        <span className="text-sm font-bold text-foreground block">Total Payable</span>
-                        <span className="text-[10px] text-muted-foreground">
-                          {enableAutopay ? "Auto-renews at end of cycle" : "Single billing cycle"}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-2xl font-black text-primary font-mono tracking-tight">
-                          {formatCurrencyAmount(priceSummary?.finalAmount !== undefined ? priceSummary.finalAmount : ((selectedCheckoutPlan as any).currencyPrices?.[selectedCurrency] ?? Number(selectedCheckoutPlan.price) * activeCurrencyRate), selectedCurrency, currencySymbol)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground block font-mono">
-                          {priceSummary?.currency || selectedCurrency}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Trust & Security Badges Row */}
-                  <div className="grid grid-cols-3 gap-2 text-center text-[10px] text-muted-foreground p-2.5 rounded-xl bg-muted/30 border">
-                    <div className="flex flex-col items-center gap-1">
-                      <Lock className="h-3.5 w-3.5 text-primary" />
-                      <span>256-Bit SSL</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>Razorpay Verified</span>
-                    </div>
-                    <div className="flex flex-col items-center gap-1">
-                      <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Instant Access</span>
-                    </div>
-                  </div>
-
-                  {/* Dev Sandbox simulation box if keys are in mock mode */}
-                  {mockOrderPayload && (
-                    <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/5 space-y-2">
-                      <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-300 font-bold text-xs">
-                        <Info className="h-4 w-4 shrink-0" />
-                        Sandbox / Dev Mode Testing Active
-                      </div>
-                      <p className="text-[11px] text-muted-foreground leading-relaxed">
-                        Backend detected test Razorpay mode ({mockOrderPayload.isAutopay ? "Autopay Subscription" : "One-time Order"}). Test complete verification:
-                      </p>
-                      <div className="flex gap-2 pt-1">
-                        <Button
-                          size="sm"
-                          onClick={() => handleSimulateMockVerification(false)}
-                          disabled={isProcessingPayment}
-                          className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 flex-1 font-semibold"
-                        >
-                          <Check className="h-3 w-3" />
-                          Simulate Verified Payment
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleSimulateMockVerification(true)}
-                          disabled={isProcessingPayment}
-                          className="text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                        >
-                          Fake Signature
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  </DialogFooter>
+                </>
               )}
-
-              <DialogFooter className="p-4 px-6 border-t bg-muted/20 flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedCheckoutPlan(null);
-                    setMockOrderPayload(null);
-                  }}
-                  disabled={isProcessingPayment}
-                  className="text-xs h-9 w-full sm:w-auto touch-manipulation"
-                >
-                  Cancel
-                </Button>
-
-                {!mockOrderPayload && (
-                  <Button
-                    size="sm"
-                    onClick={handleProceedPayment}
-                    disabled={isProcessingPayment || isCalculatingPrice}
-                    className="text-xs font-bold gap-2 px-6 h-9 shadow-md bg-primary hover:bg-primary/90 text-primary-foreground w-full sm:w-auto touch-manipulation"
-                  >
-                    {isProcessingPayment ? (
-                      <>
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                        {paymentStatusText || "Processing..."}
-                      </>
-                    ) : (
-                      <>
-                        {enableAutopay ? <Repeat className="h-3.5 w-3.5" /> : <CreditCard className="h-3.5 w-3.5" />}
-                        <span>
-                          {enableAutopay ? "Subscribe with Autopay • " : "Pay & Activate • "}
-                          {currencySymbol}
-                          {formatCurrencyAmount(priceSummary?.finalAmount !== undefined ? priceSummary.finalAmount : (selectedCheckoutPlan ? (Number(selectedCheckoutPlan.price) * activeCurrencyRate) : 0), selectedCurrency, currencySymbol)}
-                        </span>
-                      </>
-                    )}
-                  </Button>
-                )}
-              </DialogFooter>
             </DialogContent>
-          </Dialog>{/* ========================================================================= */}
-          {/* PAYMENT SUCCESS DIALOG                                                    */}
-          {/* ========================================================================= */}
-          <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
-            <DialogContent className="sm:max-w-md p-6 text-center space-y-4">
-              <div className="mx-auto w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center ring-8 ring-emerald-500/5">
-                <CheckCircle2 className="h-6 w-6" />
-              </div>
+          </Dialog>
 
-              <div className="space-y-1">
-                <DialogTitle className="text-lg font-bold text-foreground">
-                  {successReceipt?.isAutopay ? 'Autopay Subscription Activated!' : 'Payment Verified Successfully!'}
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground">
-                  Your workspace subscription has been updated and capabilities are active immediately.
-                </DialogDescription>
+          {/* ── Payment success dialog ───────────────────────────────── */}
+          <Dialog open={successDialogOpen} onOpenChange={setSuccessDialogOpen}>
+            <DialogContent className="sm:max-w-sm" showCloseButton={false}>
+              <div className="flex flex-col items-center gap-4 pt-2 text-center">
+                <span className="flex size-14 items-center justify-center rounded-full bg-success/12 text-success ring-8 ring-success/5">
+                  <Check className="size-7" strokeWidth={2.5} />
+                </span>
+                <div className="space-y-1.5">
+                  <DialogTitle>{successReceipt?.isAutopay ? 'Autopay is on' : 'Payment successful'}</DialogTitle>
+                  <DialogDescription>
+                    {successReceipt?.planTitle} is active on your workspace now.
+                  </DialogDescription>
+                </div>
               </div>
 
               {successReceipt && (
-                <div className="p-4 rounded-xl border bg-muted/30 text-left space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Activated Plan:</span>
-                    <strong className="text-foreground">{successReceipt.planTitle}</strong>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount Paid:</span>
-                    <span className="font-mono font-bold text-foreground">{successReceipt.amount}</span>
-                  </div>
-                  {successReceipt.isAutopay && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Billing Model:</span>
-                      <Badge className="text-[10px] bg-emerald-500/10 text-emerald-600 border-emerald-500/20 font-semibold">
-                        Autopay (Auto-renewing)
-                      </Badge>
-                    </div>
-                  )}
+                <div className="space-y-2.5 rounded-xl bg-muted/50 p-4">
+                  <SummaryRow label="Plan" value={successReceipt.planTitle} />
+                  <SummaryRow label="Amount paid" value={successReceipt.amount} />
                   {successReceipt.newExpiry && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Current Validity:</span>
-                      <strong className="text-emerald-600 dark:text-emerald-400">
-                        {new Date(Number(successReceipt.newExpiry)).toLocaleDateString('en-US', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
-                      </strong>
-                    </div>
+                    <SummaryRow
+                      label={successReceipt.isAutopay ? 'Next renewal' : 'Valid until'}
+                      value={fmtDate(Number(successReceipt.newExpiry))}
+                    />
                   )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Reference:</span>
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      {successReceipt.orderId.slice(0, 18)}...
-                    </span>
-                  </div>
+                  <SummaryRow
+                    label="Reference"
+                    value={<span className="font-mono text-xs text-muted-foreground">{successReceipt.orderId.slice(0, 20)}…</span>}
+                  />
                 </div>
               )}
 
-              <DialogFooter className="justify-center sm:justify-center">
-                <Button
-                  size="sm"
-                  onClick={() => setSuccessDialogOpen(false)}
-                  className="w-full text-xs font-semibold"
-                >
-                  Done
-                </Button>
-              </DialogFooter>
+              <Button size="lg" className="w-full" onClick={() => setSuccessDialogOpen(false)}>
+                Done
+              </Button>
             </DialogContent>
           </Dialog>
         </>

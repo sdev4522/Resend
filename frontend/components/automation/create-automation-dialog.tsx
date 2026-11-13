@@ -135,9 +135,9 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle className="text-base font-bold flex items-center gap-2">
+            <DialogTitle className="text-base font-semibold flex items-center gap-2">
               <Bot className="h-5 w-5 text-primary" />
-              <span>Create New Automation</span>
+              <span>Create new automation</span>
             </DialogTitle>
             <DialogDescription className="text-xs">
               Configure basic trigger and connection details, then build your flow visually.
@@ -146,7 +146,7 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
 
           <div className="space-y-4 py-4">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Automation Name</Label>
+              <Label className="text-xs font-semibold">Automation name</Label>
               <Input
                 placeholder="e.g. Lead Qualification, Support Router"
                 className="text-xs"
@@ -172,16 +172,16 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
                     WhatsApp Chatbot (Primary)
                   </SelectItem>
                   <SelectItem value="webhook_automation" className="text-xs">
-                    Webhook Triggered Flow
+                    Webhook triggered flow
                   </SelectItem>
                   <SelectItem value="telegram_chatbot" className="text-xs">
-                    Telegram Chatbot
+                    Telegram chatbot
                   </SelectItem>
                   <SelectItem value="instagram_chatbot" className="text-xs">
-                    Instagram DM Chatbot
+                    Instagram DM chatbot
                   </SelectItem>
                   <SelectItem value="messenger_chatbot" className="text-xs">
-                    Messenger Chatbot
+                    Messenger chatbot
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -189,7 +189,7 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
 
             {source === 'wa_chatbot' && (
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">WhatsApp Connection Target</Label>
+                <Label className="text-xs font-semibold">WhatsApp connection target</Label>
                 <Select
                   value={selectedOriginCode}
                   onValueChange={(val) => {
@@ -208,12 +208,12 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
                       >
                         <div className="flex items-center gap-2">
                           {orig.code === 'QR' ? (
-                            <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                            <QrCode className="h-3.5 w-3.5 text-success" />
                           ) : (
-                            <Cloud className="h-3.5 w-3.5 text-blue-600" />
+                            <Cloud className="h-3.5 w-3.5 text-info" />
                           )}
                           <span>{orig.title}</span>
-                          <span className="text-[10px] text-muted-foreground">({orig.code})</span>
+                          <span className="text-xs text-muted-foreground">({orig.code})</span>
                         </div>
                       </SelectItem>
                     ))}
@@ -221,11 +221,11 @@ export function CreateAutomationDialog({ isOpen, onClose }: CreateAutomationDial
                 </Select>
 
                 {selectedOrigin?.code === 'QR' && (
-                  <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 flex items-start gap-2 mt-2">
+                  <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning flex items-start gap-2 mt-2">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold">WhatsApp QR Instance Notice</p>
-                      <p className="text-[10px] opacity-90">
+                      <p className="font-semibold">WhatsApp QR instance notice</p>
+                      <p className="text-xs opacity-90">
                         Interactive buttons and lists are only supported on Meta Cloud API. This flow will use standard text messages, media, and conditions.
                       </p>
                     </div>

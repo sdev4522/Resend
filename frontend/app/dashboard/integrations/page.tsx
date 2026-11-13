@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { UpgradePrompt } from '@/components/dashboard/upgrade-prompt';
 import { DashboardPageHeader } from '@/components/dashboard/dashboard-page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -571,8 +572,8 @@ export default function IntegrationsPage() {
   return (
     <div className="space-y-8 max-w-6xl">
       <DashboardPageHeader
-        title="WhatsApp Connections & Channels"
-        description="Manage your WhatsApp accounts, link official Meta Cloud API WABA or Baileys QR instances, and view channel health."
+        title="Integrations"
+        description="Connect WhatsApp numbers by QR code or through the official Meta Cloud API."
         breadcrumbs={[{ title: 'Integrations' }]}
       />
 
@@ -581,7 +582,7 @@ export default function IntegrationsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-foreground">
-              Connected WhatsApp Accounts
+              Connected WhatsApp accounts
             </h2>
             <p className="text-xs text-muted-foreground">
               Active sessions receiving chats and processing automated campaigns.
@@ -607,13 +608,12 @@ export default function IntegrationsPage() {
         </div>
 
         {isLimitReached && (
-          <Alert className="border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200">
-            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <AlertDescription className="text-xs">
-              Your current subscription plan allows {planQrLimit} WhatsApp QR connection{planQrLimit > 1 ? 's' : ''}.
-              To connect additional QR numbers, upgrade your plan or connect an official WhatsApp Business Account via Meta Cloud API.
-            </AlertDescription>
-          </Alert>
+          <UpgradePrompt
+            tone="limit"
+            title={`You're using all ${planQrLimit} WhatsApp ${planQrLimit > 1 ? 'numbers' : 'number'} on your plan`}
+            description="Upgrade to connect more numbers, or connect an official WhatsApp Business account through Meta Cloud API."
+            ctaLabel="Upgrade"
+          />
         )}
 
         {/* Loading State */}
@@ -685,7 +685,7 @@ export default function IntegrationsPage() {
               <div className="flex items-center gap-3 mt-2">
                 <Button
                   onClick={handleStartQrConnection}
-                  className="gap-2 text-xs"
+                  className="gap-2"
                 >
                   <QrCode className="h-4 w-4" />
                   <span>Connect with QR</span>
@@ -693,7 +693,7 @@ export default function IntegrationsPage() {
                 <Button
                   onClick={handleStartMetaSignup}
                   variant="outline"
-                  className="gap-2 text-xs"
+                  className="gap-2"
                 >
                   <Cloud className="h-4 w-4" />
                   <span>Connect with Meta</span>
@@ -714,7 +714,7 @@ export default function IntegrationsPage() {
                     <div className="space-y-1">
                       <CardTitle className="text-base font-semibold truncate flex items-center gap-1.5">
                         <Building2 className="h-4 w-4 text-primary shrink-0" />
-                        <span>WhatsApp Business</span>
+                        <span>WhatsApp business</span>
                       </CardTitle>
                       <CardDescription className="text-xs">
                         Meta Cloud API · {metaConnection.login_type === 'embed' ? 'Embedded Signup' : 'Direct API'}
@@ -723,7 +723,7 @@ export default function IntegrationsPage() {
 
                     <Badge
                       variant="default"
-                      className="text-[11px] font-medium gap-1.5 px-2 py-0.5 bg-emerald-600 hover:bg-emerald-600 text-white"
+                      className="text-xs font-medium gap-1.5 px-2 py-0.5 bg-success hover:bg-success text-white"
                     >
                       <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
                       <span>● Connected</span>
@@ -741,15 +741,15 @@ export default function IntegrationsPage() {
                     <div className="truncate">
                       WABA: {metaConnection.waba_id ? `••••${metaConnection.waba_id.slice(-6)}` : 'Active'}
                     </div>
-                    <div className="truncate text-[11px]">
+                    <div className="truncate text-xs">
                       Phone ID: {metaConnection.business_phone_number_id ? `••••${metaConnection.business_phone_number_id.slice(-6)}` : 'Active'}
                     </div>
                   </div>
                 </CardContent>
 
                 <CardFooter className="p-3 px-5 border-t bg-muted/20 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ShieldCheck className="h-3.5 w-3.5 text-success" />
                     <span>Meta Cloud</span>
                   </span>
 
@@ -757,7 +757,7 @@ export default function IntegrationsPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowMetaDisconnectDialog(true)}
-                    className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 px-2.5"
+                    className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 px-2.5"
                   >
                     <Unlink className="h-3.5 w-3.5" />
                     <span>Disconnect</span>
@@ -791,9 +791,9 @@ export default function IntegrationsPage() {
 
                       <Badge
                         variant={isConnected ? 'default' : 'secondary'}
-                        className={`text-[11px] font-medium gap-1.5 px-2 py-0.5 ${
+                        className={`text-xs font-medium gap-1.5 px-2 py-0.5 ${
                           isConnected
-                            ? 'bg-emerald-600 hover:bg-emerald-600 text-white'
+                            ? 'bg-success hover:bg-success text-white'
                             : 'bg-muted text-muted-foreground'
                         }`}
                       >
@@ -822,7 +822,7 @@ export default function IntegrationsPage() {
                   </CardContent>
 
                   <CardFooter className="p-3 px-5 border-t bg-muted/20 flex items-center justify-between gap-2">
-                    <div className="text-[11px] text-muted-foreground font-mono truncate max-w-[120px]">
+                    <div className="text-xs text-muted-foreground font-mono truncate max-w-[120px]">
                       ID: {inst.uniqueId.slice(-8)}
                     </div>
 
@@ -833,7 +833,7 @@ export default function IntegrationsPage() {
                           size="sm"
                           disabled={isBusy}
                           onClick={() => handleLogout(inst.uniqueId)}
-                          className="h-8 text-xs text-muted-foreground hover:text-foreground gap-1 px-2.5"
+                          className="h-8 text-muted-foreground hover:text-foreground gap-1 px-2.5"
                         >
                           <LogOut className="h-3.5 w-3.5" />
                           <span>Logout</span>
@@ -844,7 +844,7 @@ export default function IntegrationsPage() {
                           size="sm"
                           disabled={isBusy || isCreatingQr}
                           onClick={() => handleReconnect(inst.uniqueId)}
-                          className="h-8 text-xs gap-1 px-2.5"
+                          className="h-8 gap-1 px-2.5"
                         >
                           <RefreshCw className="h-3.5 w-3.5" />
                           <span>Reconnect</span>
@@ -856,7 +856,7 @@ export default function IntegrationsPage() {
                         size="sm"
                         disabled={isBusy}
                         onClick={() => setInstanceToDelete(inst)}
-                        className="h-8 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 px-2"
+                        className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10 gap-1 px-2"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                         <span className="sr-only">Remove</span>
@@ -874,7 +874,7 @@ export default function IntegrationsPage() {
       <div className="space-y-4 pt-4 border-t">
         <div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Connection Methods
+            Connection methods
           </h2>
           <p className="text-xs text-muted-foreground">
             Select the architecture that fits your team&apos;s messaging requirements.
@@ -889,7 +889,7 @@ export default function IntegrationsPage() {
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                   <QrCode className="h-5 w-5" />
                 </div>
-                <Badge variant="outline" className="text-[11px] font-normal border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20">
+                <Badge variant="outline" className="text-xs font-normal border-success/30 text-success bg-success/10 dark:bg-success/20">
                   Ready to Connect
                 </Badge>
               </div>
@@ -903,15 +903,15 @@ export default function IntegrationsPage() {
 
             <CardContent className="p-5 pt-0 pb-4 text-xs text-muted-foreground space-y-1.5">
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Instant 30-second setup with any existing SIM</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Supports inbox chats, voice notes, media & auto-replies</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Multi-account support under your active subscription</span>
               </div>
             </CardContent>
@@ -921,7 +921,7 @@ export default function IntegrationsPage() {
                 onClick={handleStartQrConnection}
                 disabled={isLimitReached || isCreatingQr}
                 variant="outline"
-                className="w-full gap-2 text-xs"
+                className="w-full gap-2"
               >
                 {isCreatingQr ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                 <span>{isLimitReached ? 'Plan Limit Reached' : isCreatingQr ? 'Initializing...' : 'Connect with QR Code'}</span>
@@ -938,7 +938,7 @@ export default function IntegrationsPage() {
                 </div>
                 <Badge
                   variant={metaConnection ? 'default' : metaPublicConfig?.configured ? 'outline' : 'secondary'}
-                  className="text-[11px] font-normal"
+                  className="text-xs font-normal"
                 >
                   {metaConnection
                     ? 'Connected'
@@ -957,15 +957,15 @@ export default function IntegrationsPage() {
 
             <CardContent className="p-5 pt-0 pb-4 text-xs text-muted-foreground space-y-1.5">
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Unlimited tier messaging scalability via Meta CDN</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Official Meta verified green checkmark badge eligibility</span>
               </div>
               <div className="flex items-center gap-2">
-                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <Check className="h-3.5 w-3.5 text-success" />
                 <span>Direct integration with Meta template approval engine</span>
               </div>
             </CardContent>
@@ -975,16 +975,16 @@ export default function IntegrationsPage() {
                 <Button
                   disabled
                   variant="outline"
-                  className="w-full gap-2 text-xs border-emerald-500/30 text-emerald-600"
+                  className="w-full gap-2 border-success/30 text-success"
                 >
                   <Check className="h-4 w-4" />
-                  <span>WhatsApp Business Connected</span>
+                  <span>WhatsApp business connected</span>
                 </Button>
               ) : (
                 <Button
                   onClick={handleStartMetaSignup}
                   disabled={!metaPublicConfig?.configured}
-                  className="w-full gap-2 text-xs"
+                  className="w-full gap-2"
                 >
                   <Cloud className="h-4 w-4" />
                   <span>
@@ -1035,7 +1035,7 @@ export default function IntegrationsPage() {
                   onClick={handleCancelPending}
                   variant="ghost"
                   size="sm"
-                  className="mt-2 text-xs text-muted-foreground hover:text-foreground"
+                  className="mt-2 text-muted-foreground hover:text-foreground"
                 >
                   Cancel
                 </Button>
@@ -1057,8 +1057,8 @@ export default function IntegrationsPage() {
                     </div>
 
                     <div className="flex items-center justify-between w-full px-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span className="flex items-center gap-1.5 font-medium text-success">
+                        <span className="h-2 w-2 rounded-full bg-success animate-ping" />
                         <span>Waiting for scan...</span>
                       </span>
 
@@ -1086,7 +1086,7 @@ export default function IntegrationsPage() {
                         Tap <span className="font-semibold text-foreground">Menu (⋮)</span> or <span className="font-semibold text-foreground">Settings</span>
                       </li>
                       <li className="leading-snug">
-                        Select <span className="font-semibold text-foreground">Linked Devices</span>
+                        Select <span className="font-semibold text-foreground">Linked devices</span>
                       </li>
                       <li className="leading-snug">
                         Tap <span className="font-semibold text-foreground">Link a Device</span>
@@ -1096,7 +1096,7 @@ export default function IntegrationsPage() {
                       </li>
                     </ol>
 
-                    <div className="p-3 rounded-lg bg-muted/50 border text-[11px] text-muted-foreground flex items-start gap-2">
+                    <div className="p-3 rounded-lg bg-muted/50 border text-xs text-muted-foreground flex items-start gap-2">
                       <ShieldCheck className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                       <span>
                         End-to-end encrypted session. Your messages are processed directly through your private instance.
@@ -1110,9 +1110,9 @@ export default function IntegrationsPage() {
                     onClick={handleCancelPending}
                     variant="ghost"
                     size="sm"
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground"
                   >
-                    Cancel Connection
+                    Cancel connection
                   </Button>
                 </div>
               </div>
@@ -1121,7 +1121,7 @@ export default function IntegrationsPage() {
             {/* 3. CONNECTING */}
             {connectionState === 'CONNECTING' && (
               <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
-                <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+                <Loader2 className="h-10 w-10 text-success animate-spin" />
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">QR Code Scanned!</h4>
                   <p className="text-xs text-muted-foreground max-w-xs">
@@ -1134,7 +1134,7 @@ export default function IntegrationsPage() {
             {/* 4. CONNECTED */}
             {connectionState === 'CONNECTED' && (
               <div className="py-8 flex flex-col items-center justify-center gap-4 text-center">
-                <div className="h-14 w-14 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <div className="h-14 w-14 rounded-full bg-success/10 text-success flex items-center justify-center">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
@@ -1165,11 +1165,11 @@ export default function IntegrationsPage() {
             {/* 5. EXPIRED */}
             {connectionState === 'EXPIRED' && (
               <div className="py-8 flex flex-col items-center justify-center gap-4 text-center">
-                <div className="h-12 w-12 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                <div className="h-12 w-12 rounded-full bg-warning/10 text-warning flex items-center justify-center">
                   <Clock className="h-6 w-6" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-semibold text-sm">QR Code Expired</h4>
+                  <h4 className="font-semibold text-sm">QR code expired</h4>
                   <p className="text-xs text-muted-foreground max-w-xs">
                     For your security, WhatsApp QR codes expire after 60 seconds. Click below to generate a fresh QR code.
                   </p>
@@ -1182,13 +1182,13 @@ export default function IntegrationsPage() {
                     className="gap-2"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
-                    <span>Refresh QR Code</span>
+                    <span>Refresh QR code</span>
                   </Button>
                   <Button
                     onClick={handleCancelPending}
                     variant="ghost"
                     size="sm"
-                    className="text-xs"
+                    
                   >
                     Cancel
                   </Button>
@@ -1204,7 +1204,7 @@ export default function IntegrationsPage() {
                 </div>
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm text-destructive">
-                    Connection Error
+                    Connection error
                   </h4>
                   <p className="text-xs text-muted-foreground max-w-sm">
                     {qrErrorMsg || 'Unable to complete WhatsApp connection. Please try again.'}
@@ -1218,13 +1218,13 @@ export default function IntegrationsPage() {
                     className="gap-2"
                   >
                     <RefreshCw className="h-3.5 w-3.5" />
-                    <span>Try Again</span>
+                    <span>Try again</span>
                   </Button>
                   <Button
                     onClick={handleCancelPending}
                     variant="ghost"
                     size="sm"
-                    className="text-xs"
+                    
                   >
                     Cancel
                   </Button>
@@ -1266,7 +1266,7 @@ export default function IntegrationsPage() {
                     Please complete the business verification and phone number selection in the Meta popup window.
                   </p>
                 </div>
-                <div className="p-3 bg-muted/50 border rounded-lg text-[11px] text-muted-foreground flex items-center gap-2">
+                <div className="p-3 bg-muted/50 border rounded-lg text-xs text-muted-foreground flex items-center gap-2">
                   <Info className="h-4 w-4 shrink-0 text-primary" />
                   <span>If a popup window didn&apos;t appear, please allow popups in your browser address bar.</span>
                 </div>
@@ -1276,7 +1276,7 @@ export default function IntegrationsPage() {
             {/* PROCESSING */}
             {metaState === 'PROCESSING' && (
               <div className="py-8 flex flex-col items-center justify-center gap-4 text-center">
-                <Loader2 className="h-10 w-10 text-emerald-600 animate-spin" />
+                <Loader2 className="h-10 w-10 text-success animate-spin" />
                 <div className="space-y-1">
                   <h4 className="font-semibold text-sm">Finishing WhatsApp connection...</h4>
                   <p className="text-xs text-muted-foreground max-w-xs">
@@ -1289,7 +1289,7 @@ export default function IntegrationsPage() {
             {/* CONNECTED */}
             {metaState === 'CONNECTED' && (
               <div className="py-6 flex flex-col items-center justify-center gap-4 text-center">
-                <div className="h-14 w-14 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <div className="h-14 w-14 rounded-full bg-success/10 text-success flex items-center justify-center">
                   <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <div className="space-y-1">
@@ -1305,7 +1305,7 @@ export default function IntegrationsPage() {
                     setMetaDialogOpen(false);
                     setMetaState('IDLE');
                   }}
-                  className="mt-2 text-xs"
+                  className="mt-2"
                 >
                   Done
                 </Button>
@@ -1319,7 +1319,7 @@ export default function IntegrationsPage() {
                   <AlertCircle className="h-6 w-6" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-semibold text-sm">Meta Setup Cancelled</h4>
+                  <h4 className="font-semibold text-sm">Meta setup cancelled</h4>
                   <p className="text-xs text-muted-foreground max-w-xs">
                     The Meta setup popup was closed. Your WhatsApp Business account was not connected.
                   </p>
@@ -1328,10 +1328,10 @@ export default function IntegrationsPage() {
                   onClick={handleStartMetaSignup}
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-xs"
+                  className="gap-2"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Try Again</span>
+                  <span>Try again</span>
                 </Button>
               </div>
             )}
@@ -1343,7 +1343,7 @@ export default function IntegrationsPage() {
                   <AlertCircle className="h-6 w-6" />
                 </div>
                 <div className="space-y-1">
-                  <h4 className="font-semibold text-sm text-destructive">Connection Failed</h4>
+                  <h4 className="font-semibold text-sm text-destructive">Connection failed</h4>
                   <p className="text-xs text-muted-foreground max-w-xs">
                     {metaErrorMsg || 'We could not complete the WhatsApp Business connection. Please try again.'}
                   </p>
@@ -1352,10 +1352,10 @@ export default function IntegrationsPage() {
                   onClick={handleStartMetaSignup}
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-xs"
+                  className="gap-2"
                 >
                   <RefreshCw className="h-3.5 w-3.5" />
-                  <span>Try Again</span>
+                  <span>Try again</span>
                 </Button>
               </div>
             )}

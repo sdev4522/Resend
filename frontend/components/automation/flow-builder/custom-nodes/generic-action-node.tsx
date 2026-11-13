@@ -22,7 +22,7 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
           title: 'Save Response',
           subtitle: 'Store answer to variable',
           icon: Bookmark,
-          color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30',
+          color: 'text-success bg-success/10 border-success/30',
           preview: ((data?.variables as any[]) || []).map((v) => v.varName).join(', ') || 'No variables mapped',
         };
       case 'SET_CHAT_LABEL':
@@ -38,7 +38,7 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
           title: 'Contact Book',
           subtitle: `${data?.action === 'remove' ? 'Remove from' : 'Add to'} phonebook`,
           icon: BookUser,
-          color: 'text-indigo-500 bg-indigo-500/10 border-indigo-500/30',
+          color: 'text-info bg-info/10 border-info/30',
           preview: (data?.phonebook_name as string) || `Phonebook #${data?.phonebook_id || '—'}`,
         };
       case 'DISABLE_AUTOREPLY':
@@ -46,7 +46,7 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
           title: 'Disable Auto-Reply',
           subtitle: 'Mute bot for conversation',
           icon: ShieldBan,
-          color: 'text-red-500 bg-red-500/10 border-red-500/30',
+          color: 'text-destructive bg-destructive/10 border-destructive/30',
           preview: 'Hands conversation off to human agent',
         };
       case 'RESET':
@@ -62,7 +62,7 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
           title: 'WhatsApp Template',
           subtitle: 'Meta Cloud API Template',
           icon: FileCheck,
-          color: 'text-blue-500 bg-blue-500/10 border-blue-500/30',
+          color: 'text-info bg-info/10 border-info/30',
           preview: (data?.template as any)?.name || 'Approved Meta template',
         };
       case 'SEND_WA_FORM':
@@ -70,7 +70,7 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
           title: 'WhatsApp Form',
           subtitle: 'Interactive WhatsApp Flow',
           icon: FormInput,
-          color: 'text-teal-500 bg-teal-500/10 border-teal-500/30',
+          color: 'text-success bg-success/10 border-success/30',
           preview: (data?.waForm as any)?.name || data?.headerText || 'Customer intake form',
         };
       default:
@@ -106,18 +106,18 @@ export const GenericActionNode = memo(({ type, data, selected }: NodeProps) => {
             <Icon className="h-4 w-4" />
           </div>
           <div>
-            <span className="text-xs font-bold text-foreground">{action.title}</span>
-            <p className="text-[10px] text-muted-foreground">{action.subtitle}</p>
+            <span className="text-xs font-semibold text-foreground">{action.title}</span>
+            <p className="text-xs text-muted-foreground">{action.subtitle}</p>
           </div>
         </div>
 
-        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+        <Badge variant="secondary" className="text-xs px-1.5 py-0">
           Action
         </Badge>
       </div>
 
       <div className="pt-2">
-        <p className="text-[11px] text-muted-foreground truncate bg-muted/30 p-1.5 rounded border border-border/40 font-mono">
+        <p className="text-xs text-muted-foreground truncate bg-muted/30 p-1.5 rounded border border-border/40 font-mono">
           {action.preview}
         </p>
       </div>

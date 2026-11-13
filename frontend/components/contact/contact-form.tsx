@@ -153,7 +153,7 @@ export function ContactForm() {
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 text-primary">
           <CheckCircle2 className="h-7 w-7" />
         </div>
-        <h3 className="text-xl font-bold tracking-tight text-foreground">
+        <h3 className="text-xl font-semibold tracking-tight text-foreground">
           Thanks — your message has been received.
         </h3>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-md mx-auto">
@@ -177,7 +177,7 @@ export function ContactForm() {
               generateCaptcha();
             }}
           >
-            Send Another Inquiry
+            Send another inquiry
           </Button>
           <Button size="sm" render={<Link href="/dashboard" />}>
             Go to Workspace
@@ -190,7 +190,7 @@ export function ContactForm() {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {serverError && (
-        <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm ${isRateLimited ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-destructive/30 bg-destructive/10 text-destructive'}`}>
+        <div className={`flex items-center gap-3 p-4 rounded-xl border text-sm ${isRateLimited ? 'border-warning/30 bg-warning/10 text-warning' : 'border-destructive/30 bg-destructive/10 text-destructive'}`}>
           <AlertCircle className="h-5 w-5 shrink-0" />
           <span>{serverError}</span>
         </div>
@@ -200,7 +200,7 @@ export function ContactForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="contact-name" className="text-xs font-medium">
-            Full Name <span className="text-destructive">*</span>
+            Full name <span className="text-destructive">*</span>
           </Label>
           <Input
             id="contact-name"
@@ -214,13 +214,13 @@ export function ContactForm() {
             className={fieldErrors.name ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
           {fieldErrors.name && (
-            <p className="text-[11px] text-destructive mt-1">{fieldErrors.name}</p>
+            <p className="text-xs text-destructive mt-1">{fieldErrors.name}</p>
           )}
         </div>
 
         <div className="space-y-1.5">
           <Label htmlFor="contact-email" className="text-xs font-medium">
-            Work Email <span className="text-destructive">*</span>
+            Work email <span className="text-destructive">*</span>
           </Label>
           <Input
             id="contact-email"
@@ -235,7 +235,7 @@ export function ContactForm() {
             className={fieldErrors.email ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
           {fieldErrors.email && (
-            <p className="text-[11px] text-destructive mt-1">{fieldErrors.email}</p>
+            <p className="text-xs text-destructive mt-1">{fieldErrors.email}</p>
           )}
         </div>
       </div>
@@ -244,7 +244,7 @@ export function ContactForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="contact-company" className="text-xs font-medium">
-            Company / Workspace <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+            Company / Workspace <span className="text-muted-foreground text-xs font-normal">(Optional)</span>
           </Label>
           <Input
             id="contact-company"
@@ -257,7 +257,7 @@ export function ContactForm() {
 
         <div className="space-y-1.5">
           <Label htmlFor="contact-mobile" className="text-xs font-medium">
-            WhatsApp / Phone <span className="text-muted-foreground text-[10px] font-normal">(Optional)</span>
+            WhatsApp / Phone <span className="text-muted-foreground text-xs font-normal">(Optional)</span>
           </Label>
           <Input
             id="contact-mobile"
@@ -274,7 +274,7 @@ export function ContactForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-1.5">
           <Label htmlFor="contact-reason" className="text-xs font-medium">
-            Inquiry Category <span className="text-destructive">*</span>
+            Inquiry category <span className="text-destructive">*</span>
           </Label>
           <Select
             value={formData.reason}
@@ -312,7 +312,7 @@ export function ContactForm() {
             className={fieldErrors.subject ? 'border-destructive focus-visible:ring-destructive' : ''}
           />
           {fieldErrors.subject && (
-            <p className="text-[11px] text-destructive mt-1">{fieldErrors.subject}</p>
+            <p className="text-xs text-destructive mt-1">{fieldErrors.subject}</p>
           )}
         </div>
       </div>
@@ -320,7 +320,7 @@ export function ContactForm() {
       {/* Message Body */}
       <div className="space-y-1.5">
         <Label htmlFor="contact-content" className="text-xs font-medium">
-          Detailed Message <span className="text-destructive">*</span>
+          Detailed message <span className="text-destructive">*</span>
         </Label>
         <Textarea
           id="contact-content"
@@ -335,7 +335,7 @@ export function ContactForm() {
           className={`resize-none ${fieldErrors.content ? 'border-destructive focus-visible:ring-destructive' : ''}`}
         />
         {fieldErrors.content && (
-          <p className="text-[11px] text-destructive mt-1">{fieldErrors.content}</p>
+          <p className="text-xs text-destructive mt-1">{fieldErrors.content}</p>
         )}
       </div>
 
@@ -348,7 +348,7 @@ export function ContactForm() {
           <button
             type="button"
             onClick={generateCaptcha}
-            className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer transition-colors"
+            className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 cursor-pointer transition-colors"
           >
             <RefreshCw className="h-3 w-3" /> New challenge
           </button>
@@ -366,7 +366,7 @@ export function ContactForm() {
           className={`h-9 w-44 ${fieldErrors.captcha ? 'border-destructive' : ''}`}
         />
         {fieldErrors.captcha && (
-          <p className="text-[11px] text-destructive mt-1">{fieldErrors.captcha}</p>
+          <p className="text-xs text-destructive mt-1">{fieldErrors.captcha}</p>
         )}
       </div>
 
@@ -374,7 +374,7 @@ export function ContactForm() {
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-xl h-11 text-sm font-semibold gap-2 shadow-xs cursor-pointer"
+        className="w-full rounded-xl h-11 text-sm gap-2 cursor-pointer"
       >
         {isSubmitting ? (
           <>
@@ -384,12 +384,12 @@ export function ContactForm() {
         ) : (
           <>
             <Send className="h-4 w-4" />
-            Send Message
+            Send message
           </>
         )}
       </Button>
 
-      <p className="text-[11px] text-center text-muted-foreground">
+      <p className="text-xs text-center text-muted-foreground">
         Protected by rate limiting &amp; challenge verification. We respect your privacy.
       </p>
     </form>

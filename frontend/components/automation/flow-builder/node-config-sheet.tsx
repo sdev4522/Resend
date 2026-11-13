@@ -131,11 +131,11 @@ export function NodeConfigSheet({
         <SheetHeader className="p-4 border-b border-border/80 sticky top-0 bg-card z-10">
           <div className="flex items-center justify-between">
             <div>
-              <SheetTitle className="text-base font-bold flex items-center gap-2">
+              <SheetTitle className="text-base font-semibold flex items-center gap-2">
                 <span>{node.type.replace('_', ' ')}</span>
               </SheetTitle>
               <SheetDescription className="text-xs text-muted-foreground">
-                Node ID: <code className="font-mono text-[10px]">{node.id}</code>
+                Node ID: <code className="font-mono text-xs">{node.id}</code>
               </SheetDescription>
             </div>
 
@@ -174,8 +174,8 @@ export function NodeConfigSheet({
             <div className="p-3 rounded-lg border border-border/70 bg-muted/20 space-y-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label className="text-xs font-semibold">Execution Transition</Label>
-                  <p className="text-[10px] text-muted-foreground">
+                  <Label className="text-xs font-semibold">Execution transition</Label>
+                  <p className="text-xs text-muted-foreground">
                     Does flow wait for customer reply or continue immediately?
                   </p>
                 </div>
@@ -202,15 +202,15 @@ export function NodeConfigSheet({
           {/* INITIAL NODE */}
           {node.type === 'INITIAL' && (
             <div className="space-y-3">
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-foreground/80 space-y-1">
-                <p className="font-semibold text-emerald-600 dark:text-emerald-400">Trigger Node</p>
-                <p className="text-[11px] text-muted-foreground">
+              <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-xs text-foreground/80 space-y-1">
+                <p className="font-semibold text-success">Trigger node</p>
+                <p className="text-xs text-muted-foreground">
                   This is the entry point of your automation. When an incoming message arrives on the connected channel, execution begins from here.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Trigger Label</Label>
+                <Label className="text-xs">Trigger label</Label>
                 <Input
                   className="text-xs"
                   value={data.sourceTitle || 'Customer sends WhatsApp message'}
@@ -227,13 +227,13 @@ export function NodeConfigSheet({
               {data.type?.type === 'text' && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-semibold">Message Text</Label>
+                    <Label className="text-xs font-semibold">Message text</Label>
                     <div className="flex items-center gap-1">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-6 text-[10px] px-1.5"
+                        className="h-6 px-1.5"
                         onClick={() => {
                           const current = data.content?.text?.body || '';
                           updateNestedField('content', 'text', {
@@ -248,7 +248,7 @@ export function NodeConfigSheet({
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-6 text-[10px] px-1.5"
+                        className="h-6 px-1.5"
                         onClick={() => {
                           const current = data.content?.text?.body || '';
                           updateNestedField('content', 'text', {
@@ -330,7 +330,7 @@ export function NodeConfigSheet({
 
                   {data.type?.type === 'document' && (
                     <div className="space-y-1.5">
-                      <Label className="text-xs font-semibold">File Name</Label>
+                      <Label className="text-xs font-semibold">File name</Label>
                       <Input
                         className="text-xs"
                         placeholder="Document.pdf"
@@ -351,13 +351,13 @@ export function NodeConfigSheet({
               {data.type?.type === 'button' && (
                 <div className="space-y-3">
                   {isQrConnection && (
-                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs">
+                    <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs">
                       ⚠️ Interactive buttons are not supported on WhatsApp QR connections. They require Meta Cloud API.
                     </div>
                   )}
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Message Body</Label>
+                    <Label className="text-xs font-semibold">Message body</Label>
                     <Textarea
                       rows={3}
                       className="text-xs"
@@ -383,7 +383,7 @@ export function NodeConfigSheet({
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="h-6 text-[10px]"
+                          className="h-6"
                           onClick={() => {
                             const prev = data.content?.interactive?.action?.buttons || [];
                             const newBtn = {
@@ -402,7 +402,7 @@ export function NodeConfigSheet({
                             });
                           }}
                         >
-                          <Plus className="h-3 w-3 mr-1" /> Add Button
+                          <Plus className="h-3 w-3 mr-1" /> Add button
                         </Button>
                       )}
                     </div>
@@ -462,7 +462,7 @@ export function NodeConfigSheet({
               {data.type?.type === 'list' && (
                 <div className="space-y-3">
                   {isQrConnection && (
-                    <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs">
+                    <div className="p-2.5 rounded-lg bg-warning/10 border border-warning/30 text-warning text-xs">
                       ⚠️ List menus are not supported on WhatsApp QR connections. They require Meta Cloud API.
                     </div>
                   )}
@@ -485,7 +485,7 @@ export function NodeConfigSheet({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Body Text</Label>
+                    <Label className="text-xs font-semibold">Body text</Label>
                     <Textarea
                       rows={2}
                       className="text-xs"
@@ -503,7 +503,7 @@ export function NodeConfigSheet({
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-semibold">Menu Button Title</Label>
+                    <Label className="text-xs font-semibold">Menu button title</Label>
                     <Input
                       className="text-xs"
                       placeholder="View Options"
@@ -530,15 +530,15 @@ export function NodeConfigSheet({
           {node.type === 'CONDITION' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Condition Rules</Label>
+                <Label className="text-xs font-semibold">Condition rules</Label>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 text-xs"
+                  className="h-7"
                   onClick={handleAddCondition}
                 >
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Rule
+                  <Plus className="h-3.5 w-3.5 mr-1" /> Add rule
                 </Button>
               </div>
 
@@ -574,8 +574,8 @@ export function NodeConfigSheet({
                         <SelectContent>
                           <SelectItem value="text_contains" className="text-xs">Contains</SelectItem>
                           <SelectItem value="text_exact" className="text-xs">Equals</SelectItem>
-                          <SelectItem value="text_starts_with" className="text-xs">Starts With</SelectItem>
-                          <SelectItem value="text_ends_with" className="text-xs">Ends With</SelectItem>
+                          <SelectItem value="text_starts_with" className="text-xs">Starts with</SelectItem>
+                          <SelectItem value="text_ends_with" className="text-xs">Ends with</SelectItem>
                           <SelectItem value="number_equals" className="text-xs">Number =</SelectItem>
                           <SelectItem value="number_greater" className="text-xs">Number &gt;</SelectItem>
                           <SelectItem value="number_less" className="text-xs">Number &lt;</SelectItem>
@@ -617,7 +617,7 @@ export function NodeConfigSheet({
                     type="button"
                     variant={data.seconds === s ? 'default' : 'outline'}
                     size="sm"
-                    className="h-6 text-[10px] px-2"
+                    className="h-6 px-2"
                     onClick={() => updateField('seconds', s)}
                   >
                     {s < 60 ? `${s}s` : `${s / 60}m`}
@@ -631,7 +631,7 @@ export function NodeConfigSheet({
           {node.type === 'MAKE_REQUEST' && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">HTTP Method</Label>
+                <Label className="text-xs font-semibold">HTTP method</Label>
                 <Select
                   value={data.method || 'POST'}
                   onValueChange={(val) => updateField('method', val)}
@@ -657,7 +657,7 @@ export function NodeConfigSheet({
                   value={data.url || ''}
                   onChange={(e) => updateField('url', e.target.value)}
                 />
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Supports variable substitution like <code>&#123;&#123;&#123;senderMobile&#125;&#125;&#125;</code>
                 </p>
               </div>
@@ -697,7 +697,7 @@ export function NodeConfigSheet({
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Message Memory Depth</Label>
+                <Label className="text-xs font-semibold">Message memory depth</Label>
                 <Input
                   type="number"
                   min={1}
@@ -708,7 +708,7 @@ export function NodeConfigSheet({
                     updateField('messageReferenceCount', parseInt(e.target.value, 10) || 10)
                   }
                 />
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Number of past conversation messages sent to AI for context
                 </p>
               </div>
@@ -719,14 +719,14 @@ export function NodeConfigSheet({
           {node.type === 'RESPONSE_SAVER' && (
             <div className="space-y-3">
               <div className="p-3 rounded-lg bg-muted/30 border border-border/60 text-xs space-y-1">
-                <p className="font-semibold text-foreground">Capture User Reply</p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="font-semibold text-foreground">Capture user reply</p>
+                <p className="text-xs text-muted-foreground">
                   Stores customer&apos;s answer into variable so later nodes can reference it using <code>&#123;&#123;varName&#125;&#125;</code>.
                 </p>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Variable Name</Label>
+                <Label className="text-xs font-semibold">Variable name</Label>
                 <Input
                   className="text-xs font-mono"
                   placeholder="e.g. userEmail, leadBudget"
@@ -748,7 +748,7 @@ export function NodeConfigSheet({
           {node.type === 'SET_CHAT_LABEL' && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tag Name</Label>
+                <Label className="text-xs font-semibold">Tag name</Label>
                 <Input
                   className="text-xs"
                   placeholder="e.g. VIP Lead, Qualified"
@@ -802,8 +802,8 @@ export function NodeConfigSheet({
 
         {/* Footer */}
         <SheetFooter className="p-4 border-t border-border/80 sticky bottom-0 bg-card">
-          <Button className="w-full text-xs" onClick={onClose}>
-            Done Configuring
+          <Button className="w-full" onClick={onClose}>
+            Done configuring
           </Button>
         </SheetFooter>
       </SheetContent>

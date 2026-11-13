@@ -156,7 +156,7 @@ export function MessageList() {
           <React.Fragment key={msg.metaChatId || msg.id || idx}>
             {showDateSeparator && (
               <div className="flex justify-center my-3">
-                <span className="px-2.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground text-[10px] font-mono shadow-2xs">
+                <span className="px-2.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground text-xs font-mono shadow-2xs">
                   {currentDateStr}
                 </span>
               </div>
@@ -187,15 +187,15 @@ export function MessageList() {
                         if (isFailed) {
                           return (
                             <div className="p-3 rounded-lg bg-black/10 dark:bg-white/10 text-center space-y-1">
-                              <div className="flex items-center justify-center gap-1.5 text-[11px] font-medium">
+                              <div className="flex items-center justify-center gap-1.5 text-xs font-medium">
                                 <FileText className="h-4 w-4" />
-                                <span>Image Attachment</span>
+                                <span>Image attachment</span>
                               </div>
                               <a
                                 href={resolvedUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-[10px] underline hover:opacity-80"
+                                className="inline-flex items-center gap-1 text-xs underline hover:opacity-80"
                               >
                                 <Download className="h-3 w-3" /> View or download
                               </a>
@@ -223,7 +223,7 @@ export function MessageList() {
                         );
                       })()
                     ) : (
-                      <div className="p-4 rounded-lg bg-muted text-center text-[11px] text-muted-foreground">
+                      <div className="p-4 rounded-lg bg-muted text-center text-xs text-muted-foreground">
                         📷 Image file
                       </div>
                     )}
@@ -245,7 +245,7 @@ export function MessageList() {
                         className="max-h-60 rounded-lg w-full bg-black/20"
                       />
                     ) : (
-                      <div className="p-4 rounded-lg bg-muted text-center text-[11px] text-muted-foreground">
+                      <div className="p-4 rounded-lg bg-muted text-center text-xs text-muted-foreground">
                         🎥 Video file
                       </div>
                     )}
@@ -261,7 +261,7 @@ export function MessageList() {
                     {ctx?.audio?.link ? (
                       <audio controls preload="metadata" src={resolveMediaUrl(ctx.audio.link)} className="max-w-[240px] h-8" />
                     ) : (
-                      <p className="text-[11px] italic">🎵 Voice note</p>
+                      <p className="text-xs italic">🎵 Voice note</p>
                     )}
                   </div>
                 )}
@@ -272,7 +272,7 @@ export function MessageList() {
                     <div className="flex items-center gap-2 p-2 rounded-lg bg-black/10 dark:bg-white/10">
                       <FileText className="h-5 w-5 shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-semibold truncate text-[11px]">
+                        <p className="font-semibold truncate text-xs">
                           {ctx?.document?.filename || "Document"}
                         </p>
                       </div>
@@ -305,7 +305,7 @@ export function MessageList() {
 
                 {/* Timestamp & Status Footer */}
                 <div
-                  className={`flex items-center justify-end gap-1 mt-1 text-[9px] font-mono ${
+                  className={`flex items-center justify-end gap-1 mt-1 text-xs font-mono ${
                     isOutgoing ? "text-primary-foreground/75" : "text-muted-foreground"
                   }`}
                 >
@@ -314,7 +314,7 @@ export function MessageList() {
                   {isOutgoing && (
                     <>
                       {msg.isFailed ? (
-                        <span className="text-red-300 flex items-center gap-0.5 font-bold" title="Failed to send">
+                        <span className="text-destructive flex items-center gap-0.5 font-semibold" title="Failed to send">
                           <AlertCircle className="h-3 w-3" />
                           <button
                             onClick={() => sendTextMessage(ctx?.text?.body || "")}
@@ -326,7 +326,7 @@ export function MessageList() {
                       ) : msg.isOptimistic || msg.status === "sending" ? (
                         <span title="Sending..."><Clock className="h-2.5 w-2.5 animate-spin" /></span>
                       ) : msg.status === "read" ? (
-                        <span title="Read"><CheckCheck className="h-3 w-3 text-sky-300" /></span>
+                        <span title="Read"><CheckCheck className="h-3 w-3 text-info" /></span>
                       ) : msg.status === "delivered" ? (
                         <span title="Delivered"><CheckCheck className="h-3 w-3" /></span>
                       ) : (
@@ -350,7 +350,7 @@ export function MessageList() {
           className="fixed bottom-24 right-8 z-10 p-2 rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all flex items-center gap-1 text-xs"
         >
           <ArrowDown className="h-4 w-4" />
-          <span className="text-[10px] font-bold pr-1">Latest</span>
+          <span className="text-xs font-semibold pr-1">Latest</span>
         </button>
       )}
     </div>

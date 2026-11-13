@@ -28,18 +28,18 @@ export const AiNode = memo(({ data, selected }: NodeProps) => {
             <Bot className="h-4 w-4" />
           </div>
           <div>
-            <span className="text-xs font-bold text-foreground">AI Response</span>
-            <p className="text-[10px] text-muted-foreground">Conversational AI Agent</p>
+            <span className="text-xs font-semibold text-foreground">AI response</span>
+            <p className="text-xs text-muted-foreground">Conversational AI agent</p>
           </div>
         </div>
 
-        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-mono">
+        <Badge variant="secondary" className="text-xs px-1.5 py-0 font-mono">
           {model}
         </Badge>
       </div>
 
       <div className="pt-2">
-        <p className="text-[11px] text-foreground/80 line-clamp-2 leading-relaxed bg-muted/30 p-1.5 rounded border border-border/40 font-sans">
+        <p className="text-xs text-foreground/80 line-clamp-2 leading-relaxed bg-muted/30 p-1.5 rounded border border-border/40 font-sans">
           {instruction}
         </p>
       </div>

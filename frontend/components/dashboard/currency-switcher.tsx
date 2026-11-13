@@ -27,7 +27,7 @@ export function CurrencySwitcher() {
           <Button
             variant="outline"
             size="sm"
-            className="h-8 gap-1.5 px-2.5 text-xs font-mono font-bold rounded-full border-muted-foreground/20 hover:border-primary/50 transition-colors shadow-2xs"
+            className="h-8 gap-1.5 px-2.5 font-mono rounded-full border-muted-foreground/20 hover:border-primary/50 transition-colors"
           />
         }
       >
@@ -39,8 +39,8 @@ export function CurrencySwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl shadow-lg border">
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
-            Select Currency
+          <DropdownMenuLabel className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground px-2 py-1">
+            Select currency
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
         </DropdownMenuGroup>
@@ -53,9 +53,9 @@ export function CurrencySwitcher() {
               className="flex items-center justify-between py-1.5 px-2 text-xs cursor-pointer rounded-lg font-mono"
             >
               <div className="flex items-center gap-2">
-                <span className="font-bold text-foreground w-4 text-center">{c.symbol}</span>
+                <span className="font-semibold text-foreground w-4 text-center">{c.symbol}</span>
                 <span className="font-semibold">{c.code}</span>
-                <span className="text-[10px] text-muted-foreground font-sans truncate max-w-[80px]">
+                <span className="text-xs text-muted-foreground font-sans truncate max-w-[80px]">
                   ({c.name || c.code})
                 </span>
               </div>

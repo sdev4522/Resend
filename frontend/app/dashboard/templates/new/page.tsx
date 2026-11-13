@@ -438,8 +438,8 @@ export default function NewTemplatePage() {
           <span className="sr-only">Back to Templates</span>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Create WhatsApp Template
+          <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
+            Create WhatsApp template
           </h1>
           <p className="text-sm text-muted-foreground">
             Configure message structure and submit directly to Meta Cloud API for review.
@@ -467,7 +467,7 @@ export default function NewTemplatePage() {
           }`}
         >
           <FileEdit className="h-3.5 w-3.5" />
-          <span>Configure Template</span>
+          <span>Configure template</span>
         </button>
         <button
           type="button"
@@ -479,7 +479,7 @@ export default function NewTemplatePage() {
           }`}
         >
           <Eye className="h-3.5 w-3.5" />
-          <span>Live WhatsApp Preview</span>
+          <span>Live WhatsApp preview</span>
         </button>
       </div>
 
@@ -507,7 +507,7 @@ export default function NewTemplatePage() {
                   className="font-mono text-sm h-9"
                   required
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Lowercase letters, numbers, and underscores only. Cannot be changed once approved by Meta.
                 </p>
               </div>
@@ -564,7 +564,7 @@ export default function NewTemplatePage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="header-type" className="text-xs font-medium">
-                  Header Type
+                  Header type
                 </Label>
                 <Select
                   value={headerType}
@@ -580,7 +580,7 @@ export default function NewTemplatePage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="NONE">None (Body only)</SelectItem>
-                    <SelectItem value="TEXT">Text Headline</SelectItem>
+                    <SelectItem value="TEXT">Text headline</SelectItem>
                     <SelectItem value="IMAGE">Image</SelectItem>
                     <SelectItem value="VIDEO">Video</SelectItem>
                     <SelectItem value="DOCUMENT">Document (PDF)</SelectItem>
@@ -602,7 +602,7 @@ export default function NewTemplatePage() {
                     className="h-9 text-sm"
                     required
                   />
-                  <div className="text-right text-[11px] text-muted-foreground">
+                  <div className="text-right text-xs text-muted-foreground">
                     {headerText.length} / 60 characters
                   </div>
                 </div>
@@ -612,8 +612,8 @@ export default function NewTemplatePage() {
                 <div className="space-y-2 border rounded-lg p-4 bg-muted/20">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="text-xs font-semibold">Meta Media Upload</h4>
-                      <p className="text-[11px] text-muted-foreground">
+                      <h4 className="text-xs font-semibold">Meta media upload</h4>
+                      <p className="text-xs text-muted-foreground">
                         Upload sample {headerType.toLowerCase()} asset for Meta review verification.
                       </p>
                     </div>
@@ -624,7 +624,7 @@ export default function NewTemplatePage() {
                     <label className="cursor-pointer">
                       <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border bg-background text-xs font-medium hover:bg-muted transition-colors">
                         <Upload className="h-3.5 w-3.5" />
-                        <span>Select File</span>
+                        <span>Select file</span>
                       </div>
                       <input
                         type="file"
@@ -642,7 +642,7 @@ export default function NewTemplatePage() {
                     </label>
 
                     {headerMediaHandle && (
-                      <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                      <span className="text-xs text-success font-medium">
                         ✓ Asset uploaded to Meta
                       </span>
                     )}
@@ -668,7 +668,7 @@ export default function NewTemplatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleInsertFormatting('*', '*')}
-                  className="h-7 px-2 gap-1 text-xs"
+                  className="h-7 px-2 gap-1"
                   title="Bold (*text*)"
                 >
                   <Bold className="h-3.5 w-3.5" /> Bold
@@ -678,7 +678,7 @@ export default function NewTemplatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleInsertFormatting('_', '_')}
-                  className="h-7 px-2 gap-1 text-xs"
+                  className="h-7 px-2 gap-1"
                   title="Italic (_text_)"
                 >
                   <Italic className="h-3.5 w-3.5" /> Italic
@@ -688,7 +688,7 @@ export default function NewTemplatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleInsertFormatting('~', '~')}
-                  className="h-7 px-2 gap-1 text-xs"
+                  className="h-7 px-2 gap-1"
                   title="Strikethrough (~text~)"
                 >
                   <Strikethrough className="h-3.5 w-3.5" /> Strike
@@ -698,7 +698,7 @@ export default function NewTemplatePage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleInsertFormatting('`', '`')}
-                  className="h-7 px-2 gap-1 text-xs"
+                  className="h-7 px-2 gap-1"
                   title="Monospace (`code`)"
                 >
                   <Code className="h-3.5 w-3.5" /> Mono
@@ -709,7 +709,7 @@ export default function NewTemplatePage() {
                   variant="secondary"
                   size="sm"
                   onClick={handleInsertVariable}
-                  className="h-7 px-2 gap-1 text-xs font-mono font-medium"
+                  className="h-7 px-2 gap-1 font-mono font-medium"
                 >
                   <Plus className="h-3 w-3" /> Add {`{{${detectedVarIndices.length + 1}}}`}
                 </Button>
@@ -725,7 +725,7 @@ export default function NewTemplatePage() {
                   className="text-sm font-sans leading-relaxed"
                   required
                 />
-                <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Formatting: *bold*, _italic_, ~strike~, `mono`</span>
                   <span>{bodyText.length} / 1024 characters</span>
                 </div>
@@ -780,7 +780,7 @@ export default function NewTemplatePage() {
                   maxLength={60}
                   className="h-9 text-sm"
                 />
-                <div className="text-right text-[11px] text-muted-foreground">
+                <div className="text-right text-xs text-muted-foreground">
                   {footerText.length} / 60 characters
                 </div>
               </div>
@@ -798,7 +798,7 @@ export default function NewTemplatePage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="button-type" className="text-xs font-medium">
-                  Button Category
+                  Button category
                 </Label>
                 <Select
                   value={buttonType}
@@ -827,7 +827,7 @@ export default function NewTemplatePage() {
                           <span className="text-xs font-semibold text-foreground">
                             Button {i + 1}
                           </span>
-                          <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
+                          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
                             {btn.type === 'QUICK_REPLY' && <MessageSquare className="h-3 w-3" />}
                             {btn.type === 'URL' && <ExternalLink className="h-3 w-3" />}
                             {btn.type === 'PHONE_NUMBER' && <Phone className="h-3 w-3" />}
@@ -875,7 +875,7 @@ export default function NewTemplatePage() {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <Label className="text-xs">Button Label *</Label>
-                          <span className="text-[11px] text-muted-foreground">{btn.text.length} / 25</span>
+                          <span className="text-xs text-muted-foreground">{btn.text.length} / 25</span>
                         </div>
                         <Input
                           placeholder={
@@ -928,7 +928,7 @@ export default function NewTemplatePage() {
                       variant="outline"
                       size="sm"
                       onClick={handleAddQuickReply}
-                      className="w-full gap-1.5 text-xs"
+                      className="w-full gap-1.5"
                     >
                       <Plus className="h-3.5 w-3.5" /> Add Quick Reply Button ({buttons.length}/3)
                     </Button>
@@ -941,9 +941,9 @@ export default function NewTemplatePage() {
                         variant="outline"
                         size="sm"
                         onClick={handleAddUrlButton}
-                        className="flex-1 gap-1.5 text-xs"
+                        className="flex-1 gap-1.5"
                       >
-                        <Plus className="h-3.5 w-3.5" /> Add Website Link
+                        <Plus className="h-3.5 w-3.5" /> Add website link
                       </Button>
                       {!hasPhoneButton && (
                         <Button
@@ -951,9 +951,9 @@ export default function NewTemplatePage() {
                           variant="outline"
                           size="sm"
                           onClick={handleAddPhoneButton}
-                          className="flex-1 gap-1.5 text-xs"
+                          className="flex-1 gap-1.5"
                         >
-                          <Plus className="h-3.5 w-3.5" /> Add Phone Call
+                          <Plus className="h-3.5 w-3.5" /> Add phone call
                         </Button>
                       )}
                     </div>
@@ -987,7 +987,7 @@ export default function NewTemplatePage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-semibold">Live Simulation</CardTitle>
+                  <CardTitle className="text-base font-semibold">Live simulation</CardTitle>
                   <CardDescription className="text-xs">
                     Real-time WhatsApp rendering preview with dynamic variable substitution.
                   </CardDescription>
@@ -998,7 +998,7 @@ export default function NewTemplatePage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setMobileTab('editor')}
-                  className="lg:hidden text-xs gap-1 h-7"
+                  className="lg:hidden gap-1 h-7"
                 >
                   <FileEdit className="h-3 w-3" />
                   <span>Edit</span>

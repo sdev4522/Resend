@@ -97,8 +97,8 @@ export default function UserAnalyticsPage() {
       {/* Top Header & Filters Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <DashboardPageHeader
-          title="Workspace Analytics"
-          description="Real-time operational messaging metrics, instance throughput, and campaign deliverability."
+          title="Analytics"
+          description="Message volume, delivery rates and campaign performance."
           breadcrumbs={[{ title: 'Analytics' }]}
         />
 
@@ -112,7 +112,7 @@ export default function UserAnalyticsPage() {
               className="bg-transparent border-none text-xs font-medium text-foreground focus:outline-none cursor-pointer pr-1"
               aria-label="Filter by WhatsApp connection"
             >
-              <option value="all">All Connections</option>
+              <option value="all">All connections</option>
               {data?.availableInstances
                 ?.filter((inst) => inst.id !== 'all')
                 .map((inst) => (
@@ -161,7 +161,7 @@ export default function UserAnalyticsPage() {
             size="sm"
             onClick={() => fetchAnalytics()}
             disabled={loading}
-            className="h-8 gap-1.5 text-xs shadow-2xs"
+            className="h-8 gap-1.5"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
@@ -194,8 +194,8 @@ export default function UserAnalyticsPage() {
                 required
               />
             </div>
-            <Button type="submit" size="sm" className="h-8 text-xs px-3">
-              Apply Window
+            <Button type="submit" size="sm" className="h-8 px-3">
+              Apply window
             </Button>
           </form>
         </Card>
@@ -205,14 +205,14 @@ export default function UserAnalyticsPage() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertTitle>Error Loading Analytics</AlertTitle>
+          <AlertTitle>Error loading analytics</AlertTitle>
           <AlertDescription className="mt-1 flex items-center justify-between">
             <span>{error}</span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => fetchAnalytics()}
-              className="h-7 text-xs ml-4"
+              className="h-7 ml-4"
             >
               Retry
             </Button>
@@ -225,22 +225,22 @@ export default function UserAnalyticsPage() {
         {/* Messages Outbound */}
         <Card className="shadow-2xs border">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <span className="text-xs font-semibold text-muted-foreground">Messages Sent</span>
-            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600">
+            <span className="text-xs font-semibold text-muted-foreground">Messages sent</span>
+            <div className="h-8 w-8 rounded-lg bg-info/10 flex items-center justify-center text-info">
               <ArrowUpRight className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-1 space-y-2">
-            <div className="text-2xl font-bold font-mono tracking-tight">
+            <div className="text-2xl font-semibold font-mono tracking-tight">
               {loading ? <Skeleton className="h-8 w-24" /> : data?.messages.outgoing.toLocaleString()}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1 text-emerald-600 font-medium">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1 text-success font-medium">
                 <CheckCheck className="h-3 w-3" />
                 <span>{data?.messages.delivered.toLocaleString() || 0} deliv</span>
               </span>
               <span>•</span>
-              <span className="flex items-center gap-1 text-blue-600 font-medium">
+              <span className="flex items-center gap-1 text-info font-medium">
                 <span>{data?.messages.read.toLocaleString() || 0} read</span>
               </span>
             </div>
@@ -250,23 +250,23 @@ export default function UserAnalyticsPage() {
         {/* Messages Inbound */}
         <Card className="shadow-2xs border">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <span className="text-xs font-semibold text-muted-foreground">Messages Received</span>
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+            <span className="text-xs font-semibold text-muted-foreground">Messages received</span>
+            <div className="h-8 w-8 rounded-lg bg-success/10 flex items-center justify-center text-success">
               <ArrowDownLeft className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-1 space-y-2">
-            <div className="text-2xl font-bold font-mono tracking-tight">
+            <div className="text-2xl font-semibold font-mono tracking-tight">
               {loading ? <Skeleton className="h-8 w-24" /> : data?.messages.incoming.toLocaleString()}
             </div>
-            <div className="flex items-center gap-2 text-[11px]">
+            <div className="flex items-center gap-2 text-xs">
               {Boolean(data?.messages.failed) ? (
                 <span className="flex items-center gap-1 text-destructive font-medium">
                   <XCircle className="h-3 w-3" />
                   <span>{data?.messages.failed} failed</span>
                 </span>
               ) : (
-                <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                <span className="flex items-center gap-1 text-success font-medium">
                   <CheckCircle2 className="h-3 w-3" />
                   <span>0 failures</span>
                 </span>
@@ -278,16 +278,16 @@ export default function UserAnalyticsPage() {
         {/* Total Audience / Contacts */}
         <Card className="shadow-2xs border">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
-            <span className="text-xs font-semibold text-muted-foreground">Workspace Audience</span>
+            <span className="text-xs font-semibold text-muted-foreground">Workspace audience</span>
             <div className="h-8 w-8 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-600">
               <Users className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-1 space-y-2">
-            <div className="text-2xl font-bold font-mono tracking-tight">
+            <div className="text-2xl font-semibold font-mono tracking-tight">
               {loading ? <Skeleton className="h-8 w-24" /> : data?.contacts.total.toLocaleString()}
             </div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-xs text-muted-foreground">
               <span className="font-semibold text-foreground">
                 +{data?.contacts.newInPeriod.toLocaleString() || 0}
               </span>{' '}
@@ -300,18 +300,18 @@ export default function UserAnalyticsPage() {
         <Card className="shadow-2xs border">
           <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between space-y-0">
             <span className="text-xs font-semibold text-muted-foreground">Conversations</span>
-            <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
+            <div className="h-8 w-8 rounded-lg bg-warning/10 flex items-center justify-center text-warning">
               <MessageSquare className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent className="p-4 pt-1 space-y-2">
-            <div className="text-2xl font-bold font-mono tracking-tight">
+            <div className="text-2xl font-semibold font-mono tracking-tight">
               {loading ? <Skeleton className="h-8 w-24" /> : data?.conversations.total.toLocaleString()}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <span>{data?.conversations.activeInPeriod || 0} active in period</span>
               {Boolean(data?.conversations.totalUnread) && (
-                <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-500/20 bg-amber-500/10 px-1 py-0">
+                <Badge variant="outline" className="text-xs text-warning border-warning/20 bg-warning/10 px-1 py-0">
                   {data?.conversations.totalUnread} unread
                 </Badge>
               )}
@@ -329,7 +329,7 @@ export default function UserAnalyticsPage() {
               <div>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <TrendingUp className="h-4 w-4 text-primary" />
-                  <span>Message Throughput Over Time</span>
+                  <span>Message throughput over time</span>
                 </CardTitle>
                 <CardDescription className="text-xs mt-0.5">
                   Daily incoming vs outgoing messages stored in the database.
@@ -337,7 +337,7 @@ export default function UserAnalyticsPage() {
               </div>
 
               {data?.selectedInstance && (
-                <Badge variant="secondary" className="text-[11px] self-start sm:self-auto font-normal">
+                <Badge variant="secondary" className="text-xs self-start sm:self-auto font-normal">
                   Scoped: {data.selectedInstance.title}
                 </Badge>
               )}
@@ -352,7 +352,7 @@ export default function UserAnalyticsPage() {
               <div className="h-60 flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
                 <AlertCircle className="h-8 w-8 text-muted-foreground/30 mb-2" />
                 <span className="text-xs font-medium">No messaging activity recorded for this period.</span>
-                <span className="text-[11px] text-muted-foreground mt-0.5">
+                <span className="text-xs text-muted-foreground mt-0.5">
                   Try selecting a wider date range or &ldquo;All Connections&rdquo;.
                 </span>
               </div>
@@ -375,8 +375,8 @@ export default function UserAnalyticsPage() {
         <Card className="shadow-2xs border">
           <CardHeader className="p-5 pb-2 border-b">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
-              <span>Plan Quota & Consumption</span>
+              <ShieldCheck className="h-4 w-4 text-success" />
+              <span>Plan quota & consumption</span>
             </CardTitle>
             <CardDescription className="text-xs mt-0.5">
               Live database utilization vs subscription entitlements.
@@ -401,7 +401,7 @@ export default function UserAnalyticsPage() {
                 {/* Contacts Gauge */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-foreground">Contact Audience</span>
+                    <span className="font-medium text-foreground">Contact audience</span>
                     <span className="font-mono text-muted-foreground">
                       {data?.usage.contacts.used.toLocaleString()} /{' '}
                       {data?.usage.contacts.limit ? data.usage.contacts.limit.toLocaleString() : '∞'}
@@ -415,7 +415,7 @@ export default function UserAnalyticsPage() {
                     }
                     className="h-1.5"
                   />
-                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{data?.usage.contacts.remaining.toLocaleString()} slots available</span>
                     <span>
                       {data?.usage.contacts.limit
@@ -428,7 +428,7 @@ export default function UserAnalyticsPage() {
                 {/* WhatsApp Instances Gauge */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-medium text-foreground">WhatsApp Accounts</span>
+                    <span className="font-medium text-foreground">WhatsApp accounts</span>
                     <span className="font-mono text-muted-foreground">
                       {data?.usage.qrAccounts.used} / {data?.usage.qrAccounts.limit || '∞'}
                     </span>
@@ -441,7 +441,7 @@ export default function UserAnalyticsPage() {
                     }
                     className="h-1.5"
                   />
-                  <div className="flex justify-between text-[11px] text-muted-foreground">
+                  <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{data?.whatsapp.active || 0} connected active</span>
                     <span>
                       {data?.usage.qrAccounts.limit
@@ -455,18 +455,18 @@ export default function UserAnalyticsPage() {
                 <div className="pt-2 border-t space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Deliverability Rate:</span>
-                    <span className="font-semibold text-emerald-600 font-mono">{deliveryRate}%</span>
+                    <span className="font-semibold text-success font-mono">{deliveryRate}%</span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">Recipient Read Rate:</span>
-                    <span className="font-semibold text-blue-600 font-mono">{readRate}%</span>
+                    <span className="font-semibold text-info font-mono">{readRate}%</span>
                   </div>
                 </div>
 
                 {data?.usage.planExpire && (
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-1 border-t">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1 border-t">
                     <Calendar className="h-3.5 w-3.5 shrink-0" />
-                    <span>Active until: {new Date(data.usage.planExpire).toLocaleDateString()}</span>
+                    <span>Active until {new Date(/^\d+$/.test(String(data.usage.planExpire)) ? Number(data.usage.planExpire) : data.usage.planExpire).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                   </div>
                 )}
               </>
@@ -484,7 +484,7 @@ export default function UserAnalyticsPage() {
               <div>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <Send className="h-4 w-4 text-primary" />
-                  <span>Broadcast Campaign Performance</span>
+                  <span>Broadcast campaign performance</span>
                 </CardTitle>
                 <CardDescription className="text-xs mt-0.5">
                   Aggregate dispatch, delivery, and read counts from beta_campaign records.
@@ -493,7 +493,7 @@ export default function UserAnalyticsPage() {
 
               {Boolean(data?.campaigns.total) && (
                 <div className="flex items-center gap-3 text-xs font-mono">
-                  <span className="text-emerald-600 font-medium">
+                  <span className="text-success font-medium">
                     {data?.campaigns.sent.toLocaleString()} sent
                   </span>
                   <span className="text-muted-foreground">
@@ -536,11 +536,11 @@ export default function UserAnalyticsPage() {
                         <td className="py-3 px-4 text-center">
                           <Badge
                             variant="outline"
-                            className={`text-[10px] uppercase font-semibold ${
+                            className={`text-[11px] uppercase font-semibold ${
                               c.status === 'COMPLETED'
-                                ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
+                                ? 'bg-success/10 text-success border-success/20'
                                 : c.status === 'RUNNING'
-                                ? 'bg-blue-500/10 text-blue-600 border-blue-500/20 animate-pulse'
+                                ? 'bg-info/10 text-info border-info/20 animate-pulse'
                                 : 'bg-muted text-muted-foreground'
                             }`}
                           >
@@ -550,13 +550,13 @@ export default function UserAnalyticsPage() {
                         <td className="py-3 px-4 text-right font-mono text-muted-foreground">
                           {c.total_contacts.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-emerald-600 font-semibold">
+                        <td className="py-3 px-4 text-right font-mono text-success font-semibold">
                           {c.sent_count.toLocaleString()}
                         </td>
                         <td className="py-3 px-4 text-right font-mono text-muted-foreground">
                           {c.delivered_count.toLocaleString()}
                         </td>
-                        <td className="py-3 px-4 text-right font-mono text-blue-600">
+                        <td className="py-3 px-4 text-right font-mono text-info">
                           {c.read_count.toLocaleString()}
                         </td>
                         <td className="py-3 px-4 text-right text-muted-foreground">

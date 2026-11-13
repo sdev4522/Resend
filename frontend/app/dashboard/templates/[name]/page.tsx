@@ -122,11 +122,11 @@ export default function TemplateDetailPage({ params }: PageProps) {
           <Button variant="ghost" size="icon" render={<Link href="/dashboard/templates" />}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <h1 className="text-xl font-bold">Template Not Found</h1>
+          <h1 className="text-lg font-semibold text-foreground">Template not found</h1>
         </div>
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Template Error</AlertTitle>
+          <AlertTitle>Template error</AlertTitle>
           <AlertDescription className="text-xs mt-1">
             {error || 'Unable to retrieve template information.'}
           </AlertDescription>
@@ -156,7 +156,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
           </Button>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-2xl font-bold font-mono tracking-tight text-foreground">
+              <h1 className="font-mono text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
                 {template.name}
               </h1>
               <TemplateStatusBadge status={template.status} />
@@ -167,7 +167,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
               {template.id && (
                 <>
                   {' '}
-                  | Meta ID: <span className="font-mono text-[11px]">{template.id}</span>
+                  | Meta ID: <span className="font-mono text-xs">{template.id}</span>
                 </>
               )}
             </p>
@@ -183,7 +183,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
             onClick={() => setDeleteDialogOpen(true)}
           >
             <Trash2 className="h-4 w-4" />
-            <span>Delete Template</span>
+            <span>Delete template</span>
           </Button>
 
           <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -222,7 +222,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
           {headerComp && (
             <Card className="shadow-xs">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Header Component</CardTitle>
+                <CardTitle className="text-sm font-semibold">Header component</CardTitle>
                 <CardDescription className="text-xs">
                   Format: <span className="font-medium text-foreground">{headerComp.format}</span>
                 </CardDescription>
@@ -244,7 +244,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
           {/* Body Component Card */}
           <Card className="shadow-xs">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Body Content</CardTitle>
+              <CardTitle className="text-sm font-semibold">Body content</CardTitle>
               <CardDescription className="text-xs">
                 Raw template string stored in Meta Graph API
               </CardDescription>
@@ -259,7 +259,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
                 <div className="space-y-3 pt-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                     <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    <span>Test Variable Simulation</span>
+                    <span>Test variable simulation</span>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {detectedVarIndices.map((idx) => (
@@ -284,7 +284,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
           {footerComp?.text && (
             <Card className="shadow-xs">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Footer Component</CardTitle>
+                <CardTitle className="text-sm font-semibold">Footer component</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">{footerComp.text}</p>
@@ -296,7 +296,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
           {buttonsComp?.buttons && buttonsComp.buttons.length > 0 && (
             <Card className="shadow-xs">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Interactive Buttons</CardTitle>
+                <CardTitle className="text-sm font-semibold">Interactive buttons</CardTitle>
                 <CardDescription className="text-xs">
                   {buttonsComp.buttons.length} button(s) configured
                 </CardDescription>
@@ -315,14 +315,14 @@ export default function TemplateDetailPage({ params }: PageProps) {
                         <div>
                           <span className="font-semibold text-foreground">{btn.text}</span>
                           {btn.url && (
-                            <p className="text-[11px] text-muted-foreground font-mono">{btn.url}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{btn.url}</p>
                           )}
                           {btn.phone_number && (
-                            <p className="text-[11px] text-muted-foreground font-mono">{btn.phone_number}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{btn.phone_number}</p>
                           )}
                         </div>
                       </div>
-                      <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                      <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-muted text-muted-foreground">
                         {btn.type}
                       </span>
                     </div>
@@ -337,7 +337,7 @@ export default function TemplateDetailPage({ params }: PageProps) {
         <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
           <Card className="shadow-xs">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold">Live Simulation</CardTitle>
+              <CardTitle className="text-base font-semibold">Live simulation</CardTitle>
               <CardDescription className="text-xs">
                 Real-time WhatsApp rendering with your test variables.
               </CardDescription>

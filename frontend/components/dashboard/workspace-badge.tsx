@@ -12,21 +12,21 @@ export function WorkspaceBadge() {
 
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-sidebar-accent/30 text-sidebar-foreground text-xs">
-      <Building2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+      <Building2 className="h-3.5 w-3.5 text-success shrink-0" />
       <div className="flex flex-col truncate">
-        <span className="font-semibold truncate text-[11px] leading-none">
+        <span className="font-semibold truncate text-xs leading-none">
           {workspace.name}
         </span>
-        <span className="text-[9px] text-muted-foreground capitalize mt-0.5 flex items-center gap-1">
+        <span className="text-xs text-muted-foreground capitalize mt-0.5 flex items-center gap-1">
           {role === 'admin' ? (
             <>
-              <ShieldCheck className="h-2.5 w-2.5 text-red-500" />
-              Super Admin
+              <ShieldCheck className="h-2.5 w-2.5 text-destructive" />
+              Super admin
             </>
           ) : role === 'agent' ? (
             <>
-              <UserCheck className="h-2.5 w-2.5 text-blue-500" />
-              Support Agent
+              <UserCheck className="h-2.5 w-2.5 text-info" />
+              Support agent
             </>
           ) : (
             'Workspace Owner'

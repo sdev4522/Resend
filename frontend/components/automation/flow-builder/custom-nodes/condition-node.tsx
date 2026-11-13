@@ -11,7 +11,7 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
   return (
     <div
       className={`min-w-[280px] max-w-[340px] rounded-xl border bg-card p-3 shadow-xs transition-all ${
-        selected ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-amber-500/40 bg-card hover:border-amber-500/60'
+        selected ? 'border-primary ring-2 ring-primary/20 shadow-md' : 'border-warning/40 bg-card hover:border-warning/60'
       }`}
     >
       {/* Incoming port */}
@@ -24,12 +24,12 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
 
       <div className="flex items-center justify-between pb-2 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-600 shadow-2xs">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/10 border border-warning/30 text-warning shadow-2xs">
             <GitFork className="h-4 w-4" />
           </div>
           <div>
-            <span className="text-xs font-bold text-foreground">Condition Router</span>
-            <p className="text-[10px] text-muted-foreground">Branch by matching keywords</p>
+            <span className="text-xs font-semibold text-foreground">Condition router</span>
+            <p className="text-xs text-muted-foreground">Branch by matching keywords</p>
           </div>
         </div>
       </div>
@@ -37,20 +37,20 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
       {/* Rules list with individual handle ports */}
       <div className="pt-2 space-y-2">
         {conditions.length === 0 ? (
-          <p className="text-[11px] text-muted-foreground italic p-2 bg-muted/30 rounded border border-dashed text-center">
+          <p className="text-xs text-muted-foreground italic p-2 bg-muted/30 rounded border border-dashed text-center">
             No rules added yet. Click to configure.
           </p>
         ) : (
           conditions.map((rule, idx) => (
             <div
               key={idx}
-              className="relative flex items-center justify-between bg-muted/40 hover:bg-muted/70 rounded-md p-1.5 border border-border/50 text-[11px] transition-colors"
+              className="relative flex items-center justify-between bg-muted/40 hover:bg-muted/70 rounded-md p-1.5 border border-border/50 text-xs transition-colors"
             >
               <div className="min-w-0 pr-4">
                 <span className="font-semibold text-foreground truncate block">
                   {rule.name || `Rule #${idx + 1}`}
                 </span>
-                <span className="text-[10px] text-muted-foreground font-mono truncate block">
+                <span className="text-xs text-muted-foreground font-mono truncate block">
                   {rule.type.replace('_', ' ')}: &quot;{rule.value}&quot;
                 </span>
               </div>
@@ -60,7 +60,7 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
                 type="source"
                 position={Position.Right}
                 id={rule.targetNodeId || `rule_${idx}`}
-                className="!w-3 !h-3 !bg-amber-500 !border-2 !border-background hover:!scale-125 transition-transform"
+                className="!w-3 !h-3 !bg-warning !border-2 !border-background hover:!scale-125 transition-transform"
                 style={{ top: 'auto', transform: 'none' }}
               />
             </div>
@@ -68,10 +68,10 @@ export const ConditionNode = memo(({ data, selected }: NodeProps) => {
         )}
 
         {/* Fallback default branch */}
-        <div className="relative flex items-center justify-between bg-zinc-500/10 rounded-md p-1.5 border border-zinc-500/20 text-[11px]">
+        <div className="relative flex items-center justify-between bg-zinc-500/10 rounded-md p-1.5 border border-zinc-500/20 text-xs">
           <div>
-            <span className="font-semibold text-foreground">Default Fallback</span>
-            <p className="text-[10px] text-muted-foreground">When no rules match</p>
+            <span className="font-semibold text-foreground">Default fallback</span>
+            <p className="text-xs text-muted-foreground">When no rules match</p>
           </div>
 
           <Handle

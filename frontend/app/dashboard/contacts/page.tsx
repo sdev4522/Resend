@@ -473,8 +473,8 @@ export default function ContactsPage() {
     <div className="space-y-6 pb-12">
       {/* Top Header */}
       <DashboardPageHeader
-        title="Contacts & Phonebooks"
-        description="Manage segmented contact lists, customer tags, and custom campaign variables."
+        title="Contacts"
+        description="Your contact lists, tags and custom fields."
         breadcrumbs={[{ title: 'Contacts' }]}
         actions={
           <div className="flex flex-wrap items-center gap-2">
@@ -487,7 +487,7 @@ export default function ContactsPage() {
                 setImportPhonebookId(phonebooks[0]?.id ? String(phonebooks[0].id) : '');
                 setImportCsvOpen(true);
               }}
-              className="gap-1.5 text-xs"
+              className="gap-1.5"
             >
               <Upload className="h-3.5 w-3.5" />
               <span>Import CSV</span>
@@ -503,7 +503,7 @@ export default function ContactsPage() {
                 });
                 window.open(url, '_blank');
               }}
-              className="gap-1.5 text-xs"
+              className="gap-1.5"
             >
               <Download className="h-3.5 w-3.5" />
               <span>Export CSV</span>
@@ -524,10 +524,10 @@ export default function ContactsPage() {
                 });
                 setAddContactOpen(true);
               }}
-              className="gap-1.5 text-xs"
+              className="gap-1.5"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>Add Contact</span>
+              <span>Add contact</span>
             </Button>
           </div>
         }
@@ -537,14 +537,14 @@ export default function ContactsPage() {
       {errorMessage && (
         <Alert variant="destructive" className="py-2.5">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-xs font-semibold">Error Notice</AlertTitle>
+          <AlertTitle className="text-xs font-semibold">Error notice</AlertTitle>
           <AlertDescription className="text-xs mt-0.5">{errorMessage}</AlertDescription>
         </Alert>
       )}
 
       {successMessage && (
-        <Alert className="py-2.5 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        <Alert className="py-2.5 border-success/40 bg-success/10 text-success">
+          <CheckCircle2 className="h-4 w-4 text-success" />
           <AlertTitle className="text-xs font-semibold">Success</AlertTitle>
           <AlertDescription className="text-xs mt-0.5">{successMessage}</AlertDescription>
         </Alert>
@@ -566,7 +566,7 @@ export default function ContactsPage() {
         >
           <Users className="h-3 w-3" />
           <span>All</span>
-          <span className="text-[10px] opacity-80">
+          <span className="text-xs opacity-80">
             ({phonebooks.reduce((acc, curr) => acc + (Number(curr.contactCount) || 0), 0)})
           </span>
         </button>
@@ -587,7 +587,7 @@ export default function ContactsPage() {
           >
             <BookOpen className="h-3 w-3" />
             <span>{pb.name}</span>
-            <span className="text-[10px] opacity-80">({Number(pb.contactCount) || 0})</span>
+            <span className="text-xs opacity-80">({Number(pb.contactCount) || 0})</span>
           </button>
         ))}
 
@@ -595,11 +595,11 @@ export default function ContactsPage() {
           variant="outline"
           size="sm"
           onClick={() => setAddPhonebookOpen(true)}
-          className="shrink-0 h-7 px-2.5 rounded-full text-xs gap-1 text-primary touch-manipulation"
+          className="shrink-0 h-7 px-2.5 rounded-full gap-1 text-primary"
           title="Create Phonebook Group"
         >
           <FolderPlus className="h-3.5 w-3.5" />
-          <span>New List</span>
+          <span>New list</span>
         </Button>
       </div>
 
@@ -609,7 +609,7 @@ export default function ContactsPage() {
         <Card className="hidden lg:block lg:col-span-3 shadow-xs">
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-sm font-semibold">Phonebook Lists</CardTitle>
+              <CardTitle className="text-sm font-semibold">Phonebook lists</CardTitle>
               <CardDescription className="text-xs">
                 Audience segments
               </CardDescription>
@@ -638,10 +638,10 @@ export default function ContactsPage() {
             >
               <div className="flex items-center gap-2">
                 <Users className="h-3.5 w-3.5" />
-                <span>All Contacts</span>
+                <span>All contacts</span>
               </div>
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                className={`text-xs px-1.5 py-0.5 rounded-full ${
                   selectedPhonebookId === 'ALL'
                     ? 'bg-primary-foreground/20 text-primary-foreground'
                     : 'bg-muted text-muted-foreground'
@@ -670,7 +670,7 @@ export default function ContactsPage() {
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    className={`text-xs px-1.5 py-0.5 rounded-full ${
                       selectedPhonebookId === String(pb.id)
                         ? 'bg-primary-foreground/20 text-primary-foreground'
                         : 'bg-muted text-muted-foreground'
@@ -729,10 +729,10 @@ export default function ContactsPage() {
                         setContactToDelete(null);
                         setDeleteConfirmOpen(true);
                       }}
-                      className="gap-1 text-xs h-8"
+                      className="gap-1 h-8"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                      <span>Delete Selected</span>
+                      <span>Delete selected</span>
                     </Button>
                   </div>
                 )}
@@ -771,7 +771,7 @@ export default function ContactsPage() {
                             />
                             <div>
                               <div className="font-semibold text-foreground text-sm">
-                                {contact.name || <span className="text-muted-foreground italic">No Name</span>}
+                                {contact.name || <span className="text-muted-foreground italic">No name</span>}
                               </div>
                               <a href={`tel:${contact.mobile}`} className="font-mono text-xs text-primary hover:underline">
                                 {contact.mobile}
@@ -786,7 +786,7 @@ export default function ContactsPage() {
                                 setEditingContact(contact);
                                 setEditContactOpen(true);
                               }}
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground touch-manipulation"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
                               title="Edit Contact"
                             >
                               <Edit2 className="h-4 w-4" />
@@ -798,25 +798,25 @@ export default function ContactsPage() {
                                 setContactToDelete(contact);
                                 setDeleteConfirmOpen(true);
                               }}
-                              className="h-8 w-8 text-destructive hover:bg-destructive/10 touch-manipulation"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
                               title="Delete Contact"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs">
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">
                             <BookOpen className="h-3 w-3" />
                             <span>{contact.phonebook_name || 'General'}</span>
                           </span>
                           {contact.var1 && (
-                            <span className="px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono text-[10px]">
+                            <span className="px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono text-xs">
                               v1: {contact.var1}
                             </span>
                           )}
                           {contact.var2 && (
-                            <span className="px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono text-[10px]">
+                            <span className="px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono text-xs">
                               v2: {contact.var2}
                             </span>
                           )}
@@ -840,8 +840,8 @@ export default function ContactsPage() {
                               onChange={(e) => handleSelectAll(e.target.checked)}
                             />
                           </TableHead>
-                          <TableHead className="font-semibold">Contact Name</TableHead>
-                          <TableHead className="font-semibold">Mobile Number</TableHead>
+                          <TableHead className="font-semibold">Contact name</TableHead>
+                          <TableHead className="font-semibold">Mobile number</TableHead>
                           <TableHead className="font-semibold">Phonebook</TableHead>
                           <TableHead className="font-semibold">Variables</TableHead>
                           <TableHead className="text-right font-semibold">Actions</TableHead>
@@ -859,13 +859,13 @@ export default function ContactsPage() {
                               />
                             </TableCell>
                             <TableCell className="font-medium text-foreground">
-                              {contact.name || <span className="text-muted-foreground italic">No Name</span>}
+                              {contact.name || <span className="text-muted-foreground italic">No name</span>}
                             </TableCell>
                             <TableCell className="font-mono text-muted-foreground">
                               {contact.mobile}
                             </TableCell>
                             <TableCell>
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-[11px] text-muted-foreground font-medium">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-xs text-muted-foreground font-medium">
                                 <BookOpen className="h-3 w-3" />
                                 <span>{contact.phonebook_name || 'General'}</span>
                               </span>
@@ -873,17 +873,17 @@ export default function ContactsPage() {
                             <TableCell>
                               <div className="flex flex-wrap items-center gap-1">
                                 {contact.var1 && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono">
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono">
                                     v1: {contact.var1}
                                   </span>
                                 )}
                                 {contact.var2 && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono">
+                                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted/70 text-muted-foreground font-mono">
                                     v2: {contact.var2}
                                   </span>
                                 )}
                                 {!contact.var1 && !contact.var2 && (
-                                  <span className="text-[11px] text-muted-foreground/60">—</span>
+                                  <span className="text-xs text-muted-foreground/60">—</span>
                                 )}
                               </div>
                             </TableCell>
@@ -951,7 +951,7 @@ export default function ContactsPage() {
                       onClick={() =>
                         setPagination((prev) => ({ ...prev, page: prev.page + 1 }))
                       }
-                      className="h-8 px-2.5 gap-1 text-xs touch-manipulation"
+                      className="h-8 px-2.5 gap-1"
                     >
                       Next <ChevronRight className="h-3.5 w-3.5" />
                     </Button>
@@ -976,7 +976,7 @@ export default function ContactsPage() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold">New Phonebook Group</DialogTitle>
+            <DialogTitle className="text-base font-semibold">New phonebook group</DialogTitle>
             <DialogDescription className="text-xs">
               Organize contacts into distinct audience lists for targeted campaigns.
             </DialogDescription>
@@ -1015,7 +1015,7 @@ export default function ContactsPage() {
               </Button>
               <Button type="submit" size="sm" disabled={actionLoading} className="gap-1.5">
                 {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>Create Group</span>
+                <span>Create group</span>
               </Button>
             </DialogFooter>
           </form>
@@ -1026,7 +1026,7 @@ export default function ContactsPage() {
       <Dialog open={addContactOpen} onOpenChange={setAddContactOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold">Add New Contact</DialogTitle>
+            <DialogTitle className="text-base font-semibold">Add new contact</DialogTitle>
             <DialogDescription className="text-xs">
               Add individual contact with optional custom attributes.
             </DialogDescription>
@@ -1053,7 +1053,7 @@ export default function ContactsPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="text-xs">Full Name</Label>
+                <Label className="text-xs">Full name</Label>
                 <Input
                   placeholder="e.g. Rahul Sharma"
                   value={newContact.name}
@@ -1082,7 +1082,7 @@ export default function ContactsPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-mono">var1 (e.g. Order ID)</Label>
+                  <Label className="text-xs font-mono">var1 (e.g. Order ID)</Label>
                   <Input
                     placeholder="ORD-9912"
                     value={newContact.var1}
@@ -1091,7 +1091,7 @@ export default function ContactsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-mono">var2 (e.g. Date / Amount)</Label>
+                  <Label className="text-xs font-mono">var2 (e.g. Date / Amount)</Label>
                   <Input
                     placeholder="25 September"
                     value={newContact.var2}
@@ -1100,7 +1100,7 @@ export default function ContactsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-mono">var3</Label>
+                  <Label className="text-xs font-mono">var3</Label>
                   <Input
                     placeholder="Optional"
                     value={newContact.var3}
@@ -1109,7 +1109,7 @@ export default function ContactsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[11px] font-mono">var4</Label>
+                  <Label className="text-xs font-mono">var4</Label>
                   <Input
                     placeholder="Optional"
                     value={newContact.var4}
@@ -1132,7 +1132,7 @@ export default function ContactsPage() {
               </Button>
               <Button type="submit" size="sm" disabled={actionLoading} className="gap-1.5">
                 {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>Save Contact</span>
+                <span>Save contact</span>
               </Button>
             </DialogFooter>
           </form>
@@ -1143,7 +1143,7 @@ export default function ContactsPage() {
       <Dialog open={editContactOpen} onOpenChange={setEditContactOpen}>
         <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-base font-semibold">Edit Contact</DialogTitle>
+            <DialogTitle className="text-base font-semibold">Edit contact</DialogTitle>
             <DialogDescription className="text-xs">
               Update contact information and personalization variables.
             </DialogDescription>
@@ -1152,7 +1152,7 @@ export default function ContactsPage() {
             <form onSubmit={handleUpdateContact} className="space-y-4 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs">Contact Name</Label>
+                  <Label className="text-xs">Contact name</Label>
                   <Input
                     value={editingContact.name || ''}
                     onChange={(e) =>
@@ -1175,10 +1175,10 @@ export default function ContactsPage() {
               </div>
 
               <div className="p-3 rounded-lg border bg-muted/20 space-y-3">
-                <div className="text-xs font-semibold text-foreground">Custom Variables</div>
+                <div className="text-xs font-semibold text-foreground">Custom variables</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-mono">var1</Label>
+                    <Label className="text-xs font-mono">var1</Label>
                     <Input
                       value={editingContact.var1 || ''}
                       onChange={(e) =>
@@ -1188,7 +1188,7 @@ export default function ContactsPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-mono">var2</Label>
+                    <Label className="text-xs font-mono">var2</Label>
                     <Input
                       value={editingContact.var2 || ''}
                       onChange={(e) =>
@@ -1198,7 +1198,7 @@ export default function ContactsPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-mono">var3</Label>
+                    <Label className="text-xs font-mono">var3</Label>
                     <Input
                       value={editingContact.var3 || ''}
                       onChange={(e) =>
@@ -1208,7 +1208,7 @@ export default function ContactsPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-[11px] font-mono">var4</Label>
+                    <Label className="text-xs font-mono">var4</Label>
                     <Input
                       value={editingContact.var4 || ''}
                       onChange={(e) =>
@@ -1232,7 +1232,7 @@ export default function ContactsPage() {
                 </Button>
                 <Button type="submit" size="sm" disabled={actionLoading} className="gap-1.5">
                   {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  <span>Save Changes</span>
+                  <span>Save changes</span>
                 </Button>
               </DialogFooter>
             </form>
@@ -1284,7 +1284,7 @@ export default function ContactsPage() {
                   <p className="text-xs font-medium text-foreground">
                     {importFile ? importFile.name : 'Click to select .csv file'}
                   </p>
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Supported columns: <code className="font-mono">name, mobile, var1, var2, var3, var4, var5</code>
                   </p>
                 </label>
@@ -1297,7 +1297,7 @@ export default function ContactsPage() {
                 <p className="font-semibold text-destructive">
                   {importResult.invalidNumbers.length} Invalid Phone Numbers Detected
                 </p>
-                <div className="max-h-28 overflow-y-auto space-y-1 font-mono text-[11px]">
+                <div className="max-h-28 overflow-y-auto space-y-1 font-mono text-xs">
                   {importResult.invalidNumbers.map((inv, idx) => (
                     <div key={idx} className="text-destructive/90">
                       Row {inv.row}: &ldquo;{inv.mobile}&rdquo; ({inv.name || 'Unnamed'})
@@ -1319,7 +1319,7 @@ export default function ContactsPage() {
               </Button>
               <Button type="submit" size="sm" disabled={actionLoading || !importFile} className="gap-1.5">
                 {actionLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                <span>Start Import</span>
+                <span>Start import</span>
               </Button>
             </DialogFooter>
           </form>

@@ -221,8 +221,8 @@ export default function NewCampaignPage() {
           <span className="sr-only">Back</span>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Create Broadcast Campaign
+          <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
+            Create broadcast campaign
           </h1>
           <p className="text-sm text-muted-foreground">
             Launch a targeted bulk WhatsApp broadcast to a segmented contact phonebook.
@@ -233,7 +233,7 @@ export default function NewCampaignPage() {
       {errorMessage && (
         <Alert variant="destructive" className="py-2.5">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-xs font-semibold">Campaign Submission Notice</AlertTitle>
+          <AlertTitle className="text-xs font-semibold">Campaign submission notice</AlertTitle>
           <AlertDescription className="text-xs mt-0.5">{errorMessage}</AlertDescription>
         </Alert>
       )}
@@ -250,7 +250,7 @@ export default function NewCampaignPage() {
           }`}
         >
           <FileEdit className="h-3.5 w-3.5" />
-          <span>Campaign Setup</span>
+          <span>Campaign setup</span>
         </button>
         <button
           type="button"
@@ -262,7 +262,7 @@ export default function NewCampaignPage() {
           }`}
         >
           <Eye className="h-3.5 w-3.5" />
-          <span>Message Preview</span>
+          <span>Message preview</span>
         </button>
       </div>
 
@@ -312,7 +312,7 @@ export default function NewCampaignPage() {
                   </SelectContent>
                 </Select>
                 {selectedPhonebook && (
-                  <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 pt-0.5">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-0.5">
                     <Users className="h-3 w-3" />
                     <span>
                       Selected audience contains{' '}
@@ -334,10 +334,10 @@ export default function NewCampaignPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {templates.length === 0 ? (
-                <div className="p-4 rounded-lg border bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-400 space-y-2">
+                <div className="p-4 rounded-lg border bg-warning/10 border-warning/30 text-warning space-y-2">
                   <div className="flex items-center gap-2 text-xs font-semibold">
                     <AlertTriangle className="h-4 w-4" />
-                    <span>No Approved Meta Templates Available</span>
+                    <span>No approved Meta templates available</span>
                   </div>
                   <p className="text-xs">
                     You do not have any approved WhatsApp templates in your Meta Business Account yet.
@@ -350,7 +350,7 @@ export default function NewCampaignPage() {
                     render={<Link href="/dashboard/templates/new" />}
                     className="text-xs"
                   >
-                    Create New Template
+                    Create new template
                   </Button>
                 </div>
               ) : (
@@ -400,7 +400,7 @@ export default function NewCampaignPage() {
                           <span className="font-mono font-semibold text-foreground text-sm">
                             {`{{${idx}}}`}
                           </span>
-                          <p className="text-[11px] text-muted-foreground">Positional placeholder</p>
+                          <p className="text-xs text-muted-foreground">Positional placeholder</p>
                         </div>
 
                         <div className="flex flex-col sm:flex-row flex-1 sm:max-w-md items-stretch sm:items-center gap-2">
@@ -420,8 +420,8 @@ export default function NewCampaignPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="field">Contact Field</SelectItem>
-                              <SelectItem value="custom">Custom Text</SelectItem>
+                              <SelectItem value="field">Contact field</SelectItem>
+                              <SelectItem value="custom">Custom text</SelectItem>
                             </SelectContent>
                           </Select>
 
@@ -439,8 +439,8 @@ export default function NewCampaignPage() {
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="{{{name}}}">Contact Name</SelectItem>
-                                <SelectItem value="{{{mobile}}}">Mobile Number</SelectItem>
+                                <SelectItem value="{{{name}}}">Contact name</SelectItem>
+                                <SelectItem value="{{{mobile}}}">Mobile number</SelectItem>
                                 <SelectItem value="{{{var1}}}">Custom var1</SelectItem>
                                 <SelectItem value="{{{var2}}}">Custom var2</SelectItem>
                                 <SelectItem value="{{{var3}}}">Custom var3</SelectItem>
@@ -492,8 +492,8 @@ export default function NewCampaignPage() {
                 >
                   <Send className="h-4 w-4" />
                   <div>
-                    <div>Send Immediately</div>
-                    <div className="text-[10px] text-muted-foreground font-normal">
+                    <div>Send immediately</div>
+                    <div className="text-xs text-muted-foreground font-normal">
                       Queue broadcast right away
                     </div>
                   </div>
@@ -511,7 +511,7 @@ export default function NewCampaignPage() {
                   <Calendar className="h-4 w-4" />
                   <div>
                     <div>Schedule for Later</div>
-                    <div className="text-[10px] text-muted-foreground font-normal">
+                    <div className="text-xs text-muted-foreground font-normal">
                       Specify dispatch date & time
                     </div>
                   </div>
@@ -531,7 +531,7 @@ export default function NewCampaignPage() {
                     className="h-9 text-xs"
                     required
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone}
                   </p>
                 </div>
@@ -567,7 +567,7 @@ export default function NewCampaignPage() {
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-base font-semibold">Recipient Preview</CardTitle>
+                  <CardTitle className="text-base font-semibold">Recipient preview</CardTitle>
                   <CardDescription className="text-xs">
                     Simulated message rendering with personalized contact values.
                   </CardDescription>
@@ -578,7 +578,7 @@ export default function NewCampaignPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => setMobileTab('wizard')}
-                  className="lg:hidden text-xs gap-1 h-7"
+                  className="lg:hidden gap-1 h-7"
                 >
                   <FileEdit className="h-3 w-3" />
                   <span>Setup</span>
@@ -604,12 +604,12 @@ export default function NewCampaignPage() {
             <Card className="shadow-xs">
               <CardContent className="p-4 space-y-2 text-xs">
                 <div className="font-semibold text-foreground flex items-center justify-between">
-                  <span>Audience Summary</span>
-                  <span className="text-primary font-mono font-bold">
+                  <span>Audience summary</span>
+                  <span className="text-primary font-mono font-semibold">
                     {selectedPhonebook.contactCount || 0} Contacts
                   </span>
                 </div>
-                <div className="text-muted-foreground text-[11px] space-y-1">
+                <div className="text-muted-foreground text-xs space-y-1">
                   <div>List: {selectedPhonebook.name}</div>
                   <div>
                     Dispatch: {scheduleType === 'NOW' ? 'Immediate' : scheduleDateTime || 'Scheduled'}

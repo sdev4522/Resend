@@ -21,14 +21,14 @@ export function AccountSelector() {
   return (
     <div className="p-3 border-b bg-muted/20">
       <div className="flex items-center justify-between mb-1.5 px-0.5">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-          <span>Active Connection</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+          <span>Active connection</span>
         </span>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => refreshAccounts()}
-          className="h-8 w-8 text-muted-foreground hover:text-foreground touch-manipulation"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
           aria-label="Refresh WhatsApp connections"
           title="Refresh connections"
         >
@@ -42,27 +42,27 @@ export function AccountSelector() {
             <Button
               variant="outline"
               size="sm"
-              className="w-full justify-between h-10 px-3 bg-background border shadow-2xs hover:bg-muted/40 font-normal"
+              className="w-full justify-between h-10 px-3 bg-background border hover:bg-muted/40 font-normal"
             />
           }
         >
           <div className="flex items-center gap-2.5 min-w-0 text-left">
             <div className="relative shrink-0">
               {selectedAccount?.type === "qr" ? (
-                <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-md bg-success/10 text-success flex items-center justify-center">
                   <QrCode className="h-3.5 w-3.5" />
                 </div>
               ) : selectedAccount?.type === "meta" ? (
-                <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                <div className="w-6 h-6 rounded-md bg-info/10 text-info flex items-center justify-center">
                   <Cloud className="h-3.5 w-3.5" />
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
+                <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs">
                   ALL
                 </div>
               )}
               <span
-                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background ${selectedAccount?.isConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
+                className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background ${selectedAccount?.isConnected ? "bg-success" : "bg-muted-foreground/40"
                   }`}
               />
             </div>
@@ -71,7 +71,7 @@ export function AccountSelector() {
               <p className="text-xs font-semibold text-foreground truncate leading-tight">
                 {selectedAccount?.title || "Select Account"}
               </p>
-              <p className="text-[10px] text-muted-foreground font-mono truncate leading-tight">
+              <p className="text-xs text-muted-foreground font-mono truncate leading-tight">
                 {selectedAccount?.number || (selectedAccount?.type === "all" ? "All Channels" : "—")}
               </p>
             </div>
@@ -82,8 +82,8 @@ export function AccountSelector() {
 
         <DropdownMenuContent align="start" className="w-[260px] p-1.5 shadow-lg rounded-xl">
           <DropdownMenuGroup>
-            <DropdownMenuLabel className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider px-2 py-1">
-              Switch WhatsApp Line
+            <DropdownMenuLabel className="text-[11px] uppercase font-semibold text-muted-foreground tracking-wider px-2 py-1">
+              Switch WhatsApp line
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
           </DropdownMenuGroup>
@@ -100,34 +100,34 @@ export function AccountSelector() {
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="relative shrink-0">
                     {acc.type === "qr" ? (
-                      <div className="w-6 h-6 rounded-md bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-md bg-success/10 text-success flex items-center justify-center">
                         <QrCode className="h-3.5 w-3.5" />
                       </div>
                     ) : acc.type === "meta" ? (
-                      <div className="w-6 h-6 rounded-md bg-blue-500/10 text-blue-600 flex items-center justify-center">
+                      <div className="w-6 h-6 rounded-md bg-info/10 text-info flex items-center justify-center">
                         <Cloud className="h-3.5 w-3.5" />
                       </div>
                     ) : (
-                      <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center font-bold text-[10px]">
+                      <div className="w-6 h-6 rounded-md bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs">
                         ALL
                       </div>
                     )}
                     <span
-                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background ${acc.isConnected ? "bg-emerald-500" : "bg-muted-foreground/40"
+                      className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-background ${acc.isConnected ? "bg-success" : "bg-muted-foreground/40"
                         }`}
                     />
                   </div>
 
                   <div className="min-w-0">
                     <p className="text-xs truncate">{acc.title}</p>
-                    <p className="text-[10px] text-muted-foreground font-mono truncate">
+                    <p className="text-xs text-muted-foreground font-mono truncate">
                       {acc.number || (acc.type === "all" ? "Unified feed" : "Disconnected")}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                  <Badge variant="outline" className="text-[9px] uppercase px-1.5 py-0 font-mono">
+                  <Badge variant="outline" className="text-[11px] uppercase px-1.5 py-0 font-mono">
                     {acc.type === "qr" ? "QR" : acc.type === "meta" ? "META" : "ALL"}
                   </Badge>
                   {isSelected && <Check className="h-3.5 w-3.5 text-primary" />}

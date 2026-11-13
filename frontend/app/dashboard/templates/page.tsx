@@ -184,13 +184,13 @@ function TemplatesContent() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">
-              WhatsApp Templates
+            <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl">
+              WhatsApp templates
             </h1>
             {metaStatus.configured ? (
               <Badge
                 variant="outline"
-                className="bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 font-mono text-xs gap-1"
+                className="bg-success/10 text-success border-success/20 font-mono text-xs gap-1"
               >
                 <ShieldCheck className="h-3 w-3" />
                 WABA CONNECTED
@@ -198,7 +198,7 @@ function TemplatesContent() {
             ) : (
               <Badge
                 variant="outline"
-                className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 font-mono text-xs gap-1"
+                className="bg-warning/10 text-warning border-warning/20 font-mono text-xs gap-1"
               >
                 DISCONNECTED
               </Badge>
@@ -223,15 +223,15 @@ function TemplatesContent() {
 
           <Button size="sm" render={<Link href="/dashboard/templates/new" />} className="gap-1.5">
             <Plus className="h-4 w-4" />
-            Create Template
+            Create template
           </Button>
         </div>
       </div>
 
       {/* Created Notice Banner */}
       {showCreatedNotice && (
-        <Alert className="bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-800 dark:text-emerald-300 py-3">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+        <Alert className="bg-success/10 border-success/20 text-success py-3">
+          <CheckCircle2 className="h-4 w-4 text-success" />
           <AlertTitle className="text-sm font-semibold">Template Submitted to Meta!</AlertTitle>
           <AlertDescription className="text-xs mt-1 flex items-center justify-between">
             <span>
@@ -241,7 +241,7 @@ function TemplatesContent() {
               variant="ghost"
               size="sm"
               onClick={() => setShowCreatedNotice(false)}
-              className="h-6 text-xs"
+              className="h-6"
             >
               Dismiss
             </Button>
@@ -251,10 +251,10 @@ function TemplatesContent() {
 
       {/* Meta API Disconnected Banner */}
       {!loading && !metaStatus.configured && (
-        <Alert className="border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 dark:border-amber-900 py-3">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <Alert className="border-warning/20 bg-warning/8 py-3">
+          <AlertTriangle className="h-4 w-4 text-warning" />
           <AlertTitle className="text-sm font-semibold text-foreground">
-            Meta Cloud API Not Configured
+            Meta Cloud API not configured
           </AlertTitle>
           <AlertDescription className="text-xs text-muted-foreground mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span>
@@ -264,7 +264,7 @@ function TemplatesContent() {
               variant="outline"
               size="sm"
               render={<Link href="/dashboard/settings" />}
-              className="gap-1.5 self-start sm:self-auto shrink-0 border-amber-300"
+              className="gap-1.5 self-start sm:self-auto shrink-0 border-warning/20"
             >
               <Settings className="h-3.5 w-3.5" />
               Configure in Settings
@@ -277,11 +277,11 @@ function TemplatesContent() {
       {error && (
         <Alert variant="destructive" className="py-3">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle className="text-sm font-semibold">Meta Template Synchronization Notice</AlertTitle>
+          <AlertTitle className="text-sm font-semibold">Meta template synchronization notice</AlertTitle>
           <AlertDescription className="text-xs mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <span>{error}</span>
-            <Button variant="outline" size="sm" onClick={handleSyncWithMeta} className="h-7 text-xs gap-1">
-              <RefreshCw className="h-3 w-3" /> Retry Sync
+            <Button variant="outline" size="sm" onClick={handleSyncWithMeta} className="h-7 gap-1">
+              <RefreshCw className="h-3 w-3" /> Retry sync
             </Button>
           </AlertDescription>
         </Alert>
@@ -302,7 +302,7 @@ function TemplatesContent() {
           </TabsList>
 
           {lastSynced && (
-            <div className="text-[11px] text-muted-foreground font-mono">
+            <div className="text-xs text-muted-foreground font-mono">
               Last synced: {lastSynced.toLocaleTimeString()}
             </div>
           )}
@@ -331,7 +331,7 @@ function TemplatesContent() {
                     <SelectValue placeholder="Filter by Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Statuses</SelectItem>
+                    <SelectItem value="ALL">All statuses</SelectItem>
                     <SelectItem value="APPROVED">Approved</SelectItem>
                     <SelectItem value="PENDING">Pending</SelectItem>
                     <SelectItem value="REJECTED">Rejected</SelectItem>
@@ -345,7 +345,7 @@ function TemplatesContent() {
                     <SelectValue placeholder="Filter by Category" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ALL">All Categories</SelectItem>
+                    <SelectItem value="ALL">All categories</SelectItem>
                     <SelectItem value="MARKETING">Marketing</SelectItem>
                     <SelectItem value="UTILITY">Utility</SelectItem>
                     <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
@@ -388,7 +388,7 @@ function TemplatesContent() {
                       className="mt-2 gap-1.5"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      Create Template
+                      Create template
                     </Button>
                   )}
                 </div>
@@ -409,10 +409,10 @@ function TemplatesContent() {
                                 {template.name}
                               </span>
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge variant="outline" className="text-[10px] font-normal py-0">
+                                <Badge variant="outline" className="text-xs font-normal py-0">
                                   {template.category}
                                 </Badge>
-                                <span className="font-mono text-[11px] text-muted-foreground flex items-center gap-1">
+                                <span className="font-mono text-xs text-muted-foreground flex items-center gap-1">
                                   <Globe className="h-3 w-3" />
                                   {template.language}
                                 </span>
@@ -430,15 +430,15 @@ function TemplatesContent() {
                           <div className="flex items-center justify-between pt-1">
                             <div className="flex items-center gap-1">
                               {hasHeader && (
-                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                   Header
                                 </Badge>
                               )}
-                              <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                              <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                 Body
                               </Badge>
                               {hasButtons && (
-                                <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
+                                <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                   Buttons
                                 </Badge>
                               )}
@@ -449,7 +449,7 @@ function TemplatesContent() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => handleOpenDetail(template)}
-                                className="h-8 px-2 text-xs gap-1 text-primary touch-manipulation"
+                                className="h-8 px-2 gap-1 text-primary"
                               >
                                 <Eye className="h-3.5 w-3.5" />
                                 <span>Preview</span>
@@ -458,7 +458,7 @@ function TemplatesContent() {
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => setTemplateToDelete(template)}
-                                className="h-8 w-8 text-destructive hover:bg-destructive/10 touch-manipulation"
+                                className="h-8 w-8 text-destructive hover:bg-destructive/10"
                                 title="Delete Template"
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -475,7 +475,7 @@ function TemplatesContent() {
                     <Table>
                       <TableHeader>
                         <TableRow className="bg-muted/40 hover:bg-muted/40">
-                          <TableHead className="w-[260px]">Template Name</TableHead>
+                          <TableHead className="w-[260px]">Template name</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>Language</TableHead>
                           <TableHead>Status</TableHead>
@@ -522,15 +522,15 @@ function TemplatesContent() {
                               <TableCell>
                                 <div className="flex items-center gap-1">
                                   {hasHeader && (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                       Header
                                     </Badge>
                                   )}
-                                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                  <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                     Body
                                   </Badge>
                                   {hasButtons && (
-                                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
                                       Buttons
                                     </Badge>
                                   )}
@@ -555,7 +555,7 @@ function TemplatesContent() {
                                       className="text-destructive focus:text-destructive cursor-pointer"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
-                                      <span>Delete Template</span>
+                                      <span>Delete template</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -577,7 +577,7 @@ function TemplatesContent() {
           <Card className="shadow-xs">
             <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-sm font-semibold">Inbox Quick Replies</CardTitle>
+                <CardTitle className="text-sm font-semibold">Inbox quick replies</CardTitle>
                 <p className="text-xs text-muted-foreground">
                   Local preset snippets used by human agents in the inbox and chat flows.
                 </p>
@@ -641,7 +641,7 @@ function TemplatesContent() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="text-base font-semibold">
-              Delete Meta WhatsApp Template
+              Delete Meta WhatsApp template
             </AlertDialogTitle>
             <AlertDialogDescription className="text-xs">
               Are you sure you want to delete template <strong>{templateToDelete?.name}</strong> from your Meta WhatsApp Business Account?
@@ -664,7 +664,7 @@ function TemplatesContent() {
                 handleDeleteTemplate();
               }}
               disabled={deleteLoading}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              className="bg-destructive hover:bg-destructive text-white"
             >
               {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Delete from Meta

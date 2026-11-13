@@ -45,18 +45,18 @@ function InboxMainView() {
               <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4 shadow-2xs">
                 <MessageSquare className="h-8 w-8" />
               </div>
-              <h3 className="text-base font-bold text-foreground">WhatsApp Operational Inbox</h3>
+              <h3 className="text-base font-semibold text-foreground">WhatsApp operational inbox</h3>
               <p className="text-xs text-muted-foreground max-w-sm mt-1 leading-relaxed">
                 Select a conversation from the sidebar or choose an active WhatsApp line to start messaging contacts in real-time.
               </p>
 
-              <div className="flex items-center gap-3 pt-6 text-[11px] font-mono text-muted-foreground">
+              <div className="flex items-center gap-3 pt-6 text-xs font-mono text-muted-foreground">
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border bg-background shadow-2xs">
-                  <QrCode className="h-3.5 w-3.5 text-emerald-600" />
+                  <QrCode className="h-3.5 w-3.5 text-success" />
                   <span>WhatsApp Web (QR)</span>
                 </span>
                 <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border bg-background shadow-2xs">
-                  <Cloud className="h-3.5 w-3.5 text-blue-600" />
+                  <Cloud className="h-3.5 w-3.5 text-info" />
                   <span>Meta Cloud API</span>
                 </span>
               </div>
@@ -73,7 +73,7 @@ function InboxMainView() {
       {/* Mobile & Tablet Drawer / Sheet for Contact Details */}
       <Sheet open={showContactPanel} onOpenChange={setShowContactPanel}>
         <SheetContent side="right" className="p-0 w-[88vw] sm:max-w-sm lg:hidden border-l">
-          <SheetTitle className="sr-only">Contact Details</SheetTitle>
+          <SheetTitle className="sr-only">Contact details</SheetTitle>
           <ContactDetailPanel isMobileSheet />
         </SheetContent>
       </Sheet>

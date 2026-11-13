@@ -181,26 +181,26 @@ export function NewChatDialog() {
 
   return (
     <Dialog open={isNewChatOpen} onOpenChange={setIsNewChatOpen}>
-      <DialogContent className="sm:max-w-md p-0 overflow-hidden rounded-2xl border bg-card shadow-2xl">
+      <DialogContent className="sm:max-w-md p-0 [--dialog-p:0px] overflow-hidden">
         <DialogHeader className="p-4 pb-3 border-b bg-muted/20">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-base font-semibold flex items-center gap-2">
               <UserPlus className="h-4 w-4 text-primary" />
-              <span>New Conversation</span>
+              <span>New conversation</span>
             </DialogTitle>
           </div>
 
           {/* Sending From Account Banner */}
           <div className="flex items-center gap-2 mt-2 px-2.5 py-1.5 rounded-lg bg-background border text-xs">
-            <span className="text-muted-foreground text-[11px]">Sending from:</span>
+            <span className="text-muted-foreground text-xs">Sending from:</span>
             <div className="flex items-center gap-1.5 font-medium truncate min-w-0">
               {selectedAccount?.type === "qr" ? (
-                <QrCode className="h-3 w-3 text-emerald-600 shrink-0" />
+                <QrCode className="h-3 w-3 text-success shrink-0" />
               ) : selectedAccount?.type === "meta" ? (
-                <Cloud className="h-3 w-3 text-blue-600 shrink-0" />
+                <Cloud className="h-3 w-3 text-info shrink-0" />
               ) : null}
               <span className="truncate">{selectedAccount?.title}</span>
-              <Badge variant="secondary" className="text-[9px] px-1 py-0 uppercase shrink-0">
+              <Badge variant="secondary" className="text-[11px] px-1 py-0 uppercase shrink-0">
                 {selectedAccount?.type === "qr" ? "QR" : selectedAccount?.type === "meta" ? "Cloud API" : "ALL"}
               </Badge>
             </div>
@@ -216,7 +216,7 @@ export function NewChatDialog() {
               </TabsTrigger>
               <TabsTrigger value="direct" className="text-xs flex items-center gap-1.5">
                 <Phone className="h-3.5 w-3.5" />
-                <span>Direct Number</span>
+                <span>Direct number</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -261,7 +261,7 @@ export function NewChatDialog() {
                 <div className="p-8 text-center text-muted-foreground space-y-1.5">
                   <BookOpen className="h-7 w-7 text-muted-foreground/40 mx-auto" />
                   <p className="text-xs font-semibold text-foreground">No contacts found</p>
-                  <p className="text-[11px] text-muted-foreground max-w-xs mx-auto">
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
                     {searchContact
                       ? "No phonebook contacts match your search."
                       : "Your contacts phonebook is currently empty."}
@@ -282,14 +282,14 @@ export function NewChatDialog() {
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-xs shrink-0">
                             {initials}
                           </div>
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-foreground truncate">
                               {contact.name || contact.mobile}
                             </p>
-                            <p className="text-[11px] text-muted-foreground font-mono truncate">
+                            <p className="text-xs text-muted-foreground font-mono truncate">
                               +{contact.mobile}
                             </p>
                           </div>
@@ -297,7 +297,7 @@ export function NewChatDialog() {
 
                         <div className="flex items-center gap-2 shrink-0">
                           {contact.phonebook_name && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                               {contact.phonebook_name}
                             </span>
                           )}
@@ -318,7 +318,7 @@ export function NewChatDialog() {
                         size="sm"
                         onClick={() => fetchContacts(page + 1, searchContact)}
                         disabled={loadingMore}
-                        className="h-7 text-xs text-primary"
+                        className="h-7 text-primary"
                       >
                         {loadingMore ? (
                           <>
@@ -341,7 +341,7 @@ export function NewChatDialog() {
             <form onSubmit={handleStartDirectChat} className="space-y-3.5">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-foreground">
-                  Phone Number <span className="text-red-500">*</span>
+                  Phone number <span className="text-destructive">*</span>
                 </label>
                 <div className="relative">
                   <Input
@@ -353,7 +353,7 @@ export function NewChatDialog() {
                     autoFocus
                   />
                 </div>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Enter full international format without + or spaces (e.g. 919876543210).
                 </p>
               </div>
@@ -372,7 +372,7 @@ export function NewChatDialog() {
               <Button
                 type="submit"
                 disabled={!directPhone.trim() || checkingDirect}
-                className="w-full h-9 text-xs font-medium gap-1.5 mt-2"
+                className="w-full h-9 font-medium gap-1.5 mt-2"
               >
                 {checkingDirect ? (
                   <>
@@ -381,7 +381,7 @@ export function NewChatDialog() {
                   </>
                 ) : (
                   <>
-                    <span>Start Conversation</span>
+                    <span>Start conversation</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </>
                 )}

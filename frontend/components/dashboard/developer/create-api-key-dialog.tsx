@@ -158,7 +158,7 @@ export function CreateApiKeyDialog({
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Generate New API Key</DialogTitle>
+            <DialogTitle>Generate new API key</DialogTitle>
             <DialogDescription>
               Create a cryptographic key to integrate your applications with the Resend Developer API.
             </DialogDescription>
@@ -167,7 +167,7 @@ export function CreateApiKeyDialog({
           <div className="space-y-5 py-4">
             {/* Key Name */}
             <div className="space-y-1.5">
-              <Label htmlFor="key-name">Key Name</Label>
+              <Label htmlFor="key-name">Key name</Label>
               <Input
                 id="key-name"
                 placeholder="e.g. Website Production, Order Bot"
@@ -195,7 +195,7 @@ export function CreateApiKeyDialog({
 
             {/* Scopes */}
             <div className="space-y-2">
-              <Label>Granular Scopes</Label>
+              <Label>Granular scopes</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-lg p-3 bg-card">
                 {AVAILABLE_SCOPES.map((scope) => {
                   const isChecked = selectedScopes.includes(scope.id);
@@ -214,7 +214,7 @@ export function CreateApiKeyDialog({
                         <span className="font-mono font-medium block text-foreground">
                           {scope.label}
                         </span>
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-xs text-muted-foreground">
                           {scope.description}
                         </span>
                       </div>
@@ -227,8 +227,8 @@ export function CreateApiKeyDialog({
             {/* WhatsApp Connections Authorization */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Allowed WhatsApp Connections</Label>
-                <span className="text-[11px] text-muted-foreground">
+                <Label>Allowed WhatsApp connections</Label>
+                <span className="text-xs text-muted-foreground">
                   Leave unselected to allow all workspace connections
                 </span>
               </div>
@@ -253,11 +253,11 @@ export function CreateApiKeyDialog({
                             className="rounded border-muted-foreground/30 text-primary h-4 w-4"
                           />
                           <span className="font-medium">{conn.name}</span>
-                          <span className="text-muted-foreground font-mono text-[11px]">
+                          <span className="text-muted-foreground font-mono text-xs">
                             ({conn.phone_number || conn.id})
                           </span>
                         </div>
-                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
+                        <span className="text-[11px] uppercase font-mono px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
                           {conn.provider}
                         </span>
                       </label>
@@ -286,7 +286,7 @@ export function CreateApiKeyDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   If set, requests omitting <code>connection_id</code> will default to this account.
                 </p>
               </div>
@@ -304,7 +304,7 @@ export function CreateApiKeyDialog({
             </Button>
             <Button type="submit" disabled={isLoading} className="gap-1.5">
               {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              <span>Generate API Key</span>
+              <span>Generate API key</span>
             </Button>
           </DialogFooter>
         </form>

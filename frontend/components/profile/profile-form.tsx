@@ -119,7 +119,7 @@ export function ProfileForm({ mode, initialValues, onSubmit }: ProfileFormProps)
               {statusMessage.type === 'error' ? (
                 <AlertTriangle className="h-4 w-4" />
               ) : (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <CheckCircle2 className="h-4 w-4 text-success" />
               )}
               <AlertDescription className="text-xs font-medium">
                 {statusMessage.text}
@@ -271,7 +271,7 @@ export function ProfileForm({ mode, initialValues, onSubmit }: ProfileFormProps)
           <Button
             type="submit"
             disabled={loading}
-            className={mode === 'admin' ? 'bg-red-600 hover:bg-red-700 text-white' : ''}
+            className={mode === 'admin' ? 'bg-destructive hover:bg-destructive text-white' : ''}
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Changes

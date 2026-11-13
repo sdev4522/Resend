@@ -73,7 +73,7 @@ export default function DeveloperPage() {
     <div className="space-y-6">
       <DashboardPageHeader
         title="Developer API"
-        description="Generate API keys, manage WhatsApp connections, monitor rate limits, and integrate via REST."
+        description="API keys, rate limits and usage for the REST API."
       />
 
       {isLoading ? (
@@ -86,7 +86,7 @@ export default function DeveloperPage() {
           <TabsList className="grid grid-cols-2 sm:grid-cols-4 w-full max-w-xl">
             <TabsTrigger value="keys" className="gap-1.5 text-xs">
               <Key className="h-3.5 w-3.5" />
-              <span>API Keys</span>
+              <span>API keys</span>
             </TabsTrigger>
             <TabsTrigger value="connections" className="gap-1.5 text-xs">
               <Radio className="h-3.5 w-3.5" />
@@ -94,7 +94,7 @@ export default function DeveloperPage() {
             </TabsTrigger>
             <TabsTrigger value="limits" className="gap-1.5 text-xs">
               <Gauge className="h-3.5 w-3.5" />
-              <span>Limits & Usage</span>
+              <span>Limits & usage</span>
             </TabsTrigger>
             <TabsTrigger value="docs" className="gap-1.5 text-xs">
               <BookOpen className="h-3.5 w-3.5" />

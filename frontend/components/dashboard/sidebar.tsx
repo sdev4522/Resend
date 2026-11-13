@@ -82,7 +82,7 @@ export function DashboardSidebar() {
         {/* Brand Header */}
         <div className="flex items-center gap-2.5 px-1 py-1">
           <ResendMark className="h-8 w-8 shrink-0 text-primary" />
-          <span className="text-lg font-bold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
+          <span className="text-lg font-semibold tracking-tight text-sidebar-foreground group-data-[collapsible=icon]:hidden">
             Resend
           </span>
         </div>
@@ -132,7 +132,7 @@ export function DashboardSidebar() {
                           <span>{item.title}</span>
                         </SidebarMenuButton>
                         {item.badge && (
-                          <SidebarMenuBadge className="gap-1 text-[10px] font-semibold text-primary group-data-[collapsible=icon]:hidden">
+                          <SidebarMenuBadge className="gap-1 text-xs font-semibold text-primary group-data-[collapsible=icon]:hidden">
                             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" aria-hidden="true" />
                             {item.badge}
                           </SidebarMenuBadge>
@@ -181,7 +181,7 @@ export function DashboardSidebar() {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold leading-tight">Help &amp; Support</p>
-            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5 truncate">Tickets &amp; resources</p>
+            <p className="text-xs text-muted-foreground leading-tight mt-0.5 truncate">Tickets &amp; resources</p>
           </div>
         </Link>
       </SidebarFooter>

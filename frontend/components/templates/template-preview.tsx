@@ -121,7 +121,7 @@ export function TemplatePreview({
         {headerComp && (
           <div>
             {headerComp.format === 'TEXT' && formattedHeaderText && (
-              <div className="px-3.5 pt-3 pb-1 font-bold text-sm text-foreground">
+              <div className="px-3.5 pt-3 pb-1 font-semibold text-sm text-foreground">
                 {formattedHeaderText}
               </div>
             )}
@@ -139,7 +139,7 @@ export function TemplatePreview({
                 ) : (
                   <div className="flex flex-col items-center gap-1.5 text-muted-foreground">
                     <ImageIcon className="h-8 w-8" />
-                    <span className="text-[11px] font-medium">Image Header</span>
+                    <span className="text-xs font-medium">Image header</span>
                   </div>
                 )}
               </div>
@@ -149,7 +149,7 @@ export function TemplatePreview({
               <div className="h-36 w-full bg-muted flex items-center justify-center text-muted-foreground">
                 <div className="flex flex-col items-center gap-1.5">
                   <Video className="h-8 w-8" />
-                  <span className="text-[11px] font-medium">Video Header</span>
+                  <span className="text-xs font-medium">Video header</span>
                 </div>
               </div>
             )}
@@ -158,8 +158,8 @@ export function TemplatePreview({
               <div className="m-2 p-2.5 rounded-md bg-muted/60 border flex items-center gap-2.5">
                 <FileText className="h-6 w-6 text-primary" />
                 <div className="flex flex-col">
-                  <span className="text-xs font-semibold">Document Header</span>
-                  <span className="text-[10px] text-muted-foreground">PDF, DOCX, or XLSX</span>
+                  <span className="text-xs font-semibold">Document header</span>
+                  <span className="text-xs text-muted-foreground">PDF, DOCX, or XLSX</span>
                 </div>
               </div>
             )}
@@ -179,15 +179,15 @@ export function TemplatePreview({
 
         {/* Footer Component */}
         {footerComp?.text && (
-          <div className="px-3.5 pb-1 text-[11px] text-muted-foreground">
+          <div className="px-3.5 pb-1 text-xs text-muted-foreground">
             {footerComp.text}
           </div>
         )}
 
         {/* Message Delivery Meta */}
-        <div className="px-3.5 pb-2 flex items-center justify-end gap-1 text-[10px] text-muted-foreground">
+        <div className="px-3.5 pb-2 flex items-center justify-end gap-1 text-xs text-muted-foreground">
           <span>12:00 PM</span>
-          <CheckCheck className="h-3.5 w-3.5 text-sky-500" />
+          <CheckCheck className="h-3.5 w-3.5 text-info" />
         </div>
 
         {/* Interactive Buttons Component */}
@@ -208,8 +208,8 @@ export function TemplatePreview({
         )}
       </div>
 
-      <div className="mt-3 text-[11px] text-muted-foreground text-center">
-        Live WhatsApp Message Preview
+      <div className="mt-3 text-xs text-muted-foreground text-center">
+        Live WhatsApp message preview
       </div>
     </div>
   );

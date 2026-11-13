@@ -88,12 +88,12 @@ export default function UserProfilePage() {
       <div className="max-w-4xl mx-auto py-8">
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
-          <AlertTitle>Profile Unavailable</AlertTitle>
+          <AlertTitle>Profile unavailable</AlertTitle>
           <AlertDescription className="mt-2 flex flex-col items-start gap-3">
             <span>{error || 'Unable to retrieve user information from the backend.'}</span>
             <Button variant="outline" size="sm" onClick={fetchProfile} className="gap-1.5">
               <RefreshCw className="h-3.5 w-3.5" />
-              Try Again
+              Try again
             </Button>
           </AlertDescription>
         </Alert>

@@ -31,22 +31,22 @@ export const DelayNode = memo(({ data, selected }: NodeProps) => {
 
       <div className="flex items-center justify-between pb-2 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-600 shadow-2xs">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-warning/10 border border-warning/30 text-warning shadow-2xs">
             <Clock className="h-4 w-4" />
           </div>
           <div>
-            <span className="text-xs font-bold text-foreground">Delay</span>
-            <p className="text-[10px] text-muted-foreground">Pause execution</p>
+            <span className="text-xs font-semibold text-foreground">Delay</span>
+            <p className="text-xs text-muted-foreground">Pause execution</p>
           </div>
         </div>
 
-        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal">
+        <Badge variant="secondary" className="text-xs px-1.5 py-0 font-normal">
           Timer
         </Badge>
       </div>
 
       <div className="pt-2 text-center">
-        <div className="text-xs font-mono font-bold text-foreground bg-muted/30 py-1 px-2 rounded border border-border/40">
+        <div className="text-xs font-mono font-semibold text-foreground bg-muted/30 py-1 px-2 rounded border border-border/40">
           ⏳ Wait {formatDuration(seconds)}
         </div>
       </div>

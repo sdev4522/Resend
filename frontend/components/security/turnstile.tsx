@@ -359,7 +359,7 @@ export const Turnstile = forwardRef<TurnstileRef, TurnstileProps>(
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-background text-foreground border hover:bg-accent transition-colors shadow-xs cursor-pointer"
             >
               <RefreshCw className="h-3 w-3" />
-              <span>Retry Verification</span>
+              <span>Retry verification</span>
             </button>
           </div>
         )}

@@ -109,9 +109,9 @@ export function ChatListPanel() {
       {/* Header with Title and New Chat (+) Button */}
       <div className="flex items-center justify-between px-3 pt-3 pb-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-bold text-foreground">Chats</span>
+          <span className="text-sm font-semibold text-foreground">Chats</span>
           {chats.length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-muted font-mono text-muted-foreground">
+            <span className="text-xs px-1.5 py-0.2 rounded-full bg-muted font-mono text-muted-foreground">
               {chats.length}
             </span>
           )}
@@ -120,11 +120,11 @@ export function ChatListPanel() {
           variant="default"
           size="sm"
           onClick={() => setIsNewChatOpen(true)}
-          className="h-7 px-2.5 text-xs gap-1 shadow-2xs font-medium cursor-pointer"
+          className="h-7 px-2.5 gap-1 font-medium cursor-pointer"
           title="New Chat"
         >
           <Plus className="h-3.5 w-3.5" />
-          <span>New Chat</span>
+          <span>New chat</span>
         </Button>
       </div>
 
@@ -152,7 +152,7 @@ export function ChatListPanel() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => setFilterTab("all")}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               filterTab === "all"
                 ? "bg-primary text-primary-foreground font-semibold"
                 : "bg-muted/40 hover:bg-muted text-muted-foreground"
@@ -162,7 +162,7 @@ export function ChatListPanel() {
           </button>
           <button
             onClick={() => setFilterTab("unread")}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
               filterTab === "unread"
                 ? "bg-primary text-primary-foreground font-semibold"
                 : "bg-muted/40 hover:bg-muted text-muted-foreground"
@@ -172,7 +172,7 @@ export function ChatListPanel() {
           </button>
           <button
             onClick={() => setFilterTab("has_note")}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer ${
               filterTab === "has_note"
                 ? "bg-primary text-primary-foreground font-semibold"
                 : "bg-muted/40 hover:bg-muted text-muted-foreground"
@@ -211,7 +211,7 @@ export function ChatListPanel() {
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-foreground">No conversations</p>
-              <p className="text-[11px] text-muted-foreground max-w-[200px]">
+              <p className="text-xs text-muted-foreground max-w-[200px]">
                 {searchQuery
                   ? "No chats matched your search."
                   : "Start a new chat from your phonebook or direct number."}
@@ -220,10 +220,10 @@ export function ChatListPanel() {
             <Button
               size="sm"
               onClick={() => setIsNewChatOpen(true)}
-              className="h-8 text-xs gap-1.5 shadow-2xs cursor-pointer"
+              className="h-8 gap-1.5 cursor-pointer"
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>New Chat</span>
+              <span>New chat</span>
             </Button>
           </div>
         ) : (
@@ -253,18 +253,18 @@ export function ChatListPanel() {
                 >
                   {/* Avatar */}
                   <div className="relative shrink-0 mt-0.5">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-primary/25 text-primary flex items-center justify-center font-bold text-xs">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary/10 to-primary/25 text-primary flex items-center justify-center font-semibold text-xs">
                       {(chat.sender_name || chat.sender_mobile || "?").slice(0, 2).toUpperCase()}
                     </div>
                     {/* Origin Channel Pill */}
                     <span
-                      className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border flex items-center justify-center shadow-2xs text-[9px]"
+                      className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-background border flex items-center justify-center shadow-2xs text-xs"
                       title={chat.origin === "qr" ? "WhatsApp Web (QR)" : "Meta Cloud API"}
                     >
                       {chat.origin === "qr" ? (
-                        <QrCode className="h-2.5 w-2.5 text-emerald-600" />
+                        <QrCode className="h-2.5 w-2.5 text-success" />
                       ) : (
-                        <Cloud className="h-2.5 w-2.5 text-blue-600" />
+                        <Cloud className="h-2.5 w-2.5 text-info" />
                       )}
                     </span>
                   </div>
@@ -274,14 +274,14 @@ export function ChatListPanel() {
                     <div className="flex items-baseline justify-between gap-1 mb-0.5">
                       <span
                         className={`text-xs truncate ${
-                          hasUnread ? "font-bold text-foreground" : "font-semibold text-foreground/90"
+                          hasUnread ? "font-semibold text-foreground" : "font-semibold text-foreground/90"
                         }`}
                       >
                         {chat.sender_name && chat.sender_name !== "NA"
                           ? chat.sender_name
                           : chat.sender_mobile}
                       </span>
-                      <span className="text-[10px] text-muted-foreground shrink-0 font-mono">
+                      <span className="text-xs text-muted-foreground shrink-0 font-mono">
                         {timeFormatted}
                       </span>
                     </div>
@@ -291,7 +291,7 @@ export function ChatListPanel() {
                       const msgStatus = chat.last_message?.status?.toLowerCase();
                       return (
                         <p
-                          className={`text-[11px] truncate leading-tight flex items-center ${
+                          className={`text-xs truncate leading-tight flex items-center ${
                             hasUnread
                               ? "font-semibold text-foreground"
                               : "text-muted-foreground"
@@ -299,7 +299,7 @@ export function ChatListPanel() {
                         >
                           {isOutgoing && (
                             msgStatus === "read" ? (
-                              <CheckCheck className="h-3 w-3 mr-1 text-sky-500 shrink-0 inline" />
+                              <CheckCheck className="h-3 w-3 mr-1 text-info shrink-0 inline" />
                             ) : msgStatus === "delivered" ? (
                               <CheckCheck className="h-3 w-3 mr-1 text-muted-foreground shrink-0 inline" />
                             ) : msgStatus === "sending" || msgStatus === "pending" ? (
@@ -320,7 +320,7 @@ export function ChatListPanel() {
                           parsedTags.slice(0, 2).map((t: any, idx: number) => (
                             <span
                               key={idx}
-                              className="text-[9px] px-1 py-0 rounded bg-muted/60 text-muted-foreground font-mono truncate"
+                              className="text-xs px-1 py-0 rounded bg-muted/60 text-muted-foreground font-mono truncate"
                             >
                               {t.title || t}
                             </span>
@@ -328,7 +328,7 @@ export function ChatListPanel() {
                       </div>
 
                       {hasUnread && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-primary text-primary-foreground text-[10px] font-bold font-mono shrink-0">
+                        <span className="px-1.5 py-0.2 rounded-full bg-primary text-primary-foreground text-xs font-semibold font-mono shrink-0">
                           {chat.unread_count}
                         </span>
                       )}

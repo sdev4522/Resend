@@ -132,14 +132,14 @@ export default function TeamPage() {
     return (
       <div className="space-y-6">
         <DashboardPageHeader
-          title="Team Management"
-          description="Workspace team member directory."
+          title="Team"
+          description="People who share this workspace."
           breadcrumbs={[{ title: 'Team' }]}
         />
         <Card className="shadow-xs border">
           <CardContent className="p-8 text-center space-y-2">
             <ShieldCheck className="mx-auto h-10 w-10 text-muted-foreground" />
-            <h3 className="font-semibold text-base">Restricted Access</h3>
+            <h3 className="font-semibold text-base">Restricted access</h3>
             <p className="text-xs text-muted-foreground max-w-sm mx-auto">
               Team member management and invitation privileges are restricted to workspace owners.
             </p>
@@ -152,8 +152,8 @@ export default function TeamPage() {
   return (
     <div className="space-y-8">
       <DashboardPageHeader
-        title="Team Members & Agents"
-        description="Collaborate with support agents on a single WhatsApp number. Assign chats and track responses."
+        title="Team"
+        description="Invite agents to share the inbox, assign chats and track replies."
         breadcrumbs={[{ title: 'Team' }]}
         actions={
           <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ export default function TeamPage() {
               size="sm"
               onClick={fetchAgents}
               disabled={loading}
-              className="rounded-full text-xs h-9 px-4 gap-1.5"
+              className="rounded-full h-9 px-4 gap-1.5"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
               <span>Refresh</span>
@@ -171,15 +171,15 @@ export default function TeamPage() {
             <Dialog open={addModalOpen} onOpenChange={setAddModalOpen}>
               <DialogTrigger
                 render={
-                  <Button size="sm" className="rounded-full text-xs h-9 px-4 gap-1.5 cursor-pointer" />
+                  <Button size="sm" className="rounded-full h-9 px-4 gap-1.5 cursor-pointer" />
                 }
               >
                 <Plus className="h-4 w-4" />
-                <span>Add Member</span>
+                <span>Add member</span>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
                 <DialogHeader>
-                  <DialogTitle className="text-lg">Add Support Agent</DialogTitle>
+                  <DialogTitle className="text-lg">Add support agent</DialogTitle>
                   <DialogDescription className="text-xs">
                     Create an agent login with restricted access to customer conversations.
                   </DialogDescription>
@@ -195,7 +195,7 @@ export default function TeamPage() {
 
                   <div className="space-y-1">
                     <Label htmlFor="agent-name" className="text-xs font-semibold">
-                      Full Name
+                      Full name
                     </Label>
                     <Input
                       id="agent-name"
@@ -209,7 +209,7 @@ export default function TeamPage() {
 
                   <div className="space-y-1">
                     <Label htmlFor="agent-email" className="text-xs font-semibold">
-                      Email Address
+                      Email address
                     </Label>
                     <Input
                       id="agent-email"
@@ -224,7 +224,7 @@ export default function TeamPage() {
 
                   <div className="space-y-1">
                     <Label htmlFor="agent-mobile" className="text-xs font-semibold">
-                      Mobile Number
+                      Mobile number
                     </Label>
                     <Input
                       id="agent-mobile"
@@ -238,7 +238,7 @@ export default function TeamPage() {
 
                   <div className="space-y-1">
                     <Label htmlFor="agent-password" className="text-xs font-semibold">
-                      Temporary Password
+                      Temporary password
                     </Label>
                     <Input
                       id="agent-password"
@@ -271,7 +271,7 @@ export default function TeamPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => setAddModalOpen(false)}
-                      className="rounded-full text-xs"
+                      className="rounded-full"
                     >
                       Cancel
                     </Button>
@@ -279,7 +279,7 @@ export default function TeamPage() {
                       type="submit"
                       size="sm"
                       disabled={creating}
-                      className="rounded-full text-xs"
+                      className="rounded-full"
                     >
                       {creating ? (
                         <>
@@ -312,7 +312,7 @@ export default function TeamPage() {
             <div>
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                Active Team Directory
+                Active team directory
               </CardTitle>
               <CardDescription className="text-xs">
                 Colleagues with access to reply to WhatsApp chats.
@@ -333,7 +333,7 @@ export default function TeamPage() {
           ) : agents.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
-                <thead className="border-b text-muted-foreground uppercase text-[10px] font-semibold">
+                <thead className="border-b text-muted-foreground uppercase text-[11px] font-semibold">
                   <tr>
                     <th className="py-3 px-3">Agent</th>
                     <th className="py-3 px-3">Contact</th>
@@ -358,13 +358,13 @@ export default function TeamPage() {
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar className="h-8 w-8 border">
-                              <AvatarFallback className="bg-primary/10 text-[11px] font-semibold text-primary">
+                              <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
                                 {initials}
                               </AvatarFallback>
                             </Avatar>
                             <div>
                               <p className="font-semibold text-foreground text-xs">{agent.name}</p>
-                              <p className="text-[11px] text-muted-foreground font-mono">UID: {agent.uid.slice(0, 8)}...</p>
+                              <p className="text-xs text-muted-foreground font-mono">UID: {agent.uid.slice(0, 8)}...</p>
                             </div>
                           </div>
                         </td>
@@ -381,8 +381,8 @@ export default function TeamPage() {
                           )}
                         </td>
                         <td className="py-3 px-3">
-                          <Badge variant="secondary" className="text-[10px] font-medium">
-                            Support Agent
+                          <Badge variant="secondary" className="text-xs font-medium">
+                            Support agent
                           </Badge>
                         </td>
                         <td className="py-3 px-3 text-muted-foreground">
@@ -410,16 +410,16 @@ export default function TeamPage() {
               <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                 <Users className="h-5 w-5" />
               </div>
-              <span className="text-sm font-medium text-foreground">No Support Agents Added</span>
+              <span className="text-sm font-medium text-foreground">No support agents added</span>
               <p className="text-xs text-muted-foreground max-w-sm">
                 Add team members so multiple colleagues can reply to customers simultaneously from one WhatsApp number.
               </p>
               <Button
                 size="sm"
                 onClick={() => setAddModalOpen(true)}
-                className="mt-3 rounded-full text-xs h-8 px-4"
+                className="mt-3 rounded-full h-8 px-4"
               >
-                <Plus className="mr-1 h-3.5 w-3.5" /> Add First Agent
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add first agent
               </Button>
             </div>
           )}

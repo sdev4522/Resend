@@ -104,7 +104,7 @@ function StatCard({
       {loading ? (
         <Skeleton className="mt-1 h-8 w-16" />
       ) : (
-        <p className="mt-0.5 text-3xl font-bold tracking-tight tabular-nums text-foreground">{value.toLocaleString()}</p>
+        <p className="mt-0.5 text-3xl font-semibold tracking-tight tabular-nums text-foreground">{value.toLocaleString()}</p>
       )}
       <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
     </Link>
@@ -126,7 +126,7 @@ function UsageRow({ label, used, limit }: { label: string; used: number; limit: 
       {limit && (
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuenow={used} aria-valuemax={limit} aria-label={label}>
           <div
-            className={cn('h-full rounded-full transition-[width] duration-700', near ? 'bg-amber-500' : 'bg-primary')}
+            className={cn('h-full rounded-full transition-[width] duration-700', near ? 'bg-warning' : 'bg-primary')}
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -221,7 +221,7 @@ export default function DashboardOverviewPage() {
             <p className="text-sm text-muted-foreground" suppressHydrationWarning>
               {new Date(now).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}
             </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-foreground sm:text-4xl" suppressHydrationWarning>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl" suppressHydrationWarning>
               {greeting(now)}, {firstName}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
@@ -233,7 +233,7 @@ export default function DashboardOverviewPage() {
                 <span
                   className={cn(
                     'inline-flex items-center gap-1.5 rounded-full border bg-background/70 px-3 py-1 backdrop-blur',
-                    daysLeft <= 3 ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' : 'text-muted-foreground',
+                    daysLeft <= 3 ? 'border-warning/40 text-warning' : 'text-muted-foreground',
                   )}
                 >
                   <CalendarClock className="h-3.5 w-3.5" />
@@ -254,7 +254,7 @@ export default function DashboardOverviewPage() {
               <div className="flex items-center gap-3">
                 <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#dff7ee] text-[#00785f] dark:bg-[#0f3a2f] dark:text-[#5fe0bd]">
                   <Smartphone className="h-[18px] w-[18px]" />
-                  <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background bg-emerald-500" />
+                  <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-background bg-success" />
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-foreground">WhatsApp connected</p>
@@ -267,7 +267,7 @@ export default function DashboardOverviewPage() {
             ) : (
               <div>
                 <div className="flex items-center gap-3">
-                  <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400">
+                  <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-warning/10 text-warning dark:bg-warning/15">
                     <Smartphone className="h-[18px] w-[18px]" />
                   </span>
                   <div>
@@ -321,7 +321,7 @@ export default function DashboardOverviewPage() {
               <h2 className="text-base font-semibold text-foreground">Messages, last 7 days</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">Across every connected number</p>
             </div>
-            <Button variant="ghost" size="sm" onClick={fetchDashboard} disabled={loading} className="rounded-full text-xs text-muted-foreground">
+            <Button variant="ghost" size="sm" onClick={fetchDashboard} disabled={loading} className="rounded-full text-muted-foreground">
               <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', loading && 'animate-spin')} />
               Refresh
             </Button>

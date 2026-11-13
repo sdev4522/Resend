@@ -23,10 +23,10 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       <DashboardSidebar />
-      <SidebarInset className="min-w-0 flex flex-col h-[100dvh] overflow-hidden bg-muted/40 dark:bg-background">
+      <SidebarInset className="min-w-0 flex flex-col h-[100dvh] overflow-hidden bg-surface">
         <DashboardHeader />
         <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 lg:p-8 pb-safe">
-          <div className="mx-auto w-full">
+          <div className="mx-auto w-full max-w-[1440px]">
             {children}
           </div>
         </main>

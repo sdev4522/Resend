@@ -337,10 +337,10 @@ export function NodePalette({ onAddNode, isQrConnection = false }: NodePalettePr
   return (
     <div className="h-full flex flex-col bg-card border-r border-border select-none">
       <div className="p-3 border-b border-border/80">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-          Node Palette
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Node palette
         </h3>
-        <p className="text-[11px] text-muted-foreground/80 mt-0.5">
+        <p className="text-xs text-muted-foreground/80 mt-0.5">
           Click or drag onto canvas to build flow
         </p>
       </div>
@@ -352,7 +352,7 @@ export function NodePalette({ onAddNode, isQrConnection = false }: NodePalettePr
 
           return (
             <div key={cat.id} className="space-y-1.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 px-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 px-1">
                 {cat.label}
               </span>
 
@@ -396,7 +396,7 @@ export function NodePalette({ onAddNode, isQrConnection = false }: NodePalettePr
                             <Plus className="h-3 w-3 text-muted-foreground/40 group-hover:text-primary shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
                           )}
                         </div>
-                        <p className="text-[10px] text-muted-foreground line-clamp-1">
+                        <p className="text-xs text-muted-foreground line-clamp-1">
                           {item.description}
                         </p>
                       </div>

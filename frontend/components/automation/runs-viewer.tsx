@@ -70,7 +70,7 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-foreground">Active Flow Sessions</h2>
+          <h2 className="text-lg font-semibold text-foreground">Active flow sessions</h2>
           <p className="text-xs text-muted-foreground">
             Contacts currently interacting with this automation in real-time.
           </p>
@@ -79,7 +79,7 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 text-xs gap-1.5"
+          className="h-8 gap-1.5"
           onClick={fetchSessions}
           disabled={loading}
         >
@@ -95,7 +95,7 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
       ) : sessions.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-12 text-center space-y-2">
           <Layers className="h-8 w-8 mx-auto text-muted-foreground/60" />
-          <h3 className="font-semibold text-sm">No Active Sessions</h3>
+          <h3 className="font-semibold text-sm">No active sessions</h3>
           <p className="text-xs text-muted-foreground max-w-sm mx-auto">
             When contacts trigger this automation and interact with its nodes, their active session states will appear here.
           </p>
@@ -105,12 +105,12 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow>
-                <TableHead className="text-xs font-bold">Contact Mobile</TableHead>
-                <TableHead className="text-xs font-bold">Channel</TableHead>
-                <TableHead className="text-xs font-bold">Current Node</TableHead>
-                <TableHead className="text-xs font-bold">Auto-Reply State</TableHead>
-                <TableHead className="text-xs font-bold">Started At</TableHead>
-                <TableHead className="text-xs font-bold text-right">Actions</TableHead>
+                <TableHead className="text-xs font-semibold">Contact mobile</TableHead>
+                <TableHead className="text-xs font-semibold">Channel</TableHead>
+                <TableHead className="text-xs font-semibold">Current node</TableHead>
+                <TableHead className="text-xs font-semibold">Auto-Reply State</TableHead>
+                <TableHead className="text-xs font-semibold">Started at</TableHead>
+                <TableHead className="text-xs font-semibold text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,7 +142,7 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
                           <span className="font-semibold text-foreground">
                             {currentNode.type}
                           </span>
-                          <span className="text-[10px] text-muted-foreground block font-mono">
+                          <span className="text-xs text-muted-foreground block font-mono">
                             ID: {currentNode.id}
                           </span>
                         </div>
@@ -152,11 +152,11 @@ export function RunsViewer({ flowId }: RunsViewerProps) {
                     </TableCell>
                     <TableCell>
                       {isChatDisabled ? (
-                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-[10px]">
+                        <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30 text-xs">
                           Disabled
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-500/30 text-[10px]">
+                        <Badge variant="outline" className="bg-success/10 text-success border-success/30 text-xs">
                           Active
                         </Badge>
                       )}

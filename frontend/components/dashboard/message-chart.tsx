@@ -64,7 +64,7 @@ export function MessageChart({ days }: { days: Day[] }) {
             {[0, 0.5, 1].map((f) => (
               <div key={f} className="absolute inset-x-0 border-t border-dashed border-border/70" style={{ top: `${f * 100}%` }} />
             ))}
-            <span className="absolute -top-2 right-0 bg-card pl-1 text-[10px] tabular-nums text-muted-foreground">{max}</span>
+            <span className="absolute -top-2 right-0 bg-card pl-1 text-xs tabular-nums text-muted-foreground">{max}</span>
           </div>
 
           <div className="relative flex h-64 items-end gap-2 sm:gap-4" role="img" aria-label="Messages per day for the last 7 days; switch to Table for exact values">
@@ -103,7 +103,7 @@ export function MessageChart({ days }: { days: Day[] }) {
           </div>
           <div className="mt-2 flex gap-2 sm:gap-4" aria-hidden="true">
             {days.map((d) => (
-              <span key={d.date} className="flex-1 text-center text-[11px] text-muted-foreground">
+              <span key={d.date} className="flex-1 text-center text-xs text-muted-foreground">
                 {shortDay(d.date)}
               </span>
             ))}

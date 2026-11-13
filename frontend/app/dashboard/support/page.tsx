@@ -251,13 +251,13 @@ function UserSupportContent() {
   const getStatusBadge = (status: SupportStatus) => {
     switch (status) {
       case 'open':
-        return <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">Open</Badge>;
+        return <Badge variant="outline" className="border-info/30 text-info bg-info/10">Open</Badge>;
       case 'in_progress':
-        return <Badge variant="outline" className="border-amber-500/30 text-amber-400 bg-amber-500/10">In Progress</Badge>;
+        return <Badge variant="outline" className="border-warning/30 text-warning bg-warning/10">In progress</Badge>;
       case 'waiting_user':
         return <Badge variant="outline" className="border-purple-500/30 text-purple-400 bg-purple-500/10">Waiting on You</Badge>;
       case 'resolved':
-        return <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">Resolved</Badge>;
+        return <Badge variant="outline" className="border-success/30 text-success bg-success/10">Resolved</Badge>;
       case 'closed':
         return <Badge variant="outline" className="border-muted text-muted-foreground bg-muted/20">Closed</Badge>;
       default:
@@ -268,13 +268,13 @@ function UserSupportContent() {
   const getPriorityBadge = (priority: SupportPriority) => {
     switch (priority) {
       case 'urgent':
-        return <Badge className="bg-red-500/20 text-red-400 border border-red-500/30 text-[10px]">Urgent</Badge>;
+        return <Badge className="bg-destructive/20 text-destructive border border-destructive/30 text-xs">Urgent</Badge>;
       case 'high':
-        return <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px]">High</Badge>;
+        return <Badge className="bg-warning/20 text-warning border border-warning/30 text-xs">High</Badge>;
       case 'normal':
-        return <Badge variant="secondary" className="text-[10px]">Normal</Badge>;
+        return <Badge variant="secondary" className="text-xs">Normal</Badge>;
       case 'low':
-        return <Badge variant="outline" className="text-muted-foreground text-[10px]">Low</Badge>;
+        return <Badge variant="outline" className="text-muted-foreground text-xs">Low</Badge>;
       default:
         return null;
     }
@@ -285,9 +285,9 @@ function UserSupportContent() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/40 pb-5">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground flex items-center gap-2.5">
+          <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-2xl flex items-center gap-2.5">
             <LifeBuoy className="h-6 w-6 text-primary" />
-            Help & Customer Support
+            Help & customer support
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Get assistance from the engineering and support team, browse documentation, or track open requests.
@@ -314,7 +314,7 @@ function UserSupportContent() {
             className="h-9 gap-1.5"
           >
             <PlusCircle className="h-4 w-4" />
-            New Request
+            New request
           </Button>
         </div>
       </div>
@@ -324,20 +324,20 @@ function UserSupportContent() {
         <TabsList className="bg-muted/60 p-1 rounded-lg">
           <TabsTrigger value="tickets" className="text-xs sm:text-sm gap-1.5">
             <MessageSquare className="h-4 w-4" />
-            My Requests
+            My requests
             {counts.all > 0 && (
-              <Badge variant="secondary" className="ml-1 text-[11px] h-4.5 px-1.5">
+              <Badge variant="secondary" className="ml-1 text-xs h-4.5 px-1.5">
                 {counts.all}
               </Badge>
             )}
           </TabsTrigger>
           <TabsTrigger value="new" className="text-xs sm:text-sm gap-1.5">
             <PlusCircle className="h-4 w-4" />
-            Submit Request
+            Submit request
           </TabsTrigger>
           <TabsTrigger value="help" className="text-xs sm:text-sm gap-1.5">
             <BookOpen className="h-4 w-4" />
-            Help Resources & FAQ
+            Help resources & FAQ
           </TabsTrigger>
         </TabsList>
 
@@ -370,7 +370,7 @@ function UserSupportContent() {
                           {ticketDetail.category}
                         </Badge>
                       </div>
-                      <h2 className="text-xl font-bold mt-2 text-foreground">
+                      <h2 className="text-xl font-semibold mt-2 text-foreground">
                         {ticketDetail.subject}
                       </h2>
                       <p className="text-xs text-muted-foreground mt-1">
@@ -384,7 +384,7 @@ function UserSupportContent() {
                         variant="outline"
                         size="sm"
                         onClick={handleCloseTicket}
-                        className="text-xs border-muted-foreground/30 hover:border-destructive hover:text-destructive gap-1.5"
+                        className="border-muted-foreground/30 hover:border-destructive hover:text-destructive gap-1.5"
                       >
                         <XCircle className="h-3.5 w-3.5" />
                         Mark as Closed
@@ -418,11 +418,11 @@ function UserSupportContent() {
                           <div className="flex items-center justify-between gap-4 mb-2">
                             <div className="flex items-center gap-2">
                               {isAdmin ? (
-                                <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] font-semibold">
-                                  Support Team
+                                <Badge className="bg-primary/20 text-primary border-primary/30 text-xs font-semibold">
+                                  Support team
                                 </Badge>
                               ) : (
-                                <Badge variant="secondary" className="text-[10px]">
+                                <Badge variant="secondary" className="text-xs">
                                   You
                                 </Badge>
                               )}
@@ -430,7 +430,7 @@ function UserSupportContent() {
                                 {msg.sender_name}
                               </span>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-xs text-muted-foreground">
                               {new Date(msg.created_at).toLocaleString([], {
                                 dateStyle: 'short',
                                 timeStyle: 'short',
@@ -499,7 +499,7 @@ function UserSupportContent() {
                     variant={statusFilter === 'all' ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => setStatusFilter('all')}
-                    className="h-8 text-xs"
+                    className="h-8"
                   >
                     All ({counts.all})
                   </Button>
@@ -507,7 +507,7 @@ function UserSupportContent() {
                     variant={statusFilter === 'open' ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => setStatusFilter('open')}
-                    className="h-8 text-xs"
+                    className="h-8"
                   >
                     Open ({counts.open})
                   </Button>
@@ -515,7 +515,7 @@ function UserSupportContent() {
                     variant={statusFilter === 'resolved' ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => setStatusFilter('resolved')}
-                    className="h-8 text-xs"
+                    className="h-8"
                   >
                     Resolved ({counts.resolved})
                   </Button>
@@ -523,7 +523,7 @@ function UserSupportContent() {
                     variant={statusFilter === 'closed' ? 'secondary' : 'ghost'}
                     size="sm"
                     onClick={() => setStatusFilter('closed')}
-                    className="h-8 text-xs"
+                    className="h-8"
                   >
                     Closed ({counts.closed})
                   </Button>
@@ -560,7 +560,7 @@ function UserSupportContent() {
                     className="mt-4 gap-1.5 max-w-fit m-auto px-3 py-2 text-sm"
                   >
                     <PlusCircle className="h-4 w-4" />
-                    Submit Request
+                    Submit request
                   </Button>
                 </Card>
               ) : (
@@ -582,7 +582,7 @@ function UserSupportContent() {
                             </span>
                             {getStatusBadge(t.status)}
                             {getPriorityBadge(t.priority)}
-                            <span className="text-[11px] text-muted-foreground capitalize">
+                            <span className="text-xs text-muted-foreground capitalize">
                               • {t.category}
                             </span>
                           </div>
@@ -601,7 +601,7 @@ function UserSupportContent() {
                               day: 'numeric',
                             })}
                           </p>
-                          <p className="text-[11px] opacity-75">
+                          <p className="text-xs opacity-75">
                             {t.message_count || 1} {t.message_count === 1 ? 'message' : 'messages'}
                           </p>
                         </div>
@@ -638,7 +638,7 @@ function UserSupportContent() {
                 )}
 
                 {formSuccess && (
-                  <div className="flex items-center gap-2 p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 text-sm">
+                  <div className="flex items-center gap-2 p-3 rounded-lg border border-success/30 bg-success/10 text-success text-sm">
                     <CheckCircle2 className="h-4 w-4 shrink-0" />
                     <span>Your request has been submitted successfully. Redirecting to ticket...</span>
                   </div>
@@ -680,7 +680,7 @@ function UserSupportContent() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">Priority Level</Label>
+                    <Label className="text-xs font-medium">Priority level</Label>
                     <Select
                       value={newPriority}
                       onValueChange={(val) => setNewPriority(val as SupportPriority)}
@@ -702,7 +702,7 @@ function UserSupportContent() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="ticket-message" className="text-xs font-medium">
-                    Detailed Description <span className="text-destructive">*</span>
+                    Detailed description <span className="text-destructive">*</span>
                   </Label>
                   <Textarea
                     id="ticket-message"
@@ -713,7 +713,7 @@ function UserSupportContent() {
                     disabled={isCreating}
                     required
                   />
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-xs text-muted-foreground">
                     Minimum 10 characters. Avoid sharing sensitive passwords or private access tokens.
                   </p>
                 </div>
@@ -765,7 +765,7 @@ function UserSupportContent() {
                     href={article.link}
                     className="inline-flex items-center text-primary text-xs font-medium gap-1 hover:underline"
                   >
-                    View Guide <ChevronRight className="h-3 w-3" />
+                    View guide <ChevronRight className="h-3 w-3" />
                   </Link>
                 </CardFooter>
               </Card>
@@ -775,7 +775,7 @@ function UserSupportContent() {
           <Card className="border-border/60 bg-card/60 p-6">
             <h3 className="font-semibold text-base text-foreground flex items-center gap-2">
               <Zap className="h-4 w-4 text-primary" />
-              Frequently Asked Support Questions
+              Frequently asked support questions
             </h3>
             <div className="mt-4 space-y-4 text-sm divide-y divide-border/40">
               <div className="pt-3 first:pt-0">

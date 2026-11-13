@@ -26,17 +26,17 @@ function CodeBlock({ code, language = 'bash' }: CodeBlockProps) {
 
   return (
     <div className="relative rounded-lg bg-zinc-950 dark:bg-zinc-900 border border-zinc-800 text-zinc-100 font-mono text-xs overflow-hidden my-3 shadow-xs">
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-900/90 dark:bg-zinc-800/60 border-b border-zinc-800 text-[11px] text-zinc-400">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-900/90 dark:bg-zinc-800/60 border-b border-zinc-800 text-xs text-zinc-400">
         <span className="uppercase tracking-wider font-semibold">{language}</span>
         <Button
           size="sm"
           variant="ghost"
-          className="h-6 px-2 text-zinc-400 hover:text-white hover:bg-zinc-800 gap-1 text-[11px]"
+          className="h-6 px-2 text-zinc-400 hover:text-white hover:bg-zinc-800 gap-1"
           onClick={handleCopy}
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3 text-emerald-400" />
+              <Check className="h-3 w-3 text-success" />
               <span>Copied</span>
             </>
           ) : (
@@ -162,8 +162,8 @@ export function DocumentationView() {
       {/* Sticky Table of Contents */}
       <div className="md:col-span-1 hidden md:block">
         <div className="sticky top-20 rounded-lg border bg-card p-3 space-y-1 text-xs">
-          <p className="font-semibold text-foreground px-2 py-1 uppercase tracking-wider text-[10px] text-muted-foreground">
-            API Documentation
+          <p className="font-semibold text-foreground px-2 py-1 uppercase tracking-wider text-[11px] text-muted-foreground">
+            API documentation
           </p>
           {navItems.map((item) => (
             <button
@@ -183,7 +183,7 @@ export function DocumentationView() {
               href="/v1/openapi.json"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground text-[11px]"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-md text-muted-foreground hover:text-foreground text-xs"
             >
               <span>OpenAPI 3.1 Spec</span>
               <ExternalLink className="h-3 w-3" />
@@ -197,7 +197,7 @@ export function DocumentationView() {
         {/* Section: Getting Started */}
         <section id="getting-started" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
-            <h2 className="text-xl font-bold tracking-tight">Getting Started</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Getting started</h2>
             <p className="text-xs text-muted-foreground">
               Send your first WhatsApp message in minutes with the Resend Developer API.
             </p>
@@ -209,7 +209,7 @@ export function DocumentationView() {
             </p>
             <ol className="list-decimal list-inside space-y-1.5 pl-1 text-xs text-foreground/80">
               <li>
-                <strong>Create an API Key</strong> in the <em>API Keys</em> tab above, selecting the <code>messages:send</code> scope.
+                <strong>Create an API Key</strong> in the <em>API keys</em> tab above, selecting the <code>messages:send</code> scope.
               </li>
               <li>
                 <strong>Get your Connection ID</strong> (e.g. <code>wa_01KABC...</code>) from the <em>Connections</em> tab.
@@ -227,7 +227,7 @@ export function DocumentationView() {
         {/* Section: Authentication */}
         <section id="authentication" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
-            <h2 className="text-xl font-bold tracking-tight">Authentication</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Authentication</h2>
             <p className="text-xs text-muted-foreground">
               Secure Bearer token authorization using cryptographic API keys.
             </p>
@@ -254,7 +254,7 @@ export function DocumentationView() {
           <div className="border-b pb-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-mono text-xs">GET</Badge>
-              <h2 className="text-xl font-bold tracking-tight">/v1/connections</h2>
+              <h2 className="text-xl font-semibold tracking-tight">/v1/connections</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               Retrieve all WhatsApp accounts authorized for your API key.
@@ -339,8 +339,8 @@ print(response.json())`}
         <section id="messages" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-emerald-600 text-white font-mono text-xs">POST</Badge>
-              <h2 className="text-xl font-bold tracking-tight">/v1/messages</h2>
+              <Badge className="bg-success text-white font-mono text-xs">POST</Badge>
+              <h2 className="text-xl font-semibold tracking-tight">/v1/messages</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               Send a text, image, video, audio, or document WhatsApp message.
@@ -472,7 +472,7 @@ print(res.json())`}
           <div className="border-b pb-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-mono text-xs">GET</Badge>
-              <h2 className="text-xl font-bold tracking-tight">/v1/messages/:id</h2>
+              <h2 className="text-xl font-semibold tracking-tight">/v1/messages/:id</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               Retrieve real-time delivery status for a message.
@@ -508,18 +508,18 @@ print(res.json())`}
         <section id="templates" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
             <div className="flex items-center gap-2">
-              <Badge className="bg-emerald-600 text-white font-mono text-xs">POST</Badge>
-              <h2 className="text-xl font-bold tracking-tight">/v1/template-messages</h2>
+              <Badge className="bg-success text-white font-mono text-xs">POST</Badge>
+              <h2 className="text-xl font-semibold tracking-tight">/v1/template-messages</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               Send approved Meta WhatsApp Cloud templates with variables.
             </p>
           </div>
 
-          <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs space-y-1 text-amber-900 dark:text-amber-200">
+          <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg text-xs space-y-1 text-warning">
             <p className="font-semibold flex items-center gap-1.5">
-              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              Meta Cloud Connections Only
+              <AlertCircle className="h-4 w-4 text-warning" />
+              Meta Cloud connections only
             </p>
             <p>
               Meta templates are only supported by Meta Cloud API connections. Attempting to send a template through a QR/Baileys connection will return <code>400 TEMPLATE_NOT_SUPPORTED_BY_CONNECTION</code>.
@@ -554,7 +554,7 @@ print(res.json())`}
           <div className="border-b pb-2">
             <div className="flex items-center gap-2">
               <Badge variant="secondary" className="font-mono text-xs">GET</Badge>
-              <h2 className="text-xl font-bold tracking-tight">/v1/contacts</h2>
+              <h2 className="text-xl font-semibold tracking-tight">/v1/contacts</h2>
             </div>
             <p className="text-xs text-muted-foreground">
               Paginated contacts retrieval with search support.
@@ -573,7 +573,7 @@ print(res.json())`}
         {/* Section: Rate Limits */}
         <section id="rate-limits" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
-            <h2 className="text-xl font-bold tracking-tight">Rate Limits & Quotas</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Rate limits & quotas</h2>
             <p className="text-xs text-muted-foreground">
               Multi-layer protection across IP, API Key, Workspace, and WhatsApp connections.
             </p>
@@ -585,20 +585,20 @@ print(res.json())`}
                 <tr>
                   <th className="p-2.5">Layer</th>
                   <th className="p-2.5">Scope</th>
-                  <th className="p-2.5">Default Limit</th>
-                  <th className="p-2.5">Behavior Exceeded</th>
+                  <th className="p-2.5">Default limit</th>
+                  <th className="p-2.5">Behavior exceeded</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
                 <tr>
                   <td className="p-2.5 font-semibold">Layer 1 — IP</td>
-                  <td className="p-2.5 text-muted-foreground">Per Client IP</td>
+                  <td className="p-2.5 text-muted-foreground">Per client IP</td>
                   <td className="p-2.5 font-mono">120 req / min</td>
                   <td className="p-2.5">HTTP 429 + Retry-After</td>
                 </tr>
                 <tr>
                   <td className="p-2.5 font-semibold">Layer 2 — API Key</td>
-                  <td className="p-2.5 text-muted-foreground">Per Bearer Key</td>
+                  <td className="p-2.5 text-muted-foreground">Per bearer key</td>
                   <td className="p-2.5 font-mono">60 req / min</td>
                   <td className="p-2.5">HTTP 429 + Retry-After</td>
                 </tr>
@@ -617,7 +617,7 @@ print(res.json())`}
                 <tr>
                   <td className="p-2.5 font-semibold">Layer 5 — Plan Quota</td>
                   <td className="p-2.5 text-muted-foreground">Monthly volume</td>
-                  <td className="p-2.5 font-mono">Per Subscription</td>
+                  <td className="p-2.5 font-mono">Per subscription</td>
                   <td className="p-2.5">HTTP 403 QUOTA_EXCEEDED</td>
                 </tr>
               </tbody>
@@ -632,7 +632,7 @@ print(res.json())`}
         {/* Section: Idempotency */}
         <section id="idempotency" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
-            <h2 className="text-xl font-bold tracking-tight">Idempotency Keys</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Idempotency keys</h2>
             <p className="text-xs text-muted-foreground">
               Guaranteed exactly-once message dispatch over unreliable networks.
             </p>
@@ -654,7 +654,7 @@ print(res.json())`}
         {/* Section: Error Codes */}
         <section id="error-codes" className="space-y-3 scroll-mt-20">
           <div className="border-b pb-2">
-            <h2 className="text-xl font-bold tracking-tight">Standard Error Codes</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Standard error codes</h2>
             <p className="text-xs text-muted-foreground">
               Consistent, structured JSON error envelopes across all endpoints.
             </p>
@@ -675,69 +675,69 @@ print(res.json())`}
             <table className="w-full text-xs">
               <thead className="bg-muted text-muted-foreground font-medium text-left">
                 <tr>
-                  <th className="p-2.5">Error Code</th>
+                  <th className="p-2.5">Error code</th>
                   <th className="p-2.5">Status</th>
                   <th className="p-2.5">Description</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border font-mono text-[11px]">
+              <tbody className="divide-y divide-border font-mono text-xs">
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">INVALID_API_KEY</td>
+                  <td className="p-2.5 font-semibold text-foreground">INVALID_API_KEY</td>
                   <td className="p-2.5 text-muted-foreground">401</td>
                   <td className="p-2.5 font-sans">Missing, invalid, or expired API key.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">API_KEY_REVOKED</td>
+                  <td className="p-2.5 font-semibold text-foreground">API_KEY_REVOKED</td>
                   <td className="p-2.5 text-muted-foreground">401</td>
                   <td className="p-2.5 font-sans">The API key was explicitly revoked.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">INSUFFICIENT_SCOPE</td>
+                  <td className="p-2.5 font-semibold text-foreground">INSUFFICIENT_SCOPE</td>
                   <td className="p-2.5 text-muted-foreground">403</td>
                   <td className="p-2.5 font-sans">API key lacks required scope for this endpoint.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">CONNECTION_REQUIRED</td>
+                  <td className="p-2.5 font-semibold text-foreground">CONNECTION_REQUIRED</td>
                   <td className="p-2.5 text-muted-foreground">400</td>
                   <td className="p-2.5 font-sans">connection_id omitted and no default is configured.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">CONNECTION_NOT_FOUND</td>
+                  <td className="p-2.5 font-semibold text-foreground">CONNECTION_NOT_FOUND</td>
                   <td className="p-2.5 text-muted-foreground">404</td>
                   <td className="p-2.5 font-sans">WhatsApp connection does not exist or outside workspace.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">CONNECTION_NOT_ALLOWED</td>
+                  <td className="p-2.5 font-semibold text-foreground">CONNECTION_NOT_ALLOWED</td>
                   <td className="p-2.5 text-muted-foreground">403</td>
                   <td className="p-2.5 font-sans">API key is not authorized for this specific WhatsApp account.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">CONNECTION_DISCONNECTED</td>
+                  <td className="p-2.5 font-semibold text-foreground">CONNECTION_DISCONNECTED</td>
                   <td className="p-2.5 text-muted-foreground">400</td>
                   <td className="p-2.5 font-sans">Target WhatsApp account is logged out or disconnected.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">TEMPLATE_NOT_SUPPORTED_BY_CONNECTION</td>
+                  <td className="p-2.5 font-semibold text-foreground">TEMPLATE_NOT_SUPPORTED_BY_CONNECTION</td>
                   <td className="p-2.5 text-muted-foreground">400</td>
                   <td className="p-2.5 font-sans">Attempted to send a Meta template through a QR connection.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">INVALID_PHONE_NUMBER</td>
+                  <td className="p-2.5 font-semibold text-foreground">INVALID_PHONE_NUMBER</td>
                   <td className="p-2.5 text-muted-foreground">400</td>
                   <td className="p-2.5 font-sans">Invalid phone format or not registered on WhatsApp.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">RATE_LIMITED</td>
+                  <td className="p-2.5 font-semibold text-foreground">RATE_LIMITED</td>
                   <td className="p-2.5 text-muted-foreground">429</td>
                   <td className="p-2.5 font-sans">Request rate limit exceeded. Check Retry-After header.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">QUOTA_EXCEEDED</td>
+                  <td className="p-2.5 font-semibold text-foreground">QUOTA_EXCEEDED</td>
                   <td className="p-2.5 text-muted-foreground">403</td>
                   <td className="p-2.5 font-sans">Monthly message limit exceeded for workspace plan.</td>
                 </tr>
                 <tr>
-                  <td className="p-2.5 font-bold text-foreground">IDEMPOTENCY_KEY_REUSED</td>
+                  <td className="p-2.5 font-semibold text-foreground">IDEMPOTENCY_KEY_REUSED</td>
                   <td className="p-2.5 text-muted-foreground">409</td>
                   <td className="p-2.5 font-sans">Same idempotency key submitted with different body.</td>
                 </tr>

@@ -31,7 +31,7 @@ export function WorkspaceSwitcher() {
         className="flex w-full items-center justify-between gap-2 rounded-xl border bg-card p-2.5 text-left text-sm transition-all hover:bg-muted/50 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
       >
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm shadow-xs">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-semibold text-sm shadow-xs">
             <Building2 className="h-4 w-4" />
           </div>
           <div className="flex flex-col min-w-0">
@@ -39,11 +39,11 @@ export function WorkspaceSwitcher() {
               {workspaceName}
             </span>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-[10px] text-muted-foreground capitalize">
+              <span className="text-xs text-muted-foreground capitalize">
                 {roleLabel}
               </span>
-              <span className="text-[10px] text-muted-foreground">•</span>
-              <Badge variant="secondary" className="px-1 py-0 text-[9px] font-medium h-3.5">
+              <span className="text-xs text-muted-foreground">•</span>
+              <Badge variant="secondary" className="px-1 py-0 text-xs font-medium h-3.5">
                 {planName}
               </Badge>
             </div>
@@ -55,7 +55,7 @@ export function WorkspaceSwitcher() {
       <DropdownMenuContent className="w-64" align="start" sideOffset={6}>
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">
-            Active Workspace
+            Active workspace
           </DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuItem className="flex items-center justify-between py-2 cursor-pointer font-medium">
@@ -70,7 +70,7 @@ export function WorkspaceSwitcher() {
           render={<Link href="/dashboard/settings" className="flex items-center gap-2 cursor-pointer text-xs" />}
         >
           <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-          <span>Workspace Settings</span>
+          <span>Workspace settings</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -117,7 +117,7 @@ export function TimeSeriesChart({
                 x={paddingX - 8}
                 y={y + 3}
                 textAnchor="end"
-                className="text-[10px] fill-muted-foreground font-mono"
+                className="text-xs fill-muted-foreground font-mono"
               >
                 {valueFormatter(gridVal)}
               </text>
@@ -228,7 +228,7 @@ export function TimeSeriesChart({
               x={x}
               y={chartHeight - 4}
               textAnchor="middle"
-              className="text-[10px] fill-muted-foreground font-mono"
+              className="text-xs fill-muted-foreground font-mono"
             >
               {formatDateLabel(d.date)}
             </text>
@@ -241,13 +241,13 @@ export function TimeSeriesChart({
         <div
           className="absolute z-20 top-2 left-1/2 -translate-x-1/2 pointer-events-none rounded-lg border border-border bg-popover/95 px-3 py-2 text-xs shadow-md backdrop-blur-xs flex flex-col gap-1 min-w-[140px]"
         >
-          <span className="font-semibold text-foreground border-b pb-1 text-[11px]">
+          <span className="font-semibold text-foreground border-b pb-1 text-xs">
             {data[hoverIndex].date}
           </span>
           {series.map((s) => {
             const val = Number(data[hoverIndex][s.key]) || 0;
             return (
-              <div key={s.key} className="flex items-center justify-between gap-3 text-[11px]">
+              <div key={s.key} className="flex items-center justify-between gap-3 text-xs">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: s.color }} />
                   <span>{s.label}:</span>
