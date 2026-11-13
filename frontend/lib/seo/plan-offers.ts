@@ -1,4 +1,6 @@
 import { siteConfig } from '@/config/site';
+// Same backend base the /api/proxy route uses, so this works wherever the app works
+import { API_BASE_URL } from '@/config/api';
 
 /**
  * Structured-data offers built from the live plan table, so search results never
@@ -7,8 +9,6 @@ import { siteConfig } from '@/config/site';
  * rather than publishing a guessed price.
  */
 
-const API_BASE_URL =
-  process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // Plans are sold in INR by default (the API's base currency)
 const SEO_CURRENCY = 'INR';
