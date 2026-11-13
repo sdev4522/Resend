@@ -1404,7 +1404,8 @@ router.post("/del_contact", validateUser, async (req, res) => {
   }
 });
 
-router.post("/update_meta", validateUser, async (req, res) => {
+// checkPlan: an expired/no-plan workspace cannot connect a Meta number (403 PLAN_EXPIRED / NO_PLAN)
+router.post("/update_meta", validateUser, checkPlan, async (req, res) => {
   try {
     const { waba_id, access_token, business_phone_number_id, app_id } =
       req.body;
@@ -3581,7 +3582,7 @@ router.post("/update_fcm_token", validateUser, async (req, res) => {
   }
 });
 
-router.post("/exchange_embed_token", validateUser, async (req, res) => {
+router.post("/exchange_embed_token", validateUser, checkPlan, async (req, res) => {
   try {
     const { authCode, wabaId, phoneNumId, businessId, isCoexistence } =
       req.body;

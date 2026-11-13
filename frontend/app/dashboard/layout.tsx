@@ -1,13 +1,17 @@
-import React from 'react';
-import type { Metadata } from 'next';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
-import { DashboardSidebar } from '@/components/dashboard/sidebar';
-import { DashboardHeader } from '@/components/dashboard/header';
+import React from "react";
+import type { Metadata } from "next";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { DashboardSidebar } from "@/components/dashboard/sidebar";
+import { DashboardHeader } from "@/components/dashboard/header";
+import {
+  PlanStatusProvider,
+  PlanExpiredBanner,
+} from "@/components/dashboard/plan-status";
 
 export const metadata: Metadata = {
   title: {
-    default: 'Resend Dashboard',
-    template: '%s | Resend',
+    default: "Resend Dashboard",
+    template: "%s | Resend",
   },
   robots: {
     index: false,
@@ -22,15 +26,16 @@ export default function DashboardLayout({
 }) {
   return (
     <SidebarProvider>
-      <DashboardSidebar />
-      <SidebarInset className="min-w-0 flex flex-col h-[100dvh] overflow-hidden bg-surface">
-        <DashboardHeader />
-        <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 lg:p-8 pb-safe">
-          <div className="mx-auto w-full max-w-[1440px]">
-            {children}
-          </div>
-        </main>
-      </SidebarInset>
+      <PlanStatusProvider>
+        <DashboardSidebar />
+        <SidebarInset className="min-w-0 flex flex-col h-[100dvh] overflow-hidden bg-surface">
+          <DashboardHeader />
+          <PlanExpiredBanner />
+          <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 lg:p-8 pb-safe">
+            <div className="mx-auto w-full max-w-[1440px]">{children}</div>
+          </main>
+        </SidebarInset>
+      </PlanStatusProvider>
     </SidebarProvider>
   );
 }

@@ -22,10 +22,12 @@ import { CurrencySwitcher } from './currency-switcher';
 import { getPlanTitle } from '@/lib/utils';
 import { Smartphone } from 'lucide-react';
 import { siteConfig } from '@/config/site';
+import { usePlanStatus } from './plan-status';
 
 export function DashboardHeader() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { state: planState, planTitle } = usePlanStatus();
 
   // Find matching nav item
   const activeNavItem = siteConfig.dashboardNav.find((item) =>
@@ -99,14 +101,19 @@ export function DashboardHeader() {
         </div>
 
         {/* Plan Badge on Desktop */}
-        {user?.plan && (
+        {planState === 'expired' || planState === 'none' ? (
           <Badge
-            variant="outline"
-            className="hidden md:inline-flex text-xs font-medium h-6"
+            variant="destructive"
+            render={<Link href="/dashboard/billing" />}
+            className="hidden md:inline-flex"
           >
-            {getPlanTitle(user.plan)}
+            {planState === 'none' ? 'No plan' : `${planTitle || getPlanTitle(user?.plan)} · Expired`}
           </Badge>
-        )}
+        ) : user?.plan ? (
+          <Badge variant="outline" className="hidden md:inline-flex">
+            {planTitle || getPlanTitle(user.plan)}
+          </Badge>
+        ) : null}
 
         {/* Currency Switcher Dropdown (hidden on small mobile to prevent header overflow) */}
         <div className="hidden sm:block">

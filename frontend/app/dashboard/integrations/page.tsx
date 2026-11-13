@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { UpgradePrompt } from '@/components/dashboard/upgrade-prompt';
+import { usePlanStatus, isPlanError } from '@/components/dashboard/plan-status';
 import { DashboardPageHeader } from '@/components/dashboard/dashboard-page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,7 @@ import type { Socket } from 'socket.io-client';
 
 export default function IntegrationsPage() {
   const { user, refreshUser } = useAuth();
+  const { requireActivePlan, openUpgrade, refresh: refreshPlan } = usePlanStatus();
 
   // ── 1. QR Instances State ──────────────────────────────────────────────
   const [instances, setInstances] = useState<QrInstance[]>([]);
@@ -296,6 +298,7 @@ export default function IntegrationsPage() {
 
   // ── Start QR connection flow for a new account ─────────────────────────
   const handleStartQrConnection = async () => {
+    if (!requireActivePlan('connect a WhatsApp number')) return;
     if (!user?.uid || isCreatingQr) {
       if (!user?.uid) toast.error('Authentication required to connect WhatsApp');
       return;
@@ -357,6 +360,14 @@ export default function IntegrationsPage() {
       }, 4000);
     } catch (err: any) {
       console.error('Error generating QR:', err);
+      if (isPlanError(err)) {
+        // Plan lapsed since the page loaded: explain it instead of a dead-end "Try again"
+        setDialogOpen(false);
+        setConnectionState('IDLE');
+        refreshPlan();
+        openUpgrade('connect a WhatsApp number');
+        return;
+      }
       setConnectionState('ERROR');
       setQrErrorMsg(err.message || 'Unable to initialize WhatsApp session. Please try again.');
     } finally {
@@ -366,6 +377,7 @@ export default function IntegrationsPage() {
 
   // ── Reconnect flow for an existing disconnected account ────────────────
   const handleReconnect = async (uniqueId: string) => {
+    if (!requireActivePlan('reconnect this number')) return;
     if (!user?.uid || isCreatingQr) return;
 
     setIsCreatingQr(true);
@@ -419,6 +431,13 @@ export default function IntegrationsPage() {
       }, 4000);
     } catch (err: any) {
       console.error('Error reconnecting instance:', err);
+      if (isPlanError(err)) {
+        setDialogOpen(false);
+        setConnectionState('IDLE');
+        refreshPlan();
+        openUpgrade('reconnect this number');
+        return;
+      }
       setConnectionState('ERROR');
       setQrErrorMsg(err.message || 'Unable to reconnect WhatsApp. Please try again.');
     } finally {
@@ -461,6 +480,7 @@ export default function IntegrationsPage() {
 
   // ── Launch Meta Embedded Signup Flow ───────────────────────────────────
   const handleStartMetaSignup = async () => {
+    if (!requireActivePlan('connect the Meta Cloud API')) return;
     if (!metaPublicConfig?.configured || !metaPublicConfig.embed_app_id || !metaPublicConfig.embed_app_config) {
       toast.error('Meta WhatsApp is not configured yet. Please contact your administrator.');
       return;
@@ -500,6 +520,12 @@ export default function IntegrationsPage() {
       }
     } catch (err: any) {
       console.error('Meta signup error:', err);
+      if (isPlanError(err)) {
+        setMetaDialogOpen(false);
+        refreshPlan();
+        openUpgrade('connect the Meta Cloud API');
+        return;
+      }
       if (err.message && (err.message.includes('cancelled') || err.message.includes('closed'))) {
         setMetaState('CANCELLED');
       } else {
