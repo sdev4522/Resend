@@ -8,13 +8,14 @@ import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
 import { PageBreadcrumb } from '@/components/marketing/page-breadcrumb';
 import { siteConfig } from '@/config/site';
+import { getPlanOffers, toAggregateOffer } from '@/lib/seo/plan-offers';
 
 export const metadata: Metadata = {
   title: 'Pricing — Transparent WhatsApp CRM Plans',
   description:
     'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
   alternates: {
-    canonical: 'https://resend.in/pricing',
+    canonical: `${siteConfig.url}/pricing`,
   },
   openGraph: {
     title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
@@ -41,7 +42,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const planOffers = await getPlanOffers();
   const pricingJsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -62,20 +64,18 @@ export default function PricingPage() {
           },
         ],
       },
-      {
-        '@type': 'Product',
-        name: 'Resend Platform Subscription',
-        description: 'WhatsApp CRM, automation, and collaborative multi-agent inbox platform subscription plans',
-        offers: {
-          '@type': 'AggregateOffer',
-          priceCurrency: 'USD',
-          lowPrice: '6',
-          highPrice: '10',
-          offerCount: '2',
-          availability: 'https://schema.org/InStock',
-          url: `${siteConfig.url}/pricing`,
-        },
-      },
+      // Only publish prices we actually charge; skip the product node if plans couldn't be loaded
+      ...(planOffers
+        ? [
+            {
+              '@type': 'Product',
+              name: `${siteConfig.name} subscription`,
+              description: 'WhatsApp Business API, shared team inbox, chatbots and campaigns.',
+              brand: { '@type': 'Brand', name: siteConfig.name },
+              offers: toAggregateOffer(planOffers),
+            },
+          ]
+        : []),
     ],
   };
 

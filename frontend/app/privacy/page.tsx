@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description:
     'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
   alternates: {
-    canonical: 'https://resend.in/privacy',
+    canonical: `${siteConfig.url}/privacy`,
   },
   openGraph: {
     title: 'Privacy Policy — Resend',

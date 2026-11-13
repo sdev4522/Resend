@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
   alternates: {
-    canonical: 'https://resend.in/contact',
+    canonical: `${siteConfig.url}/contact`,
   },
   openGraph: {
     title: 'Contact Resend — Sales & Customer Support',

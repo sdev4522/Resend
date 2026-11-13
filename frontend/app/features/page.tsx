@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   description:
     'Explore official WhatsApp Cloud API broadcasting, visual no-code flow builder, multi-agent shared inbox, and developer APIs.',
   alternates: {
-    canonical: 'https://resend.in/features',
+    canonical: `${siteConfig.url}/features`,
   },
   openGraph: {
     title: 'Features — WhatsApp Cloud API, Inbox & Automation | Resend',

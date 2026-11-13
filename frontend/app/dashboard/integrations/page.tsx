@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -94,6 +93,7 @@ export default function IntegrationsPage() {
   // ── 2. Meta Cloud API State ─────────────────────────────────────────────
   const [metaConnection, setMetaConnection] = useState<MetaConnection | null>(null);
   const [loadingMeta, setLoadingMeta] = useState(true);
+  const [metaError, setMetaError] = useState(false);
   const [metaPublicConfig, setMetaPublicConfig] = useState<MetaPublicConfig | null>(null);
   const [metaDialogOpen, setMetaDialogOpen] = useState(false);
   const [metaState, setMetaState] = useState<MetaConnectionState>('IDLE');
@@ -120,12 +120,17 @@ export default function IntegrationsPage() {
   const fetchMetaConnection = useCallback(async () => {
     try {
       setLoadingMeta(true);
+      setMetaError(false);
       const [connRes, configRes] = await Promise.all([
-        metaApi.getConnection().catch(() => ({ success: false, data: null })),
+        // A thrown error means "couldn't check", not "not connected": keep it distinct
+        metaApi.getConnection().catch(() => null),
         metaApi.getPublicConfig().catch(() => ({ success: false, data: null })),
       ]);
 
-      if (connRes.success && connRes.data) {
+      if (connRes === null) {
+        // Keep whatever we last knew instead of falsely showing "not connected"
+        setMetaError(true);
+      } else if (connRes.success && connRes.data) {
         setMetaConnection(connRes.data);
       } else {
         setMetaConnection(null);
@@ -136,6 +141,7 @@ export default function IntegrationsPage() {
       }
     } catch (err: any) {
       console.error('Failed to load Meta connection:', err);
+      setMetaError(true);
     } finally {
       setLoadingMeta(false);
     }
@@ -659,6 +665,23 @@ export default function IntegrationsPage() {
           </Card>
         )}
 
+        {!loadingMeta && metaError && (
+          <Card className="border-warning/30 bg-warning/5">
+            <CardContent className="p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 text-warning">
+                <AlertCircle className="h-5 w-5 shrink-0" />
+                <p className="text-sm font-medium">
+                  Couldn&apos;t check your Meta Cloud API connection. It may still be connected.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={fetchMetaConnection} className="gap-1.5 shrink-0">
+                <RefreshCw className="h-3.5 w-3.5" />
+                <span>Retry</span>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Empty State */}
         {connectIntent === 'cloud' && !metaConnection && (
           <div role="status" className="rounded-2xl border border-primary/40 bg-primary/5 p-4 text-sm">
@@ -670,7 +693,7 @@ export default function IntegrationsPage() {
           </div>
         )}
 
-        {!loadingInstances && !loadingMeta && !hasAnyConnections && (
+        {!loadingInstances && !loadingMeta && !metaError && !instanceError && !hasAnyConnections && (
           <Card className="border shadow-xs">
             <CardContent className="p-10 text-center flex flex-col items-center justify-center gap-3">
               <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">

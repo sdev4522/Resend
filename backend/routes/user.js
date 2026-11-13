@@ -1191,8 +1191,11 @@ router.get("/get_me", validateUser, async (req, res) => {
       });
     }
 
+    // Never send credentials to the browser
+    const { password: _pw, api_key: _apiKey, tokenVersion: _tv, ...safeUser } = user || {};
+
     res.json({
-      data: sanitizeBigInt({ ...(user || {}), contact: contactCount }),
+      data: sanitizeBigInt({ ...safeUser, contact: contactCount }),
       success: true,
       addon: finalAddon,
     });

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   description:
     'Review terms of service, acceptable messaging policies, WhatsApp Meta API compliance, and subscription guidelines for Resend.',
   alternates: {
-    canonical: 'https://resend.in/terms',
+    canonical: `${siteConfig.url}/terms`,
   },
   openGraph: {
     title: 'Terms and Conditions — Resend',

@@ -6,6 +6,7 @@ import { MarketingPricing } from '@/components/marketing/pricing';
 import { MarketingFAQ } from '@/components/marketing/faq';
 import { MarketingFooter } from '@/components/marketing/footer';
 import { StickyMobileCTA } from '@/components/marketing/sticky-mobile-cta';
+import { getPlanOffers, toAggregateOffer } from '@/lib/seo/plan-offers';
 import { siteConfig } from '@/config/site';
 import { lpDisplay } from '@/components/marketing/landing/fonts';
 import { SmoothScroll } from '@/components/marketing/landing/smooth-scroll';
@@ -21,7 +22,7 @@ export const metadata: Metadata = {
   description:
     'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
   alternates: {
-    canonical: 'https://resend.in',
+    canonical: siteConfig.url,
   },
   openGraph: {
     title: 'Resend — WhatsApp Business API, CRM & Automation',
@@ -48,7 +49,8 @@ export const metadata: Metadata = {
   },
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const planOffers = await getPlanOffers();
   const jsonLd = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -65,13 +67,8 @@ export default function HomePage() {
         name: siteConfig.name,
         applicationCategory: 'BusinessApplication',
         operatingSystem: 'All',
-        offers: {
-          '@type': 'AggregateOffer',
-          // Plans are sold in INR; prices come from the live plan table, so only the floor is stated here
-          priceCurrency: 'INR',
-          lowPrice: '0',
-          offerCount: '3',
-        },
+        // Prices come from the live plan table; omitted if plans couldn't be loaded
+        ...(planOffers ? { offers: toAggregateOffer(planOffers) } : {}),
       },
       {
         '@type': 'Organization',

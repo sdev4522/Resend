@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     'Answers to common questions regarding WhatsApp Cloud API integration, multi-agent inbox setup, broadcast deliverability, and SaaS billing.',
   alternates: {
-    canonical: 'https://resend.in/faq',
+    canonical: `${siteConfig.url}/faq`,
   },
   openGraph: {
     title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API | Resend',

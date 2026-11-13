@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE_NAME, ROLE_COOKIE_NAME, parseJwt } from '@/lib/auth/session';
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const sessionCookie = request.cookies.get(SESSION_COOKIE_NAME)?.value;
   const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value;

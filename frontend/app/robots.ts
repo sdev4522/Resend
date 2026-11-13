@@ -14,18 +14,10 @@ export default function robots(): MetadataRoute.Robots {
     '/terms',
   ];
 
-  const privateDisallowedPaths = [
-    '/dashboard/',
-    '/admin/',
-    '/api/',
-    '/onboarding/',
-    '/login',
-    '/register',
-    '/forgot-password',
-    '/recovery-user/',
-    '/verify-email',
-    '/thank-you',
-  ];
+  // Auth, onboarding and thank-you pages are NOT blocked here on purpose: they carry
+  // <meta name="robots" content="noindex">, and crawlers must be able to fetch a page
+  // to see that tag. Blocking them would let bare URLs be indexed.
+  const privateDisallowedPaths = ['/dashboard/', '/admin/', '/api/'];
 
   const verifiedAgents = [
     '*',
