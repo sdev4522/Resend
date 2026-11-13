@@ -67,7 +67,7 @@ export function MarketingHero() {
             {/* Trust and Key Capabilities List */}
             <div className="mt-10 grid grid-cols-3 gap-4 w-full pt-6 border-t border-border/50 text-left">
               <div>
-                <p className="text-xs font-semibold text-foreground">14-Day Trial</p>
+                <p className="text-xs font-semibold text-foreground">Free trial</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">Full feature access</p>
               </div>
               <div>
