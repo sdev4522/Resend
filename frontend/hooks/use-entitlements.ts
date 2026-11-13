@@ -30,6 +30,13 @@ export function useEntitlements() {
     fetchEntitlements();
   }, [fetchEntitlements]);
 
+  // Every mounted copy refreshes when the plan changes anywhere (e.g. free trial claimed)
+  useEffect(() => {
+    const onChange = () => fetchEntitlements();
+    window.addEventListener('wacrm:plan-changed', onChange);
+    return () => window.removeEventListener('wacrm:plan-changed', onChange);
+  }, [fetchEntitlements]);
+
   const hasFeature = useCallback(
     (feature: keyof UserPlanDetails['entitlements']): boolean => {
       if (!data?.entitlements) return false;

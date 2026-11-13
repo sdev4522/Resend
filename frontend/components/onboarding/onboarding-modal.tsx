@@ -125,6 +125,8 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
   const currentPlanTitle =
     (typeof user?.plan === 'object' && user?.plan && 'title' in user.plan ? String(user.plan.title) : '') ||
     (onTrial ? 'Free trial' : 'Your plan');
+  const trialPlan = plans.find((p) => Number(p.is_trial) === 1);
+  const trialLabel = trialPlan ? `${Number(trialPlan.plan_duration_in_days) || 14}-day free trial` : 'Free trial';
   const chosenPlan = pricingChoice ? plans.find((p) => Number(p.id) === pricingChoice.planId) : undefined;
   const needsPlanStep = !hasActivePlan || Boolean(chosenPlan && !chosenPlan.is_trial);
 
@@ -326,7 +328,7 @@ export function OnboardingModal({ open = true, onComplete }: OnboardingModalProp
           ) : (
             <>
               <div className="rounded-2xl border border-border p-4">
-                <p className="text-lg font-semibold">14-day free trial</p>
+                <p className="text-lg font-semibold">{trialLabel}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Every feature, no card needed. Pick a paid plan whenever you are ready.
                 </p>

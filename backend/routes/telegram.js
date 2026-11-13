@@ -74,7 +74,7 @@ router.post(
 );
 
 // Verify OTP code
-router.post("/verify_otp", validateUser, async (req, res) => {
+router.post("/verify_otp", validateUser, checkPlan, checkTeleInbox, async (req, res) => {
   try {
     const { sessionId, code } = req.body;
 
@@ -129,7 +129,7 @@ router.get("/session_status/:sessionId", validateUser, async (req, res) => {
 });
 
 // Reconnect existing session
-router.post("/reconnect", validateUser, async (req, res) => {
+router.post("/reconnect", validateUser, checkPlan, checkTeleInbox, async (req, res) => {
   try {
     const { sessionId } = req.body;
 
@@ -213,7 +213,7 @@ router.get("/delete_session/:sessionId", validateUser, async (req, res) => {
 // ============================================
 
 // Send message to a chat
-router.post("/send_message", validateUser, async (req, res) => {
+router.post("/send_message", validateUser, checkPlan, checkTeleInbox, async (req, res) => {
   try {
     const { sessionId, chatId, message } = req.body;
 

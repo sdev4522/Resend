@@ -125,6 +125,8 @@ export interface UserPlanDetails {
   isValid: boolean;
   isExpired: boolean;
   daysLeft: number;
+  /** Free trial is claimed manually, once, by workspaces that never had a plan. */
+  trial?: { available: boolean; days: number; title: string | null };
   plan_expire: string | number;
   plan: {
     id: number;

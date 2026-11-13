@@ -26,7 +26,7 @@ const FAQ_ITEMS = [
     icon: MessageSquare,
     question: 'How do I get started with Resend?',
     answer:
-      'Getting started takes under 5 minutes. Sign up for a free 14-day trial, create your workspace, and choose your preferred WhatsApp connection method (Meta Cloud API or instant QR scan). You can immediately start inviting agents and receiving conversations.',
+      'Getting started takes under 5 minutes. Sign up, claim your free trial, create your workspace, and choose your preferred WhatsApp connection method (Meta Cloud API or instant QR scan). You can immediately start inviting agents and receiving conversations.',
   },
   {
     icon: Radio,
@@ -66,9 +66,9 @@ const FAQ_ITEMS = [
   },
   {
     icon: Clock,
-    question: 'What is included in the 14-day free trial?',
+    question: 'What is included in the free trial?',
     answer:
-      'The 14-day free trial provides full access to our collaborative multi-agent inbox, contact CRM, template management, and automation rules. No credit card is required to sign up, and you can upgrade to a paid tier whenever you are ready.',
+      'The free trial provides full access to our collaborative multi-agent inbox, contact CRM, template management, and automation rules. No credit card is required to sign up, and you can upgrade to a paid tier whenever you are ready.',
   },
   {
     icon: Code2,

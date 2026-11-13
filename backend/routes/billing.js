@@ -3,6 +3,7 @@ const router = express.Router();
 const validateUser = require("../middlewares/user.js");
 const { prisma } = require("../database/prisma");
 const { updateUserPlan } = require("../functions/function");
+const { getTrialOffer } = require("../helper/entitlements");
 const {
   validateCoupon,
   calculateCheckoutPrice,
@@ -365,29 +366,25 @@ router.post("/activate_trial", validateUser, async (req, res) => {
       });
     }
 
-    // Trial is one-time: FREE_TRIAL order is the permanent marker (see updateUserPlan)
-    const trialOrder = await prisma.orders.findFirst({
-      where: { uid, payment_mode: "FREE_TRIAL" },
-      select: { id: true },
-    });
-    if (trialOrder) {
-      return res.status(400).json({
-        success: false,
-        msg: "You have already used your free trial.",
-      });
-    }
-
-    const rawTrialPlan = await prisma.plan.findFirst({
-      where: { is_trial: 1 },
-      orderBy: { id: "asc" },
-    });
-
-    if (!rawTrialPlan) {
+    // One-time, manual claim: same rule the dashboard uses to show the claim widget
+    const offer = await getTrialOffer(user);
+    if (!offer.plan) {
       return res.status(500).json({
         success: false,
         msg: "No trial plan configured in system",
       });
     }
+    if (!offer.available) {
+      return res.status(400).json({
+        success: false,
+        code: "TRIAL_UNAVAILABLE",
+        msg:
+          offer.reason === "used"
+            ? "You have already used your free trial."
+            : "The free trial is only for new workspaces.",
+      });
+    }
+    const rawTrialPlan = offer.plan;
 
     const trialPlan = {
       ...rawTrialPlan,

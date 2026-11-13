@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Create your account',
-  description: 'Start a 14-day free trial of Resend.',
+  description: 'Create your Resend account and claim a free trial.',
 };
 
 export default function Layout({ children }: { children: React.ReactNode }) {

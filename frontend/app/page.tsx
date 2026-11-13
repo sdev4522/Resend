@@ -91,7 +91,7 @@ export default async function HomePage() {
             name: 'How do I get started with Resend?',
             acceptedAnswer: {
               '@type': 'Answer',
-              text: 'Getting started takes under 5 minutes. Sign up for a free 14-day trial, create your workspace, and connect your WhatsApp number via Meta Cloud API or QR engine.',
+              text: 'Getting started takes under 5 minutes. Sign up, claim your free trial, create your workspace, and connect your WhatsApp number via Meta Cloud API or QR engine.',
             },
           },
           {

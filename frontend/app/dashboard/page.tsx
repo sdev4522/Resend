@@ -1,5 +1,6 @@
 'use client';
 
+import { ClaimTrialCard, usePlanStatus } from '@/components/dashboard/plan-status';
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -185,6 +186,14 @@ export default function DashboardOverviewPage() {
     }
   }, []);
 
+  // Reload the summary right after the free trial is claimed (plan chip, expiry)
+  const { state: planState } = usePlanStatus();
+  const prevPlanState = React.useRef(planState);
+  useEffect(() => {
+    if (prevPlanState.current === 'trial_available' && planState === 'active') fetchDashboard();
+    prevPlanState.current = planState;
+  }, [planState, fetchDashboard]);
+
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
@@ -283,6 +292,9 @@ export default function DashboardOverviewPage() {
           </div>
         </div>
       </section>
+
+      {/* Unclaimed free trial: the first thing a new workspace should do */}
+      <ClaimTrialCard />
 
       {error && (
         <Alert variant="destructive">

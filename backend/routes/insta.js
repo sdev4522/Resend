@@ -34,7 +34,7 @@ const pageStyle = `
 `;
 
 // ─── Get Auth URL ─────────────────────────────────────────
-router.get("/auth-url", validateUser, async (req, res) => {
+router.get("/auth-url", validateUser, checkPlan, checkInstaInbox, async (req, res) => {
   try {
     const apiKeys = await getInstaKeys();
 

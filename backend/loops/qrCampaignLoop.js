@@ -3,6 +3,7 @@ const { prisma } = require("../database/prisma");
 const { idParam, intOrNull, plain, str, whereStr } = require("../database/prismaHelpers");
 const { getSession } = require("../helper/addon/qr/index.js");
 const logger = require("../utils/logger.js");
+const { isPlanActiveForUid } = require("../helper/entitlements");
 
 // ── Replace dynamic variables ────────────────────────────────────
 function replaceDynamicVars(text, contact) {
@@ -72,6 +73,11 @@ function buildBaileysMessage(campaign, contact) {
 // ── Process one campaign tick ────────────────────────────────────
 async function processCampaign(campaign) {
   try {
+    if (!(await isPlanActiveForUid(campaign.uid))) {
+      logger.log(`[QR Campaign] Plan inactive for ${campaign.uid}, pausing ${campaign.id}`);
+      await prisma.qr_campaigns.updateMany({ where: { id: idParam(campaign.id) }, data: { status: "paused" } });
+      return;
+    }
     const session = getSession(campaign.instance_id);
     if (!session) {
       logger.log(`[QR Campaign] Session not found for ${campaign.id}, pausing`);

@@ -75,6 +75,7 @@ const {
   getLimit,
   getUsage,
   getAllEntitlements,
+  getTrialOffer,
 } = require("../helper/entitlements.js");
 
 const META_API_VERSION = "v20.0";
@@ -367,13 +368,7 @@ router.post("/login_with_google", authRateLimiter({ limit: 15, prefix: "google_l
       [resolvedName, newUid, cleanEmail, hasPass, googleSub]
     );
 
-    // Assign standard 14-day Free Trial plan (matching POST /signup)
-    const getPlan = await query(
-      "SELECT * FROM plan WHERE is_trial = 1 OR title LIKE '%Trial%' ORDER BY id ASC LIMIT 1"
-    );
-    if (getPlan.length > 0) {
-      await updateUserPlan(getPlan[0], newUid, 14);
-    }
+    // No plan at signup (matching POST /signup): the free trial is claimed manually
 
     const loginToken = sign(
       {
@@ -485,14 +480,8 @@ router.post("/signup", signupRateLimiter(), async (req, res) => {
       },
     });
 
-    // Assign 14-day trial plan via is_trial = 1 only (MED-09)
-    const trialPlan = await prisma.plan.findFirst({
-      where: { is_trial: 1 },
-      orderBy: { id: "asc" },
-    });
-    if (trialPlan) {
-      await updateUserPlan(trialPlan, uid, 14);
-    }
+    // No plan at signup: the free trial is claimed manually from the dashboard
+    // (POST /api/billing/activate_trial), once per workspace.
 
     // Generate 6-digit verification OTP
     const otpCode = Math.floor(100000 + crypto.randomInt(900000)).toString();
@@ -3970,9 +3959,10 @@ router.get("/get_plan_details", validateUser, async (req, res) => {
     const resolution = await resolveUserPlan(user);
     const plan = resolution.plan;
 
-    const [contactUsage, qrUsage] = await Promise.all([
+    const [contactUsage, qrUsage, trialOffer] = await Promise.all([
       getUsage(uid, "contacts"),
       getUsage(uid, "qr_accounts"),
+      getTrialOffer(user),
     ]);
 
     const contactLimit = getLimit(plan, "contacts");
@@ -4007,6 +3997,11 @@ router.get("/get_plan_details", validateUser, async (req, res) => {
           },
         },
         entitlements: getAllEntitlements(plan),
+        trial: {
+          available: trialOffer.available,
+          days: trialOffer.days,
+          title: trialOffer.title,
+        },
       },
     });
   } catch (err) {

@@ -10,6 +10,38 @@ const { getAggregateUsage } = require("../services/api/usageService");
 const { resolveUserPlan, getAllEntitlements, getLimit } = require("../helper/entitlements");
 const { DEFAULT_LIMITS } = require("../middlewares/rateLimiter");
 const logger = require("../utils/logger");
+const { prisma } = require("../database/prisma");
+const { buildPlanError } = require("../helper/entitlements");
+
+// Creating a key needs an active plan that includes the Developer API
+async function requireApiPlan(req, res, next) {
+  try {
+    const user = await prisma.user.findFirst({ where: { uid: req.decode.uid } });
+    const resolution = await resolveUserPlan(user);
+    if (!resolution.isValid) {
+      return res.status(403).json(
+        buildPlanError(
+          resolution.isExpired ? "PLAN_EXPIRED" : "NO_PLAN",
+          "subscription",
+          0,
+          0,
+          resolution.isExpired
+            ? "Your subscription plan has expired. Please upgrade or renew your plan."
+            : "Please subscribe to a plan to proceed."
+        )
+      );
+    }
+    if (!getAllEntitlements(resolution.plan).api) {
+      return res
+        .status(403)
+        .json(buildPlanError("FEATURE_NOT_INCLUDED", "api", 0, 0, "Your plan does not include Developer API access."));
+    }
+    next();
+  } catch (err) {
+    logger.error("requireApiPlan error:", err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+}
 
 // All dashboard endpoints require valid user session
 router.use(validateUser);
@@ -33,7 +65,7 @@ router.get("/", async (req, res) => {
  * POST /api/user/api-keys
  * Create a new API key (Secret returned only once!)
  */
-router.post("/", async (req, res) => {
+router.post("/", requireApiPlan, async (req, res) => {
   try {
     const uid = req.decode.uid;
     const {

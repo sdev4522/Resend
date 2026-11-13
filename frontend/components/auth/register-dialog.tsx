@@ -60,7 +60,7 @@ export function RegisterDialog() {
           </DialogTitle>
           <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
             {step === 1
-              ? 'WhatsApp CRM · 14 days free · No credit card required'
+              ? 'WhatsApp CRM · Free trial · No credit card required'
               : 'Enter the 6-digit verification code sent to your inbox'}
           </DialogDescription>
         </DialogHeader>

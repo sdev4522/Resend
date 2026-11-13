@@ -200,7 +200,68 @@ function buildPlanError(code, resource, current, limit, message) {
   };
 }
 
+/**
+ * Free trial is claimed manually (never granted at signup) and only once.
+ * Eligible = a trial plan exists, the user has never had any plan, and has no
+ * FREE_TRIAL order (the permanent one-time marker written by updateUserPlan).
+ * Returns { available, days, title, planId }.
+ */
+async function getTrialOffer(user, db = prisma) {
+  const trialPlan = await db.plan.findFirst({
+    where: { is_trial: 1 },
+    orderBy: { id: "asc" },
+  });
+  if (!trialPlan || !user) {
+    return { available: false, days: 0, title: null, planId: null, plan: trialPlan || null };
+  }
+  const days = parseInt(trialPlan.plan_duration_in_days || 14, 10);
+  const hadPlan = Boolean(user.plan && String(user.plan).trim() && String(user.plan).trim() !== "null");
+  const trialOrder = await db.orders.findFirst({
+    where: { uid: user.uid, payment_mode: "FREE_TRIAL" },
+    select: { id: true },
+  });
+  return {
+    available: !hadPlan && !trialOrder,
+    reason: trialOrder ? "used" : hadPlan ? "had_plan" : null,
+    days,
+    title: trialPlan.title,
+    planId: trialPlan.id,
+    plan: trialPlan,
+  };
+}
+
+/**
+ * Cached plan check for background senders (chatbot replies, campaign loop), which
+ * have no request to run checkPlan on. 60s TTL keeps the hot message path cheap.
+ * Returns true when the workspace has a valid plan (and the feature, if given).
+ */
+const planActiveCache = new Map();
+const PLAN_CACHE_TTL_MS = 60 * 1000;
+async function isPlanActiveForUid(uid, feature) {
+  if (!uid) return false;
+  const key = `${uid}:${feature || ""}`;
+  const hit = planActiveCache.get(key);
+  if (hit && hit.expires > Date.now()) return hit.value;
+  let value = false;
+  try {
+    const user = await prisma.user.findFirst({
+      where: { uid },
+      select: { uid: true, plan: true, plan_expire: true },
+    });
+    const resolution = await resolveUserPlan(user);
+    value = Boolean(resolution.isValid) && (!feature || hasEntitlement(resolution.plan, feature));
+  } catch (err) {
+    logger.error("isPlanActiveForUid error:", err);
+    // Fail open on DB errors so a blip doesn't silence every bot; request paths still enforce
+    value = true;
+  }
+  planActiveCache.set(key, { value, expires: Date.now() + PLAN_CACHE_TTL_MS });
+  return value;
+}
+
 module.exports = {
+  isPlanActiveForUid,
+  getTrialOffer,
   resolveUserPlan,
   hasEntitlement,
   getLimit,

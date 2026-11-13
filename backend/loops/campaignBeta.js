@@ -3,6 +3,7 @@ const { idParam, nowSqlString, plain, str, whereStr } = require("../database/pri
 const { sendTemplateMessage } = require("../functions/function");
 const moment = require("moment-timezone");
 const logger = require("../utils/logger");
+const { isPlanActiveForUid } = require("../helper/entitlements");
 const fetch = require("node-fetch");
 const AbortController = require("abort-controller");
 const https = require("https");
@@ -376,6 +377,11 @@ async function sendCatalogTemplateMessage(
 }
 
 async function processSingleCampaign(campaign) {
+  // Expired plan: hold the campaign untouched; it continues once the plan is renewed
+  if (!(await isPlanActiveForUid(campaign.uid))) {
+    return;
+  }
+
   if (campaign.status === "PENDING") {
     await prisma.beta_campaign.updateMany({
       where: { campaign_id: whereStr(campaign.campaign_id) },

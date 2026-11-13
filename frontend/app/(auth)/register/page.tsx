@@ -15,7 +15,7 @@ export default function RegisterPage() {
           Manage WhatsApp conversations, contacts, and campaigns from one workspace.
         </CardDescription>
         <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400 pt-1">
-          14 days free · No credit card required
+          Free trial · No credit card required
         </div>
       </CardHeader>
       <CardContent>

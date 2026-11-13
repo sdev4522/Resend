@@ -30,7 +30,7 @@ export function FinalCta() {
           >
             Start free trial
           </button>
-          <p className="text-sm text-[var(--lp-mute)]">14 days free. No card needed.</p>
+          <p className="text-sm text-[var(--lp-mute)]">Free trial. No card needed.</p>
         </div>
       </div>
     </section>

@@ -87,6 +87,26 @@ class ApiClient {
       }
 
       if (!response.ok || (data && typeof data === 'object' && data.success === false)) {
+        // Plan errors (checkPlan / entitlement middleware) open the dashboard upgrade popup,
+        // wherever the request came from, instead of ending as a dead-end error toast.
+        const planCode = (data as { code?: string })?.code;
+        if (
+          typeof window !== 'undefined' &&
+          (planCode === 'PLAN_EXPIRED' ||
+            planCode === 'NO_PLAN' ||
+            planCode === 'FEATURE_NOT_INCLUDED' ||
+            planCode === 'PLAN_LIMIT_REACHED')
+        ) {
+          window.dispatchEvent(
+            new CustomEvent('wacrm:plan-required', {
+              detail: {
+                code: planCode,
+                msg: data?.msg || data?.message,
+                resource: (data as { resource?: string }).resource,
+              },
+            })
+          );
+        }
         throw new ApiError(
           data?.msg || data?.message || data?.error || `HTTP error ${response.status}`,
           response.status,

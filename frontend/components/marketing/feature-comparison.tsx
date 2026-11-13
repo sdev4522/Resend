@@ -193,7 +193,7 @@ export function MarketingFeatureComparison() {
         <div className="border-t border-border/70 bg-muted/20 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <ShieldCheck className="h-4 w-4 text-primary shrink-0" />
-            <span>Includes 14-day free trial on all plans. No credit card required.</span>
+            <span>Start with a free trial. No credit card required.</span>
           </div>
           <Button
             size="sm"

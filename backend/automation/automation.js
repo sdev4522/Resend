@@ -2,6 +2,7 @@ const flowProcessor = require("./functions");
 const { prisma } = require("../database/prisma");
 const { plain, whereStr, deleteFirst } = require("../database/prismaHelpers");
 const logger = require("../utils/logger");
+const { isPlanActiveForUid } = require("../helper/entitlements");
 
 async function processFlow({
   nodes,
@@ -503,6 +504,11 @@ async function processAutomation({
   origin,
   chatId,
 }) {
+  // Bots stop replying when the workspace plan has expired or lacks chatbots
+  if (!(await isPlanActiveForUid(uid, "chatbot"))) {
+    return logger.log(`[automation] skipped for ${uid}: plan inactive or chatbot not included`);
+  }
+
   const incomingText = flowProcessor.extractBodyText(message);
 
   const { senderMobile } = message;
@@ -556,6 +562,9 @@ async function processAutomation({
 async function processWebhookAutomation({ webhook, data }) {
   try {
     const { uid } = webhook;
+    if (!(await isPlanActiveForUid(uid, "chatbot"))) {
+      return logger.log(`[webhook automation] skipped for ${uid}: plan inactive or chatbot not included`);
+    }
     const userFlows = await flowProcessor.getActiveFlows({
       uid: webhook?.uid,
       origin: "webhook_automation",

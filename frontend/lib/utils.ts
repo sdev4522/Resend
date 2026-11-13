@@ -1,7 +1,7 @@
 export { cn } from "cn";
 
 export function getPlanTitle(plan: any): string {
-  if (!plan) return 'Free Trial';
+  if (!plan) return 'No plan';
   if (typeof plan === 'object' && plan?.title) return String(plan.title);
   if (typeof plan === 'string') {
     try {

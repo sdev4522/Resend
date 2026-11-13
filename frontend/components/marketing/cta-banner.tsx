@@ -19,7 +19,7 @@ export function MarketingCTABanner() {
             Start Managing WhatsApp Customer Conversations More Effectively
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-            Consolidate team inboxes, verified template broadcasts, and automated replies in one workspace. Start your 14-day free trial in under 5 minutes.
+            Consolidate team inboxes, verified template broadcasts, and automated replies in one workspace. Start your free trial in under 5 minutes.
           </p>
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">

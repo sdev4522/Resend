@@ -27,7 +27,7 @@ import { usePlanStatus } from './plan-status';
 export function DashboardHeader() {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { state: planState, planTitle } = usePlanStatus();
+  const { state: planState, planTitle, openUpgrade } = usePlanStatus();
 
   // Find matching nav item
   const activeNavItem = siteConfig.dashboardNav.find((item) =>
@@ -101,7 +101,15 @@ export function DashboardHeader() {
         </div>
 
         {/* Plan Badge on Desktop */}
-        {planState === 'expired' || planState === 'none' ? (
+        {planState === 'trial_available' ? (
+          <button
+            type="button"
+            onClick={() => openUpgrade()}
+            className="hidden h-[22px] cursor-pointer items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-2 text-xs font-medium text-primary transition-colors hover:bg-primary/15 md:inline-flex"
+          >
+            Claim free trial
+          </button>
+        ) : planState === 'expired' || planState === 'none' ? (
           <Badge
             variant="destructive"
             render={<Link href="/dashboard/billing" />}

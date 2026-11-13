@@ -66,12 +66,24 @@ async function publicApiAuth(req, res, next) {
       });
     }
 
+    // The plan must include the Developer API feature (plan.allow_api)
+    const entitlements = getAllEntitlements(planResolution.plan);
+    if (!entitlements.api) {
+      return res.status(403).json({
+        error: {
+          code: "FEATURE_NOT_INCLUDED",
+          message: "Your plan does not include Developer API access. Upgrade to use the API.",
+          request_id: requestId,
+        },
+      });
+    }
+
     // Attach verified context to request
     req.apiKey = key;
     req.workspaceId = key.uid;
     req.user = user;
     req.plan = planResolution.plan;
-    req.entitlements = getAllEntitlements(planResolution.plan);
+    req.entitlements = entitlements;
     req.scopes = scopes;
 
     next();

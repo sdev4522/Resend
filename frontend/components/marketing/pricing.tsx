@@ -131,7 +131,7 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
           className="lp-section-title text-balance text-4xl md:text-[3.25rem] text-foreground"
         />
         <p className="mt-4 text-base sm:text-lg text-muted-foreground leading-relaxed">
-          Every plan includes the shared inbox, team seats, contacts and automation. Start with 14 days free, no card
+          Every plan includes the shared inbox, team seats, contacts and automation. Start with a free trial, no card
           needed.
         </p>
 
@@ -287,7 +287,7 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
                     <p className="mt-2 text-xs sm:text-sm text-muted-foreground leading-relaxed min-h-[40px]">
                       {plan.short_description ||
                         (isTrial
-                          ? '14 days of full access to test WhatsApp team inbox, campaigns, and chatbot automation.'
+                          ? 'Full access to test the WhatsApp team inbox, campaigns and chatbot automation.'
                           : isAnnualPlan
                             ? 'High-volume tier for established businesses running multi-agent support and larger contact databases.'
                             : 'Standard tier for growing businesses managing customer conversations and broadcast campaigns.')}
