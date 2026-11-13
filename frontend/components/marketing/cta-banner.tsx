@@ -48,7 +48,7 @@ export function MarketingCTABanner() {
           <div className="pt-8 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground border-t border-border/50 mt-8">
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-              <span>14-Day Free Trial</span>
+              <span>Free trial</span>
             </div>
             <div className="flex items-center gap-1.5">
               <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />

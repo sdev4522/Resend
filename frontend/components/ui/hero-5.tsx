@@ -174,7 +174,7 @@ export function Hero5({
         >
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            14-Day Free Trial
+            Free trial
           </span>
           <span className="hidden sm:inline text-zinc-600">·</span>
           <span>No credit card required</span>
