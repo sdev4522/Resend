@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { Button } from '@/components/ui/button';
@@ -100,6 +101,11 @@ export function AdminLoginForm() {
           </>
         )}
       </Button>
+      <div className="text-center">
+        <Link href="/recovery-admin" className="text-xs text-muted-foreground hover:text-foreground">
+          Forgot admin password?
+        </Link>
+      </div>
     </form>
   );
 }

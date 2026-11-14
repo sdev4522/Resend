@@ -1,7 +1,7 @@
 import { api } from './client';
 import { API_ENDPOINTS } from '@/config/api';
 import { 
-  AdminOverviewStats, 
+
   AdminUserListItem, 
   AdminPlanItem, 
   AdminProfileData, 
@@ -40,20 +40,12 @@ export interface GoogleAuthSettingsData {
 }
 
 export const adminApi = {
-  getStats: () => {
-    return api.get<{ success: boolean; data: AdminOverviewStats }>(API_ENDPOINTS.admin.stats);
-  },
-
   getUsers: (params?: { email_status?: string }) => {
     return api.get<{ success: boolean; data: AdminUserListItem[] }>(API_ENDPOINTS.admin.users, { params });
   },
 
   getPlans: () => {
     return api.get<{ success: boolean; data: AdminPlanItem[]; msg?: string }>(API_ENDPOINTS.admin.plans);
-  },
-
-  getPayments: () => {
-    return api.get<{ success: boolean; data: any[] }>(API_ENDPOINTS.admin.payments);
   },
 
   getPaymentOrders: () => {
@@ -110,6 +102,8 @@ export const adminApi = {
         rz_id: string;
         rz_active: boolean;
         has_rz_key: boolean;
+        has_webhook_secret?: boolean;
+        webhook_secret_from_env?: boolean;
         rz_webhook_secret: string;
       };
     }>('/api/admin/get_razorpay_settings');
@@ -196,10 +190,16 @@ export const adminApi = {
     });
   },
 
-  updateUserPlan: (uid: string, plan: { id: number; title: string }) => {
+  updateUserPlan: (
+    uid: string,
+    plan: { id: number; title: string },
+    options: { extend?: boolean; customDays?: number | null } = {}
+  ) => {
     return api.post<{ success: boolean; msg: string }>('/admin/update_plan', {
       uid,
       plan,
+      extend: options.extend !== false,
+      customDays: options.customDays || null,
     });
   },
 
@@ -336,6 +336,7 @@ export const adminApi = {
       summary: {
         total: number;
         active: number;
+        trialing?: number;
         expired: number;
         suspended: number;
       };
@@ -350,6 +351,8 @@ export const adminApi = {
         totalInspected: number;
         nearLimit: number;
         limitReached: number;
+        noPlan?: number;
+        expired?: number;
       };
     }>('/api/admin/get_usage_summary');
   },

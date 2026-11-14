@@ -1,5 +1,7 @@
 'use client';
 
+import { toast } from 'sonner';
+import { formatMoney } from '@/lib/currency/format';
 import React, { useEffect, useState } from 'react';
 import { adminApi, SupportedCurrencyItem } from '@/lib/api/admin';
 import { AdminPlanItem, PlanPriceItem } from '@/types/admin';
@@ -71,6 +73,7 @@ import {
   Settings2,
   ShieldCheck,
   Coins,
+  MessageCircle,
 } from 'lucide-react';
 
 interface PlanFormData {
@@ -91,6 +94,7 @@ interface PlanFormData {
   rest_api_qr: boolean;
   instagram_inbox: boolean;
   telegram_inbox: boolean;
+  messenger_inbox: boolean;
   allow_wa_forms: boolean;
   currency_prices?: Record<string, string | number>;
 }
@@ -112,6 +116,7 @@ const DEFAULT_FORM: PlanFormData = {
   rest_api_qr: false,
   instagram_inbox: false,
   telegram_inbox: false,
+  messenger_inbox: false,
   allow_wa_forms: true,
   currency_prices: {},
 };
@@ -228,9 +233,16 @@ export default function AdminPlansPage() {
       if (res && res.success) {
         setMatrixPlans(res.plans);
         const map: Record<string, { amount: string | number; strike_amount: string | number; is_active: boolean }> = {};
+        const planDays = new Map<number, number>(
+          (res.plans || []).map((pl: AdminPlanItem) => [Number(pl.id), Number(pl.plan_duration_in_days || 30)])
+        );
         if (Array.isArray(res.prices)) {
+          // One cell per plan+currency: the row on the plan's own billing period wins
           res.prices.forEach((p) => {
-            map[`${p.plan_id}_${p.currency_code.toUpperCase()}`] = {
+            const key = `${p.plan_id}_${p.currency_code.toUpperCase()}`;
+            const onPlanPeriod = Number(p.billing_period_days) === planDays.get(Number(p.plan_id));
+            if (map[key] && !onPlanPeriod) return;
+            map[key] = {
               amount: p.amount,
               strike_amount: p.strike_amount ?? '',
               is_active: Boolean(p.is_active),
@@ -316,7 +328,7 @@ export default function AdminPlansPage() {
       }
 
       if (usdPrice <= 0) {
-        alert(`Please set a baseline USD price for ${plan.title} first.`);
+        toast(`Please set a baseline USD price for ${plan.title} first.`);
         return;
       }
 
@@ -415,6 +427,7 @@ export default function AdminPlansPage() {
       rest_api_qr: Number(plan.rest_api_qr) === 1,
       instagram_inbox: Number(plan.instagram_inbox) === 1,
       telegram_inbox: Number(plan.telegram_inbox) === 1,
+      messenger_inbox: Number(plan.messenger_inbox) === 1,
       allow_wa_forms: Number(plan.allow_wa_forms) === 1,
       currency_prices: customPrices,
     });
@@ -444,6 +457,7 @@ export default function AdminPlansPage() {
       rest_api_qr: Number(plan.rest_api_qr) === 1,
       instagram_inbox: Number(plan.instagram_inbox) === 1,
       telegram_inbox: Number(plan.telegram_inbox) === 1,
+      messenger_inbox: Number(plan.messenger_inbox) === 1,
       allow_wa_forms: Number(plan.allow_wa_forms) === 1,
       currency_prices: customPrices,
     });
@@ -483,6 +497,7 @@ export default function AdminPlansPage() {
         rest_api_qr: formData.rest_api_qr ? 1 : 0,
         instagram_inbox: formData.instagram_inbox ? 1 : 0,
         telegram_inbox: formData.telegram_inbox ? 1 : 0,
+        messenger_inbox: formData.messenger_inbox ? 1 : 0,
         allow_wa_forms: formData.allow_wa_forms ? 1 : 0,
         custom: {
           currency_prices: (() => {
@@ -664,6 +679,7 @@ export default function AdminPlansPage() {
                       plan.allow_wa_forms,
                       plan.instagram_inbox,
                       plan.telegram_inbox,
+                      plan.messenger_inbox,
                     ].filter((f) => Number(f) === 1).length;
 
                     return (
@@ -691,22 +707,37 @@ export default function AdminPlansPage() {
                           <div className="flex flex-col">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-bold text-foreground text-sm">
-                                {Number(plan.is_trial) === 1 ? 'Free' : `${baseCurrency.symbol}${plan.price ?? 0}`}
+                                {Number(plan.is_trial) === 1
+                                  ? 'Free'
+                                  : matrixPrices[`${plan.id}_${baseCurrency.code}`]
+                                    ? formatMoney(matrixPrices[`${plan.id}_${baseCurrency.code}`].amount, baseCurrency.code)
+                                    : `${formatMoney(plan.price ?? 0, 'USD')} (USD base)`}
                               </span>
-                              {plan.price_strike && Number(plan.is_trial) !== 1 && (
-                                <span className="text-muted-foreground line-through text-[11px]">
-                                  ${plan.price_strike}
-                                </span>
-                              )}
-                              {Object.entries(getPlanCustomPrices(plan)).map(([cCode, cPrice]) => (
-                                <Badge
-                                  key={cCode}
-                                  variant="outline"
-                                  className="text-[9px] px-1.5 py-0 font-mono text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
-                                >
-                                  {cCode === "INR" ? "₹" : cCode === "EUR" ? "€" : cCode === "GBP" ? "£" : ""}{cPrice} {cCode}
-                                </Badge>
-                              ))}
+                              {Number(plan.is_trial) !== 1 && (() => {
+                                const baseRow = matrixPrices[`${plan.id}_${baseCurrency.code}`];
+                                const strike = baseRow ? baseRow.strike_amount : plan.price_strike;
+                                if (!strike) return null;
+                                return (
+                                  <span className="text-muted-foreground line-through text-[11px]">
+                                    {formatMoney(strike, baseRow ? baseCurrency.code : 'USD')}
+                                  </span>
+                                );
+                              })()}
+                              {Number(plan.is_trial) !== 1 &&
+                                Object.entries(matrixPrices)
+                                  .filter(([k]) => k.startsWith(`${plan.id}_`) && k !== `${plan.id}_${baseCurrency.code}`)
+                                  .map(([k, row]) => {
+                                    const cCode = k.slice(String(plan.id).length + 1);
+                                    return (
+                                      <Badge
+                                        key={cCode}
+                                        variant="outline"
+                                        className="text-[9px] px-1.5 py-0 font-mono text-emerald-600 bg-emerald-500/10 border-emerald-500/20"
+                                      >
+                                        {formatMoney(row.amount, cCode)}
+                                      </Badge>
+                                    );
+                                  })}
                             </div>
                             <span className="text-[11px] text-muted-foreground">
                               {plan.plan_duration_in_days ? `${plan.plan_duration_in_days} days validity` : '—'}
@@ -1170,7 +1201,7 @@ export default function AdminPlansPage() {
                       </h4>
                       <div className="grid grid-cols-3 gap-3">
                         <div className="space-y-1">
-                          <Label className="text-xs font-semibold">Price ($)</Label>
+                          <Label className="text-xs font-semibold">Base price (USD)</Label>
                           <Input
                             type="number"
                             min="0"
@@ -1182,7 +1213,7 @@ export default function AdminPlansPage() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <Label className="text-xs font-semibold">Strike Price ($)</Label>
+                          <Label className="text-xs font-semibold">Strike price (USD)</Label>
                           <Input
                             type="number"
                             min="0"
@@ -1216,7 +1247,7 @@ export default function AdminPlansPage() {
                       >
                         <div>
                           <p className="text-xs font-semibold">Free Trial Tier</p>
-                          <p className="text-[11px] text-muted-foreground">Price is locked to $0 for trial users.</p>
+                          <p className="text-[11px] text-muted-foreground">Trials are always free. Local prices (₹, €, …) are set in the Pricing Matrix.</p>
                         </div>
                         <div
                           className={`w-8 h-4 rounded-full p-0.5 transition-colors relative flex items-center shrink-0 ${
@@ -1437,6 +1468,13 @@ export default function AdminPlansPage() {
                           checked={formData.telegram_inbox}
                           onChange={(val) => setFormData({ ...formData, telegram_inbox: val })}
                         />
+                        <FeatureToggleRow
+                          icon={MessageCircle}
+                          label="Messenger Inbox"
+                          description="Facebook Messenger conversations"
+                          checked={formData.messenger_inbox}
+                          onChange={(val) => setFormData({ ...formData, messenger_inbox: val })}
+                        />
                       </div>
                     </div>
                   </TabsContent>
@@ -1469,11 +1507,11 @@ export default function AdminPlansPage() {
                     </p>
                     <div className="flex items-baseline gap-2 mt-2 pt-2 border-t">
                       <span className="text-2xl font-black text-foreground">
-                        {formData.is_trial ? `${baseCurrency.symbol}0` : `${baseCurrency.symbol}${formData.price || 0}`}
+                        {formData.is_trial ? 'Free' : formatMoney(formData.price || 0, 'USD')}
                       </span>
                       {formData.price_strike && !formData.is_trial && (
                         <span className="text-xs text-muted-foreground line-through">
-                          ${formData.price_strike}
+                          {formatMoney(formData.price_strike, 'USD')}
                         </span>
                       )}
                       <span className="text-xs text-muted-foreground">

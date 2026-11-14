@@ -52,10 +52,8 @@ export const API_ENDPOINTS = {
     activateTrial: "/api/billing/activate_trial",
   },
   admin: {
-    stats: "/api/admin/get_stats",
     users: "/api/admin/get_users",
     plans: "/api/admin/get_plans",
-    payments: "/api/admin/get_payments",
   },
   developer: {
     keys: "/api/user/api-keys",

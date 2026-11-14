@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/currency/format';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,8 +48,18 @@ export default function AdminPaymentsPage() {
     fetchOrders();
   }, [fetchOrders]);
 
-  const paidOrders = orders.filter((o) => o.status?.toLowerCase() === 'paid');
-  const totalRevenue = paidOrders.reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
+  // Free trials and admin grants are not revenue; totals stay per currency (never mixed)
+  const paidOrders = orders.filter(
+    (o) => o.status?.toLowerCase() === 'paid' && !['FREE_TRIAL', 'ADMIN_GRANT'].includes(String(o.paymentMode).toUpperCase())
+  );
+  const revenueByCurrency = paidOrders.reduce<Record<string, number>>((acc, o) => {
+    const cur = String(o.currency || 'INR').toUpperCase();
+    acc[cur] = (acc[cur] || 0) + (parseFloat(o.amount) || 0);
+    return acc;
+  }, {});
+  const revenueText = Object.keys(revenueByCurrency).length
+    ? Object.entries(revenueByCurrency).map(([cur, total]) => formatMoney(total, cur)).join(' + ')
+    : formatMoney(0, 'INR');
   const autopayCount = orders.filter((o) => o.isAutopay).length;
 
   return (
@@ -96,7 +107,7 @@ export default function AdminPaymentsPage() {
             <TrendingUp className="h-4 w-4 text-emerald-500" />
           </div>
           <p className="text-2xl font-black text-foreground mt-1 font-mono">
-            ${totalRevenue.toFixed(2)}
+            {revenueText}
           </p>
           <span className="text-[11px] text-muted-foreground mt-0.5 block">
             Across {paidOrders.length} completed transactions
@@ -199,7 +210,7 @@ export default function AdminPaymentsPage() {
                           {ord.planTitle}
                         </TableCell>
                         <TableCell className="font-mono font-bold text-foreground">
-                          ${parseFloat(ord.amount).toFixed(2)}
+                          {formatMoney(ord.amount, ord.currency)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">

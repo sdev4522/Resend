@@ -1207,7 +1207,8 @@ async function updateUserPlan(plan, uid, customDays = null, extendIfActive = fal
   const millisecondsToAdd = planDays * 24 * 60 * 60 * 1000;
   const timeStamp = baseTimestamp + millisecondsToAdd;
 
-  const isTrial = plan?.is_trial === 1 || String(plan?.title || "").toLowerCase().includes("trial") ? 1 : 0;
+  // Only the plan flag decides: a paid plan whose title contains "trial" must not become a trial
+  const isTrial = Number(plan?.is_trial) === 1 ? 1 : 0;
   const subStatus = isTrial ? "trialing" : "active";
 
   const sanitizedPlan = {

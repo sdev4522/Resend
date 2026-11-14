@@ -326,6 +326,16 @@ async function getPlanPrice(planId, targetCurrency = "USD", durationDays = null)
     },
   });
 
+  // Without an explicit duration, match the plan's own billing period so a stray
+  // yearly/legacy row can never be picked as the monthly price.
+  if (!durationDays && priceRows.length > 1) {
+    const planRow = await prisma.plan.findFirst({
+      where: { id: parseInt(planId, 10) },
+      select: { plan_duration_in_days: true },
+    });
+    durationDays = parseInt(planRow?.plan_duration_in_days || 30, 10);
+  }
+
   let selectedRow = null;
   if (priceRows && priceRows.length > 0) {
     if (durationDays && priceRows.length > 1) {
@@ -375,7 +385,9 @@ async function getPlanPrice(planId, targetCurrency = "USD", durationDays = null)
 
   const { supportedCurrencies, roundingMode } = await getCurrencySettings();
   const currConfig = supportedCurrencies.find((c) => c.code.toUpperCase() === normCurrency);
-  const rate = parseFloat(currConfig?.rate || currConfig?.usdRate || 1.0) || 1.0;
+  // The baseline is USD, so convert with the currency's USD rate. `rate` is relative
+  // to the admin's base currency and would be wrong whenever the base isn't USD.
+  const rate = parseFloat(currConfig?.usdRate || 1.0) || 1.0;
 
   const convertedAmount = applySmartRounding(baselineUsd * rate, normCurrency, roundingMode);
   const convertedStrike = baselineStrikeUsd
@@ -518,7 +530,24 @@ async function calculateCheckoutPrice({ planId, durationMonths = 1, couponCode =
   };
 }
 
+/**
+ * Converts an amount between two supported currencies using their USD rates.
+ * Returns null when either currency's rate is unknown.
+ */
+function convertCurrency(amount, fromCode, toCode, supportedCurrencies) {
+  const from = String(fromCode || "").toUpperCase();
+  const to = String(toCode || "").toUpperCase();
+  const value = Number(amount) || 0;
+  if (from === to) return value;
+  const find = (code) => supportedCurrencies.find((c) => String(c.code).toUpperCase() === code);
+  const fromRate = parseFloat(find(from)?.usdRate);
+  const toRate = parseFloat(find(to)?.usdRate);
+  if (!fromRate || !toRate) return null;
+  return (value / fromRate) * toRate;
+}
+
 module.exports = {
+  convertCurrency,
   validateCoupon,
   calculateCheckoutPrice,
   getPlanPrice,

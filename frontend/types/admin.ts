@@ -46,6 +46,7 @@ export interface AdminPlanItem {
   instagram_inbox?: number;
   telegram_inbox?: number;
   allow_wa_forms?: number;
+  messenger_inbox?: number;
   createdAt?: string;
 }
 
@@ -123,7 +124,8 @@ export interface AdminSubscriptionItem {
   isTrial: boolean;
   planDurationDays: number;
   price: number | string;
-  status: 'ACTIVE' | 'EXPIRED' | 'SUSPENDED';
+  currency?: string;
+  status: 'ACTIVE' | 'TRIALING' | 'EXPIRED' | 'SUSPENDED' | string;
   planExpire?: string | null;
   subscriptionId?: string | null;
   paymentMode: string;
@@ -137,7 +139,8 @@ export interface AdminUsageSummaryItem {
   name: string;
   email: string;
   planTitle: string;
-  usageRisk: 'NORMAL' | 'NEAR_LIMIT' | 'LIMIT_REACHED';
+  planExpired?: boolean;
+  usageRisk: 'NORMAL' | 'NEAR_LIMIT' | 'LIMIT_REACHED' | 'NO_PLAN' | 'EXPIRED';
   contacts: {
     used: number;
     limit: number;

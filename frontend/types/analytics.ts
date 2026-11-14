@@ -148,6 +148,10 @@ export interface AdminPlatformAnalytics {
     successfulOrders: number;
     pendingOrders: number;
     failedOrders: number;
+    /** Base currency all totals are converted into */
+    currency?: string;
+    byCurrency?: { currency: string; total: number; period: number; orders: number }[];
+    unconvertedOrders?: number;
     timeSeries: AdminRevenueTimeSeriesItem[];
   };
   whatsapp: {

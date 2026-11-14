@@ -1,5 +1,7 @@
 'use client';
 
+import { toast } from 'sonner';
+import { getPlanExpiry } from '@/lib/admin/plan-status';
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -289,14 +291,17 @@ export default function AdminUsersPage() {
         );
         await fetchUsers();
       } else {
-        alert(res?.msg || 'Failed to toggle user status.');
+        toast.error(res?.msg || 'Failed to toggle user status.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error communicating with server.');
+      toast.error(err.message || 'Error communicating with server.');
     } finally {
       setBlockLoading(false);
     }
   };
+
+  const [planExtend, setPlanExtend] = useState(true);
+  const [planCustomDays, setPlanCustomDays] = useState('');
 
   const handleChangePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -307,20 +312,21 @@ export default function AdminUsersPage() {
 
     setPlanLoading(true);
     try {
-      const res = await adminApi.updateUserPlan(planUser.uid, {
-        id: chosenPlan.id,
-        title: chosenPlan.title,
-      });
+      const res = await adminApi.updateUserPlan(
+        planUser.uid,
+        { id: chosenPlan.id, title: chosenPlan.title },
+        { extend: planExtend, customDays: planCustomDays ? Number(planCustomDays) : null }
+      );
 
       if (res && res.success) {
         setPlanUser(null);
         showSuccessBanner(`Subscription plan updated to "${chosenPlan.title}" for ${planUser.email}`);
         await fetchUsers();
       } else {
-        alert(res?.msg || 'Failed to update plan.');
+        toast.error(res?.msg || 'Failed to update plan.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error updating plan.');
+      toast.error(err.message || 'Error updating plan.');
     } finally {
       setPlanLoading(false);
     }
@@ -334,11 +340,11 @@ export default function AdminUsersPage() {
       if (res && res.success) {
         window.location.href = '/dashboard';
       } else {
-        alert(res?.msg || 'Failed to switch user account.');
+        toast.error(res?.msg || 'Failed to switch user account.');
         setImpersonateLoading(false);
       }
     } catch (err: any) {
-      alert(err.message || 'Error during impersonation.');
+      toast.error(err.message || 'Error during impersonation.');
       setImpersonateLoading(false);
     }
   };
@@ -359,10 +365,10 @@ export default function AdminUsersPage() {
         showSuccessBanner(`User ${deletingUser.email} permanently removed.`);
         await fetchUsers();
       } else {
-        alert(res?.msg || 'Failed to delete user.');
+        toast.error(res?.msg || 'Failed to delete user.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error communicating with server.');
+      toast.error(err.message || 'Error communicating with server.');
     } finally {
       setDeleteLoading(false);
     }
@@ -382,10 +388,10 @@ export default function AdminUsersPage() {
         showSuccessBanner(res.msg || `Successfully deleted ${res.deletedCount || userIdsToDelete.length} user accounts.`);
         await fetchUsers();
       } else {
-        alert(res?.msg || 'Bulk deletion failed.');
+        toast.error(res?.msg || 'Bulk deletion failed.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error communicating with server during bulk deletion.');
+      toast.error(err.message || 'Error communicating with server during bulk deletion.');
     } finally {
       setBulkDeleting(false);
     }
@@ -402,10 +408,10 @@ export default function AdminUsersPage() {
         showSuccessBanner(`Email for ${verifyingUser.email} has been verified.`);
         await fetchUsers();
       } else {
-        alert(res?.msg || 'Failed to manually verify user email.');
+        toast.error(res?.msg || 'Failed to manually verify user email.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error communicating with server.');
+      toast.error(err.message || 'Error communicating with server.');
     } finally {
       setVerifyLoading(false);
     }
@@ -936,6 +942,11 @@ export default function AdminUsersPage() {
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal">
                             {parsePlanTitle(user.plan)}
                           </Badge>
+                          {user.plan && (
+                            <span className={`text-[10px] ${getPlanExpiry(user.plan_expire).expired ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                              {getPlanExpiry(user.plan_expire).label}
+                            </span>
+                          )}
                         </div>
 
                         <span className="font-mono text-[11px] text-muted-foreground">
@@ -1031,6 +1042,11 @@ export default function AdminUsersPage() {
                             <Badge variant="outline" className="text-xs font-normal">
                               {parsePlanTitle(user.plan)}
                             </Badge>
+                            {user.plan && (
+                              <div className={`text-[11px] mt-0.5 ${getPlanExpiry(user.plan_expire).expired ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                {getPlanExpiry(user.plan_expire).label}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground">
                             {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : '—'}
@@ -1324,10 +1340,37 @@ export default function AdminUsersPage() {
                 <option value="">Select a plan...</option>
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.title} — {p.price === 0 ? 'Free' : `$${p.price}`}
+                    {p.title} — {Number(p.is_trial) === 1 ? 'Free trial' : 'Paid'} · {p.plan_duration_in_days || 30} days
                   </option>
                 ))}
               </select>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="users-plan-extend"
+                type="checkbox"
+                checked={planExtend}
+                onChange={(e) => setPlanExtend(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="users-plan-extend" className="text-xs font-normal">
+                Keep remaining days if the user already has this plan active
+              </Label>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="users-plan-days" className="text-xs font-medium">
+                Custom duration in days (optional)
+              </Label>
+              <input
+                id="users-plan-days"
+                type="number"
+                min={1}
+                max={3650}
+                value={planCustomDays}
+                onChange={(e) => setPlanCustomDays(e.target.value)}
+                placeholder="Plan default"
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+              />
+            </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">

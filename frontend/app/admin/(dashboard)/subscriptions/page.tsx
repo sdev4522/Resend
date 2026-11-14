@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/currency/format';
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { adminApi } from '@/lib/api/admin';
@@ -31,9 +32,16 @@ import {
 
 export default function AdminSubscriptionsPage() {
   const [subscriptions, setSubscriptions] = useState<AdminSubscriptionItem[]>([]);
-  const [summary, setSummary] = useState({
+  const [summary, setSummary] = useState<{
+    total: number;
+    active: number;
+    trialing?: number;
+    expired: number;
+    suspended: number;
+  }>({
     total: 0,
     active: 0,
+    trialing: 0,
     expired: 0,
     suspended: 0,
   });
@@ -132,7 +140,9 @@ export default function AdminSubscriptionsPage() {
           <div className="text-2xl font-bold mt-1 text-emerald-600">
             {summary.active}
           </div>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Current &amp; valid</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Paid &amp; valid{summary.trialing ? ` · ${summary.trialing} on trial` : ''}
+          </p>
         </Card>
 
         <Card className="p-4 shadow-2xs">
@@ -245,13 +255,13 @@ export default function AdminSubscriptionsPage() {
                         </TableCell>
 
                         <TableCell className="py-3 font-mono font-medium">
-                          {sub.price ? `$${Number(sub.price).toFixed(2)}` : 'Free'}
+                          {sub.price ? formatMoney(sub.price, sub.currency || 'INR') : 'Free'}
                         </TableCell>
 
                         <TableCell className="py-3 text-[11px]">
                           <div className="flex items-center gap-1 text-muted-foreground">
                             <Calendar className="h-3 w-3" />
-                            <span>{sub.planExpire ? new Date(sub.planExpire).toLocaleDateString() : 'Lifetime / No Expiry'}</span>
+                            <span>{sub.planExpire && !isNaN(Number(sub.planExpire)) ? new Date(Number(sub.planExpire)).toLocaleDateString() : sub.planExpire ? String(sub.planExpire) : 'No expiry set'}</span>
                           </div>
                         </TableCell>
 
@@ -259,6 +269,10 @@ export default function AdminSubscriptionsPage() {
                           {isActive ? (
                             <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 text-[10px]">
                               Active
+                            </Badge>
+                          ) : sub.status === 'TRIALING' ? (
+                            <Badge variant="outline" className="text-sky-600 border-sky-300 text-[10px]">
+                              Trial
                             </Badge>
                           ) : sub.status === 'EXPIRED' ? (
                             <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">

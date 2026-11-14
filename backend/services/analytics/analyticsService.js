@@ -490,30 +490,77 @@ async function getAdminPlatformAnalytics(filters = {}) {
     ["count"],
   );
 
-  // 2. Platform Revenue & Orders (amount is VARCHAR, so sums need CAST in SQL)
-  const [revenueRow] = await prisma.$queryRaw`
-    SELECT
-      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) AS totalRevenue,
-      COALESCE(SUM(CASE WHEN status IN ('SUCCESS', 'PAID') AND ${periodSql} THEN CAST(amount AS DECIMAL(10,2)) ELSE 0 END), 0) AS periodRevenue,
-      COUNT(*) AS totalOrders,
-      COUNT(CASE WHEN status IN ('SUCCESS', 'PAID') THEN 1 END) AS successfulOrders,
-      COUNT(CASE WHEN status = 'PENDING' THEN 1 END) AS pendingOrders,
-      COUNT(CASE WHEN status = 'FAILED' THEN 1 END) AS failedOrders
-    FROM orders`;
-  const revenueStats = plain(revenueRow || {});
-
-  const revenueTimeSeries = toNumberRows(
+  // 2. Platform Revenue & Orders
+  // Orders are charged in different currencies (orders.data.currency), so totals are
+  // converted into the admin's base currency. Free trials and admin grants are not revenue.
+  const { getCurrencySettings, convertCurrency } = require("../../helper/pricing");
+  const { baseCode, supportedCurrencies } = await getCurrencySettings();
+  const orderRows = plain(
     await prisma.$queryRaw`
-      SELECT
-        DATE_FORMAT(createdAt, '%Y-%m-%d') AS date,
-        COALESCE(SUM(CAST(amount AS DECIMAL(10,2))), 0) AS revenue,
-        COUNT(*) AS orderCount
-      FROM orders
-      WHERE status IN ('SUCCESS', 'PAID') AND ${periodSql}
-      GROUP BY DATE_FORMAT(createdAt, '%Y-%m-%d')
-      ORDER BY date ASC`,
-    ["revenue", "orderCount"],
+      SELECT id, amount, status, payment_mode, data,
+             DATE_FORMAT(createdAt, '%Y-%m-%d') AS day,
+             (${periodSql}) AS inPeriod
+      FROM orders`,
   );
+  const PAID = new Set(["paid", "success"]);
+  const NON_REVENUE = new Set(["FREE_TRIAL", "ADMIN_GRANT"]);
+  const byCurrency = {};
+  const seriesMap = new Map();
+  const revenueStats = {
+    totalRevenue: 0,
+    periodRevenue: 0,
+    totalOrders: 0,
+    successfulOrders: 0,
+    pendingOrders: 0,
+    failedOrders: 0,
+    unconvertedOrders: 0,
+  };
+  for (const o of orderRows) {
+    if (NON_REVENUE.has(String(o.payment_mode || "").toUpperCase())) continue;
+    revenueStats.totalOrders++;
+    const st = String(o.status || "").toLowerCase();
+    if (st === "failed") revenueStats.failedOrders++;
+    if (st === "created" || st === "pending") revenueStats.pendingOrders++;
+    if (!PAID.has(st)) continue;
+    revenueStats.successfulOrders++;
+
+    let data = {};
+    try {
+      data = JSON.parse(o.data || "{}");
+    } catch (_) {}
+    const cur = String(data.currency || baseCode).toUpperCase();
+    const amount = Number(o.amount) || 0;
+    const inPeriod = Number(o.inPeriod) === 1;
+    byCurrency[cur] = byCurrency[cur] || { currency: cur, total: 0, period: 0, orders: 0 };
+    byCurrency[cur].total += amount;
+    byCurrency[cur].orders++;
+    if (inPeriod) byCurrency[cur].period += amount;
+
+    const inBase = convertCurrency(amount, cur, baseCode, supportedCurrencies);
+    if (inBase === null) {
+      revenueStats.unconvertedOrders++;
+      continue;
+    }
+    revenueStats.totalRevenue += inBase;
+    if (inPeriod) {
+      revenueStats.periodRevenue += inBase;
+      const point = seriesMap.get(o.day) || { date: o.day, revenue: 0, orderCount: 0 };
+      point.revenue += inBase;
+      point.orderCount++;
+      seriesMap.set(o.day, point);
+    }
+  }
+  const round2 = (n) => Math.round(n * 100) / 100;
+  revenueStats.totalRevenue = round2(revenueStats.totalRevenue);
+  revenueStats.periodRevenue = round2(revenueStats.periodRevenue);
+  const revenueTimeSeries = [...seriesMap.values()]
+    .sort((x, y) => x.date.localeCompare(y.date))
+    .map((r) => ({ ...r, revenue: round2(r.revenue) }));
+  const revenueByCurrency = Object.values(byCurrency).map((r) => ({
+    ...r,
+    total: round2(r.total),
+    period: round2(r.period),
+  }));
 
   // 3. Platform WhatsApp Accounts
   const [totalInstances, activeInstances, disconnectedInstances] = await Promise.all([
@@ -648,6 +695,9 @@ async function getAdminPlatformAnalytics(filters = {}) {
       successfulOrders: Number(revenueStats?.successfulOrders || 0),
       pendingOrders: Number(revenueStats?.pendingOrders || 0),
       failedOrders: Number(revenueStats?.failedOrders || 0),
+      currency: baseCode,
+      byCurrency: revenueByCurrency,
+      unconvertedOrders: revenueStats.unconvertedOrders,
       timeSeries: revenueTimeSeries || [],
     },
     whatsapp: {

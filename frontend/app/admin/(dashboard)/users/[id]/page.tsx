@@ -1,5 +1,7 @@
 'use client';
 
+import { toast } from 'sonner';
+import { getPlanExpiry } from '@/lib/admin/plan-status';
 import React, { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { analyticsApi } from '@/lib/api/analytics';
@@ -95,10 +97,10 @@ export default function AdminUserInspectorPage({
         setActionSuccess(`Email for ${details.user.email} marked as verified.`);
         await fetchUserDetails();
       } else {
-        alert(res?.msg || 'Failed to verify email.');
+        toast.error(res?.msg || 'Failed to verify email.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error communicating with server.');
+      toast.error(err.message || 'Error communicating with server.');
     } finally {
       setVerifyLoading(false);
     }
@@ -155,14 +157,17 @@ export default function AdminUserInspectorPage({
         );
         await fetchUserDetails();
       } else {
-        alert(res?.msg || 'Failed to update user status.');
+        toast.error(res?.msg || 'Failed to update user status.');
       }
     } catch (err: any) {
-      alert(err.message || 'Server error.');
+      toast.error(err.message || 'Server error.');
     } finally {
       setBlockLoading(false);
     }
   };
+
+  const [planExtend, setPlanExtend] = useState(true);
+  const [planCustomDays, setPlanCustomDays] = useState('');
 
   const handleChangePlanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -173,19 +178,20 @@ export default function AdminUserInspectorPage({
 
     setPlanLoading(true);
     try {
-      const res = await adminApi.updateUserPlan(details.user.uid, {
-        id: chosen.id,
-        title: chosen.title,
-      });
+      const res = await adminApi.updateUserPlan(
+        details.user.uid,
+        { id: chosen.id, title: chosen.title },
+        { extend: planExtend, customDays: planCustomDays ? Number(planCustomDays) : null }
+      );
       if (res && res.success) {
         setShowPlanDialog(false);
         showBanner(`Plan updated to "${chosen.title}" for ${details.user.email}`);
         await fetchUserDetails();
       } else {
-        alert(res?.msg || 'Failed to change plan.');
+        toast.error(res?.msg || 'Failed to change plan.');
       }
     } catch (err: any) {
-      alert(err.message || 'Error updating plan.');
+      toast.error(err.message || 'Error updating plan.');
     } finally {
       setPlanLoading(false);
     }
@@ -199,11 +205,11 @@ export default function AdminUserInspectorPage({
       if (res && res.success) {
         window.location.href = '/dashboard';
       } else {
-        alert(res?.msg || 'Impersonation failed.');
+        toast.error(res?.msg || 'Impersonation failed.');
         setImpersonateLoading(false);
       }
     } catch (err: any) {
-      alert(err.message || 'Server error.');
+      toast.error(err.message || 'Server error.');
       setImpersonateLoading(false);
     }
   };
@@ -432,6 +438,16 @@ export default function AdminUserInspectorPage({
                 </span>
                 <Badge variant="outline">{parsePlan(user.plan)}</Badge>
               </div>
+              {user.plan && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" /> Plan expiry
+                  </span>
+                  <span className={getPlanExpiry(user.plan_expire).expired ? 'text-amber-600 font-medium' : ''}>
+                    {getPlanExpiry(user.plan_expire).label}
+                  </span>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground flex items-center gap-1.5">
                   <Globe className="h-3.5 w-3.5" /> Timezone
@@ -693,10 +709,37 @@ export default function AdminUserInspectorPage({
                 <option value="">Select a plan...</option>
                 {plans.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.title} — {p.price === 0 ? 'Free' : `$${p.price}`}
+                    {p.title} — {Number(p.is_trial) === 1 ? 'Free trial' : 'Paid'} · {p.plan_duration_in_days || 30} days
                   </option>
                 ))}
               </select>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                id="inspector-plan-extend"
+                type="checkbox"
+                checked={planExtend}
+                onChange={(e) => setPlanExtend(e.target.checked)}
+                className="h-4 w-4 rounded border-input"
+              />
+              <Label htmlFor="inspector-plan-extend" className="text-xs font-normal">
+                Keep remaining days if the user already has this plan active
+              </Label>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="inspector-plan-days" className="text-xs font-medium">
+                Custom duration in days (optional)
+              </Label>
+              <input
+                id="inspector-plan-days"
+                type="number"
+                min={1}
+                max={3650}
+                value={planCustomDays}
+                onChange={(e) => setPlanCustomDays(e.target.value)}
+                placeholder="Plan default"
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-xs"
+              />
+            </div>
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0">

@@ -66,6 +66,8 @@ export default function AdminSettingsPage() {
   const [rzId, setRzId] = useState('');
   const [rzKey, setRzKey] = useState('');
   const [hasRzKey, setHasRzKey] = useState(false);
+  const [hasWebhookSecret, setHasWebhookSecret] = useState(false);
+  const [webhookSecretFromEnv, setWebhookSecretFromEnv] = useState(false);
   const [showRzKey, setShowRzKey] = useState(false);
   const [rzActive, setRzActive] = useState(true);
   const [rzWebhookSecret, setRzWebhookSecret] = useState('');
@@ -144,7 +146,9 @@ export default function AdminSettingsPage() {
         setRzId(rzRes.data.rz_id || '');
         setRzActive(Boolean(rzRes.data.rz_active));
         setHasRzKey(Boolean(rzRes.data.has_rz_key));
-        setRzWebhookSecret(rzRes.data.rz_webhook_secret || '');
+        setRzWebhookSecret('');
+        setHasWebhookSecret(Boolean(rzRes.data.has_webhook_secret));
+        setWebhookSecretFromEnv(Boolean(rzRes.data.webhook_secret_from_env));
         setRzKey('');
       }
 
@@ -372,6 +376,10 @@ export default function AdminSettingsPage() {
 
       if (res.success) {
         toast.success(res.msg || 'Razorpay settings saved successfully!');
+        if (rzWebhookSecret.trim()) {
+          setHasWebhookSecret(true);
+          setRzWebhookSecret('');
+        }
         if (rzKey.trim()) {
           setHasRzKey(true);
           setRzKey('');
@@ -1343,13 +1351,16 @@ export default function AdminSettingsPage() {
                     </Label>
                     <Input
                       id="rzWebhookSecret"
+                      type="password"
+                      autoComplete="off"
                       value={rzWebhookSecret}
                       onChange={(e) => setRzWebhookSecret(e.target.value)}
-                      placeholder="e.g. resend_rz_webhook_secret"
+                      placeholder={hasWebhookSecret ? '•••••••• (saved, leave blank to keep)' : 'Paste the webhook secret'}
                       className="font-mono text-xs"
                     />
                     <p className="text-[11px] text-muted-foreground">
                       Secret configured when setting up the webhook in Razorpay Dashboard. Used to verify server-to-server webhook requests.
+                      {webhookSecretFromEnv && ' Currently provided by the server environment (RAZORPAY_WEBHOOK_SECRET), which takes priority.'}
                     </p>
                   </div>
 

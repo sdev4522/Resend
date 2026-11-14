@@ -4,7 +4,7 @@ const { prisma, sanitizeBigInt } = require("../database/prisma.js");
 const con = require("../database/config.js");
 const randomstring = require("randomstring");
 const bcrypt = require("bcrypt");
-const { sign } = require("jsonwebtoken");
+const { sign, verify: verifyJwt } = require("jsonwebtoken");
 const adminValidator = require("../middlewares/admin.js");
 const {
   updateUserPlan,
@@ -26,6 +26,56 @@ const { getGoogleAuthConfig } = require("../helper/googleAuth.js");
 
 function getQrHelper() {
   return require("../helper/addon/qr/index.js");
+}
+
+// Writes an admin_audit_logs row. Never throws: auditing must not break the action.
+async function audit(req, action, targetType, targetId, details = null) {
+  try {
+    await query(
+      `INSERT INTO admin_audit_logs (admin_uid, action, target_type, target_id, details, ip_address) VALUES (?,?,?,?,?,?)`,
+      [
+        req.decode?.uid || "admin",
+        action,
+        targetType,
+        targetId != null ? String(targetId) : null,
+        details ? JSON.stringify(details) : null,
+        String(req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim().slice(0, 100) || null,
+      ],
+    );
+  } catch (err) {
+    logger.error("[admin audit] failed to write log:", err.message);
+  }
+}
+
+// Keeps every plan_prices row of a plan on the plan's billing period. Rows left on an
+// old period (after the duration changed) are moved, or dropped when the currency
+// already has a row on the current period. Trial plans are always free.
+async function alignPlanPrices(planId, periodDays, isTrial) {
+  const days = parseInt(periodDays || 30, 10);
+  const stale = await query(
+    `SELECT id, currency_code FROM plan_prices WHERE plan_id = ? AND billing_period_days <> ?`,
+    [planId, days],
+  );
+  for (const row of stale) {
+    const [current] = await query(
+      `SELECT id FROM plan_prices WHERE plan_id = ? AND currency_code = ? AND billing_period_days = ? LIMIT 1`,
+      [planId, row.currency_code, days],
+    );
+    if (current) {
+      await query(`DELETE FROM plan_prices WHERE id = ?`, [row.id]);
+    } else {
+      await query(`UPDATE plan_prices SET billing_period_days = ?, updated_at = NOW() WHERE id = ?`, [days, row.id]);
+    }
+  }
+  if (isTrial) {
+    await query(`UPDATE plan_prices SET amount = 0, strike_amount = NULL, updated_at = NOW() WHERE plan_id = ?`, [planId]);
+  }
+}
+
+function parseMoney(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) / 100 : NaN;
 }
 
 
@@ -107,11 +157,20 @@ router.post("/add_plan", adminValidator, async (req, res) => {
       instagram_inbox,
       telegram_inbox,
       allow_wa_forms,
+      messenger_inbox,
       custom,
     } = req.body;
 
     if (!title || !short_description || !plan_duration_in_days) {
       return res.json({ success: false, msg: "Please fill details" });
+    }
+    const priceNum = parseMoney(price);
+    const strikeNum = parseMoney(price_strike);
+    if (Number.isNaN(priceNum) || Number.isNaN(strikeNum)) {
+      return res.json({ success: false, msg: "Price must be a positive number" });
+    }
+    if (!(parseInt(plan_duration_in_days, 10) > 0)) {
+      return res.json({ success: false, msg: "Plan duration must be at least 1 day" });
     }
 
     const customVal = custom ? (typeof custom === "object" ? JSON.stringify(custom) : String(custom)) : null;
@@ -119,8 +178,8 @@ router.post("/add_plan", adminValidator, async (req, res) => {
     const insertRes = await query(
       `INSERT INTO plan (title, short_description, allow_tag, allow_note, allow_chatbot, 
         contact_limit, allow_api, is_trial, price, price_strike, plan_duration_in_days, 
-        qr_account, wa_warmer, rest_api_qr, instagram_inbox, telegram_inbox, allow_wa_forms, custom) 
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        qr_account, wa_warmer, rest_api_qr, instagram_inbox, telegram_inbox, allow_wa_forms, messenger_inbox, custom) 
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         title,
         short_description,
@@ -130,8 +189,8 @@ router.post("/add_plan", adminValidator, async (req, res) => {
         parseInt(contact_limit || 0),
         allow_api ? 1 : 0,
         is_trial ? 1 : 0,
-        is_trial ? 0 : price,
-        price_strike,
+        is_trial ? 0 : priceNum || 0,
+        is_trial ? null : strikeNum,
         parseInt(plan_duration_in_days || 1),
         parseInt(qr_account) > 0 ? parseInt(qr_account) : 0,
         wa_warmer ? 1 : 0,
@@ -139,6 +198,7 @@ router.post("/add_plan", adminValidator, async (req, res) => {
         instagram_inbox ? 1 : 0,
         telegram_inbox ? 1 : 0,
         allow_wa_forms ? 1 : 0,
+        messenger_inbox ? 1 : 0,
         customVal,
       ],
     );
@@ -154,11 +214,12 @@ router.post("/add_plan", adminValidator, async (req, res) => {
            updated_at = NOW()`,
         [
           insertRes.insertId,
-          is_trial ? 0 : parseFloat(price || 0),
-          price_strike ? parseFloat(price_strike) : null,
+          is_trial ? 0 : priceNum || 0,
+          is_trial ? null : strikeNum,
           parseInt(plan_duration_in_days || 30, 10),
         ]
       );
+      await audit(req, "PLAN_CREATE", "PLAN", insertRes.insertId, { title, price: is_trial ? 0 : priceNum, days: plan_duration_in_days });
     }
 
     res.json({ success: true, msg: "Plan has been added" });
@@ -190,12 +251,21 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
       instagram_inbox,
       telegram_inbox,
       allow_wa_forms,
+      messenger_inbox,
       custom,
     } = req.body;
 
     if (!id) return res.json({ success: false, msg: "Plan ID is required" });
     if (!title || !short_description || !plan_duration_in_days)
       return res.json({ success: false, msg: "Please fill all details" });
+    const priceNum = parseMoney(price);
+    const strikeNum = parseMoney(price_strike);
+    if (Number.isNaN(priceNum) || Number.isNaN(strikeNum)) {
+      return res.json({ success: false, msg: "Price must be a positive number" });
+    }
+    if (!(parseInt(plan_duration_in_days, 10) > 0)) {
+      return res.json({ success: false, msg: "Plan duration must be at least 1 day" });
+    }
 
     const customVal = custom ? (typeof custom === "object" ? JSON.stringify(custom) : String(custom)) : null;
 
@@ -206,7 +276,7 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
         price = ?, price_strike = ?, plan_duration_in_days = ?,
         qr_account = ?, wa_warmer = ?, rest_api_qr = ?,
         instagram_inbox = ?, telegram_inbox = ?,
-        allow_wa_forms = ?, custom = ?
+        allow_wa_forms = ?, messenger_inbox = ?, custom = ?
        WHERE id = ?`,
       [
         title,
@@ -217,8 +287,8 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
         parseInt(contact_limit || 0),
         allow_api ? 1 : 0,
         is_trial ? 1 : 0,
-        is_trial ? 0 : price,
-        price_strike,
+        is_trial ? 0 : priceNum || 0,
+        is_trial ? null : strikeNum,
         parseInt(plan_duration_in_days || 1),
         parseInt(qr_account) > 0 ? parseInt(qr_account) : 0,
         wa_warmer ? 1 : 0,
@@ -226,6 +296,7 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
         instagram_inbox ? 1 : 0,
         telegram_inbox ? 1 : 0,
         allow_wa_forms ? 1 : 0,
+        messenger_inbox ? 1 : 0,
         customVal,
         id,
       ],
@@ -242,11 +313,13 @@ router.post("/update_plan_data", adminValidator, async (req, res) => {
          updated_at = NOW()`,
       [
         id,
-        is_trial ? 0 : parseFloat(price || 0),
-        price_strike ? parseFloat(price_strike) : null,
+        is_trial ? 0 : priceNum || 0,
+        is_trial ? null : strikeNum,
         parseInt(plan_duration_in_days || 30, 10),
       ]
     );
+    await alignPlanPrices(id, plan_duration_in_days, Boolean(is_trial));
+    await audit(req, "PLAN_UPDATE", "PLAN", id, { title, price: is_trial ? 0 : priceNum, days: plan_duration_in_days, is_trial: Boolean(is_trial) });
 
     res.json({ success: true, msg: "Plan updated successfully" });
   } catch (err) {
@@ -298,7 +371,9 @@ router.post("/del_plan", adminValidator, async (req, res) => {
       });
     }
 
+    await query(`DELETE FROM plan_prices WHERE plan_id = ?`, [id]);
     await query(`DELETE FROM plan WHERE id = ?`, [id]);
+    await audit(req, "PLAN_DELETE", "PLAN", id);
     res.json({ success: true, msg: "Plan was deleted" });
   } catch (err) {
     res.json({ success: false, msg: "something went wrong" });
@@ -419,7 +494,7 @@ router.get("/get_user_details", adminValidator, async (req, res) => {
       query(`SELECT id, title, status, total_contacts, sent_count, delivered_count, failed_count, createdAt FROM beta_campaign WHERE uid = ? ORDER BY id DESC LIMIT 10`, [uid]),
       query(`SELECT id, flow_id, name, source, createdAt FROM beta_flows WHERE uid = ? ORDER BY id DESC LIMIT 10`, [uid]),
       query(`SELECT id, title, active, createdAt FROM beta_chatbot WHERE uid = ? ORDER BY id DESC`, [uid]),
-      query(`SELECT id, amount, status, payment_mode, createdAt FROM orders WHERE uid = ? ORDER BY id DESC LIMIT 10`, [uid]),
+      query(`SELECT id, amount, status, payment_mode, data, createdAt FROM orders WHERE uid = ? ORDER BY id DESC LIMIT 10`, [uid]),
     ]);
 
     let parsedPlan = null;
@@ -440,7 +515,7 @@ router.get("/get_user_details", adminValidator, async (req, res) => {
           campaignsCount: campaigns.length,
           flowsCount: flows.length,
           chatbotsCount: chatbots.length,
-          ordersCount: orders.length,
+          ordersCount: Number((await query(`SELECT COUNT(*) AS c FROM orders WHERE uid = ?`, [uid]))[0]?.c || 0),
         },
         instances,
         recentCampaigns: campaigns,
@@ -509,14 +584,20 @@ router.post("/toggle_user_status", adminValidator, async (req, res) => {
 // update user by admin
 router.post("/update_user", adminValidator, async (req, res) => {
   try {
-    const { newPassword, name, email, mobile_with_country_code, uid } =
-      req.body;
+    const { newPassword, name, mobile_with_country_code, uid } = req.body;
+    const email = String(req.body.email || "").trim().toLowerCase();
 
     if (!uid || !name || !email || !mobile_with_country_code) {
       return res.json({
         success: false,
         msg: "You forgot to enter some field(s)",
       });
+    }
+    if (!isValidEmail(email)) {
+      return res.json({ success: false, msg: "Please enter a valid email" });
+    }
+    if (newPassword && (typeof newPassword !== "string" || newPassword.length < 8)) {
+      return res.json({ success: false, msg: "Password must be at least 8 characters" });
     }
 
     const findUserByEmail = await prisma.user.findFirst({
@@ -566,6 +647,13 @@ router.post("/update_user", adminValidator, async (req, res) => {
       });
     }
 
+    await audit(req, newPassword ? "USER_UPDATE_WITH_PASSWORD" : "USER_UPDATE", "USER", uid, {
+      name,
+      email,
+      emailChanged: findUserByUid.email !== email,
+      passwordReset: Boolean(newPassword),
+    });
+
     res.json({ msg: "User was updated", success: true });
   } catch (err) {
     logger.log(err);
@@ -580,7 +668,7 @@ router.post("/update_user", adminValidator, async (req, res) => {
 // update plan
 router.post("/update_plan", adminValidator, async (req, res) => {
   try {
-    const { plan, uid } = req.body;
+    const { plan, uid, extend, customDays } = req.body;
 
     if (!plan || !uid) {
       return res.json({ success: false, msg: "Invalid input provided" });
@@ -590,8 +678,46 @@ router.post("/update_plan", adminValidator, async (req, res) => {
     if (getPlan.length < 1) {
       return res.json({ success: false, msg: "Invalid plan found" });
     }
+    const [target] = await query(`SELECT uid, plan, plan_expire FROM user WHERE uid = ?`, [uid]);
+    if (!target) {
+      return res.json({ success: false, msg: "User not found" });
+    }
+    const days = customDays ? parseInt(customDays, 10) : null;
+    if (customDays && !(days > 0 && days <= 3650)) {
+      return res.json({ success: false, msg: "Custom days must be between 1 and 3650" });
+    }
 
-    await updateUserPlan(getPlan[0], uid);
+    // extend=true (default) keeps remaining days when the user already has this plan active
+    await updateUserPlan(getPlan[0], uid, days, extend !== false);
+
+    // Admin grants are not payments, but record them so billing history and the
+    // subscriptions view show where the plan came from.
+    const { getCurrencySettings } = require("../helper/pricing");
+    const { baseCode } = await getCurrencySettings();
+    if (Number(getPlan[0].is_trial) !== 1) {
+      await prisma.orders.create({
+        data: {
+          uid,
+          payment_mode: "ADMIN_GRANT",
+          amount: "0.00",
+          status: "paid",
+          s_token: `admin_${String(uid).slice(0, 8)}_${Date.now()}`,
+          data: JSON.stringify({
+            plan: getPlan[0],
+            currency: baseCode,
+            grantedBy: req.decode?.uid || "admin",
+            durationDays: days || Number(getPlan[0].plan_duration_in_days) || null,
+          }),
+        },
+      });
+    }
+    await audit(req, "USER_PLAN_GRANT", "USER", uid, {
+      planId: getPlan[0].id,
+      planTitle: getPlan[0].title,
+      customDays: days,
+      extend: extend !== false,
+      previousExpire: target.plan_expire || null,
+    });
 
     res.json({ success: true, msg: "User plan was updated" });
   } catch (err) {
@@ -703,16 +829,19 @@ router.get("/get_razorpay_settings", adminValidator, async (req, res) => {
     const keyId =
       process.env.RAZORPAY_KEY_ID ||
       (webPrivate?.rz_id && webPrivate.rz_id !== "xxxxxxxxxxxxxxxxx" ? webPrivate.rz_id : "");
-    const webhookSecret =
-      process.env.RAZORPAY_WEBHOOK_SECRET || webPrivate?.rz_webhook_secret || "";
+    const webhookFromEnv = Boolean(process.env.RAZORPAY_WEBHOOK_SECRET);
+    const hasWebhookSecret = webhookFromEnv || Boolean(webPrivate?.rz_webhook_secret);
 
+    // Secrets never leave the server; the form shows whether one is set
     res.json({
       success: true,
       data: {
         rz_id: keyId,
         rz_active: webPrivate?.rz_active == "1",
         has_rz_key: hasKey,
-        rz_webhook_secret: webhookSecret,
+        has_webhook_secret: hasWebhookSecret,
+        webhook_secret_from_env: webhookFromEnv,
+        rz_webhook_secret: "",
       },
     });
   } catch (err) {
@@ -725,27 +854,24 @@ router.get("/get_razorpay_settings", adminValidator, async (req, res) => {
 router.post("/update_razorpay_settings", adminValidator, async (req, res) => {
   try {
     const { rz_id, rz_key, rz_active, rz_webhook_secret } = req.body;
-
-    if (rz_key && rz_key.trim() !== "") {
-      await query(
-        `UPDATE web_private SET rz_id = ?, rz_key = ?, rz_active = ?, rz_webhook_secret = ?`,
-        [
-          rz_id ? rz_id.trim() : "",
-          rz_key.trim(),
-          rz_active ? "1" : "0",
-          rz_webhook_secret ? rz_webhook_secret.trim() : "",
-        ]
-      );
-    } else {
-      await query(
-        `UPDATE web_private SET rz_id = ?, rz_active = ?, rz_webhook_secret = ?`,
-        [
-          rz_id ? rz_id.trim() : "",
-          rz_active ? "1" : "0",
-          rz_webhook_secret ? rz_webhook_secret.trim() : "",
-        ]
-      );
+    // Blank secret fields mean "keep the current value" (the form never receives them)
+    const sets = ["rz_id = ?", "rz_active = ?"];
+    const params = [rz_id ? String(rz_id).trim() : "", rz_active ? "1" : "0"];
+    if (rz_key && String(rz_key).trim() !== "") {
+      sets.push("rz_key = ?");
+      params.push(String(rz_key).trim());
     }
+    if (rz_webhook_secret && String(rz_webhook_secret).trim() !== "") {
+      sets.push("rz_webhook_secret = ?");
+      params.push(String(rz_webhook_secret).trim());
+    }
+    await query(`UPDATE web_private SET ${sets.join(", ")}`, params);
+    await audit(req, "RAZORPAY_SETTINGS_UPDATE", "SETTINGS", "razorpay", {
+      rz_id: params[0],
+      active: Boolean(rz_active),
+      keyChanged: sets.includes("rz_key = ?"),
+      webhookSecretChanged: sets.includes("rz_webhook_secret = ?"),
+    });
 
     res.json({ success: true, msg: "Razorpay settings updated successfully" });
   } catch (err) {
@@ -805,6 +931,11 @@ router.post("/update_currency_settings", adminValidator, async (req, res) => {
       [cleanCode, cleanSymbol, cleanRate, otherJson]
     );
 
+    await audit(req, "CURRENCY_SETTINGS_UPDATE", "SETTINGS", "currency", {
+      baseCode: cleanCode,
+      baseSymbol: cleanSymbol,
+      currencies: Array.isArray(supportedCurrencies) ? supportedCurrencies.map((c) => c.code) : undefined,
+    });
     res.json({ success: true, msg: "Currency settings updated successfully" });
   } catch (err) {
     logger.log(err);
@@ -843,20 +974,32 @@ router.post("/update_plan_prices", adminValidator, async (req, res) => {
       return res.json({ success: false, msg: "Prices array is required" });
     }
 
+    const planRows = await query(`SELECT id, plan_duration_in_days, is_trial FROM plan`);
+    const planById = new Map(planRows.map((p) => [Number(p.id), p]));
+    const touchedPlans = new Set();
+    let saved = 0;
+    let skipped = 0;
+
     for (const item of prices) {
       const planId = parseInt(item.plan_id, 10);
+      const plan = planById.get(planId);
       const currencyCode = (item.currency_code || "").trim().toUpperCase();
-      const amount = parseFloat(item.amount);
-      const strikeAmount =
-        item.strike_amount !== null && item.strike_amount !== undefined && item.strike_amount !== ""
-          ? parseFloat(item.strike_amount)
-          : null;
-      const billingDays = parseInt(item.billing_period_days || 30, 10);
+      let amount = parseMoney(item.amount);
+      let strikeAmount = parseMoney(item.strike_amount);
       const isActive = item.is_active === false ? 0 : 1;
 
-      if (!planId || !currencyCode || isNaN(amount)) {
+      if (!plan || !/^[A-Z]{3}$/.test(currencyCode) || amount === null || Number.isNaN(amount) || Number.isNaN(strikeAmount)) {
+        skipped++;
         continue;
       }
+      // Prices always belong to the plan's own billing period; trials are free
+      const billingDays = parseInt(plan.plan_duration_in_days || 30, 10);
+      if (Number(plan.is_trial) === 1) {
+        amount = 0;
+        strikeAmount = null;
+      }
+      touchedPlans.add(planId);
+      saved++;
 
       await query(
         `INSERT INTO plan_prices (plan_id, currency_code, amount, strike_amount, billing_period_days, is_active, updated_at)
@@ -879,7 +1022,18 @@ router.post("/update_plan_prices", adminValidator, async (req, res) => {
       }
     }
 
-    res.json({ success: true, msg: "Plan prices matrix saved successfully" });
+    for (const planId of touchedPlans) {
+      const plan = planById.get(planId);
+      await alignPlanPrices(planId, plan.plan_duration_in_days, Number(plan.is_trial) === 1);
+    }
+    await audit(req, "PLAN_PRICES_UPDATE", "PLAN", [...touchedPlans].join(","), { saved, skipped });
+
+    res.json({
+      success: true,
+      msg: skipped
+        ? `Saved ${saved} price(s); skipped ${skipped} invalid row(s)`
+        : "Plan prices matrix saved successfully",
+    });
   } catch (err) {
     logger.log(err);
     res.json({ success: false, msg: "Failed to update plan prices" });
@@ -914,8 +1068,11 @@ router.get("/get_payment_orders", adminValidator, async (req, res) => {
       `SELECT o.id, o.uid, o.payment_mode, o.amount, o.data, o.s_token, o.status, o.createdAt, u.email as user_email, u.name as user_name 
        FROM orders o 
        LEFT JOIN user u ON o.uid = u.uid 
-       ORDER BY o.createdAt DESC LIMIT 100`
+       ORDER BY o.createdAt DESC LIMIT 500`
     );
+
+    const { getCurrencySettings } = require("../helper/pricing");
+    const { baseCode } = await getCurrencySettings();
 
     const formatted = orders.map((o) => {
       let parsedData = null;
@@ -937,12 +1094,12 @@ router.get("/get_payment_orders", adminValidator, async (req, res) => {
         referenceId: o.s_token,
         planTitle: parsedData?.plan?.title || "Plan",
         isAutopay: Boolean(parsedData?.isAutopay),
-        currency: parsedData?.currency || "USD",
+        currency: String(parsedData?.currency || baseCode).toUpperCase(),
         razorpayPaymentId: parsedData?.razorpayPaymentId || null,
       };
     });
 
-    res.json({ success: true, orders: formatted });
+    res.json({ success: true, orders: formatted, baseCurrency: baseCode });
   } catch (err) {
     logger.log(err);
     res.json({ success: false, msg: "Failed to fetch payment orders" });
@@ -1164,6 +1321,7 @@ router.post("/auto_login", adminValidator, async (req, res) => {
     );
 
     logger.log(`[ADMIN AUDIT] Admin ${req.decode?.uid || "unknown"} generated impersonation token for user ${targetUser.uid}`);
+    await audit(req, "USER_IMPERSONATE", "USER", targetUser.uid, { email: targetUser.email, expiresIn: "1h" });
     res.json({ success: true, token });
   } catch (err) {
     logger.log(err);
@@ -1526,18 +1684,23 @@ router.get("/get_dashboard_for_user", adminValidator, async (req, res) => {
       getUserSignupsByMonth(getUsers);
 
     // Get orders data (selective projection)
-    const getOrders = await query(`SELECT id, uid, amount, createdAt FROM orders`, []);
+    // Real revenue only: paid orders, no free trials / admin grants
+    const getOrders = await query(
+      `SELECT id, uid, amount, status, payment_mode, data, createdAt FROM orders
+       WHERE LOWER(status) IN ('paid', 'success') AND payment_mode NOT IN ('FREE_TRIAL', 'ADMIN_GRANT')`,
+      [],
+    );
     const orders = getUserOrderssByMonth(getOrders);
 
     // Get contact form count
     const [contactFormCount] = await query(`SELECT COUNT(*) AS count FROM contact_form`, []);
 
     // Get chats data (selective projection)
-    const getChats = await query(`SELECT createdAt FROM beta_chats`, []);
+    const getChats = await query(`SELECT createdAt FROM beta_chats WHERE createdAt >= MAKEDATE(YEAR(NOW()), 1)`, []);
     const chatsByMonth = getChatsByMonth(getChats);
 
     // Get conversations data (selective projection)
-    const getConversations = await query(`SELECT type, createdAt FROM beta_conversation`, []);
+    const getConversations = await query(`SELECT type, msgContext, createdAt FROM beta_conversation WHERE createdAt >= MAKEDATE(YEAR(NOW()), 1)`, []);
     const messagesByMonth = getMessagesByMonth(getConversations);
 
     // Get message types distribution
@@ -1560,12 +1723,18 @@ router.get("/get_dashboard_for_user", adminValidator, async (req, res) => {
     const [flowsCount] = await query(`SELECT COUNT(*) AS count FROM beta_flows`, []);
 
     // Get system metrics (this would typically come from a monitoring service)
+    // Real host readings (these used to be random numbers)
+    const os = require("os");
+    let diskSpace = 0;
+    try {
+      const st = require("fs").statfsSync("/");
+      diskSpace = Math.round((1 - st.bavail / st.blocks) * 100);
+    } catch (_) {}
     const systemMetrics = {
-      serverLoad: Math.floor(Math.random() * 60) + 20, // Simulated data between 20-80%
-      memoryUsage: Math.floor(Math.random() * 40) + 30, // Simulated data between 30-70%
-      diskSpace: Math.floor(Math.random() * 30) + 10, // Simulated data between 10-40%
-      activeSessions:
-        getUsers.length > 0 ? Math.floor(getUsers.length * 0.7) : 0,
+      serverLoad: Math.min(100, Math.round((os.loadavg()[0] / Math.max(1, os.cpus().length)) * 100)),
+      memoryUsage: Math.round((1 - os.freemem() / os.totalmem()) * 100),
+      diskSpace,
+      activeSessions: activeInstances,
     };
 
     // Get recent users (last 5)
@@ -1586,12 +1755,16 @@ router.get("/get_dashboard_for_user", adminValidator, async (req, res) => {
       .slice(0, 5)
       .map((order) => {
         const user = getUsers.find((u) => u.uid === order.uid);
+        let od = {};
+        try {
+          od = JSON.parse(order.data || "{}");
+        } catch (_) {}
         return {
           id: order.id,
           user: user ? user.name : "Unknown",
-          amount: `$${order.amount}`,
-          plan: "Subscription",
-          status: "Completed",
+          amount: `${String(od.currency || "").toUpperCase() || ""} ${order.amount}`.trim(),
+          plan: od.plan?.title || "Subscription",
+          status: order.status || "paid",
           date: new Date(order.createdAt).toISOString().split("T")[0],
         };
       });
@@ -1640,11 +1813,12 @@ function getUserSignupsByMonth(users) {
 
   users.forEach((user) => {
     const createdAt = new Date(user.createdAt);
+    if (createdAt.getFullYear() !== new Date().getFullYear()) return;
     const month = createdAt.getMonth();
 
     // Check if user has a paid plan
     const plan = JSON.parse(user.plan || "{}");
-    const isPaid = plan && plan.is_trial === 0;
+    const isPaid = plan && plan.title && Number(plan.is_trial) === 0;
 
     if (isPaid) {
       paidSignupsByMonth[month]++;
@@ -1662,6 +1836,7 @@ function getUserOrderssByMonth(orders) {
 
   orders.forEach((order) => {
     const createdAt = new Date(order.createdAt);
+    if (createdAt.getFullYear() !== new Date().getFullYear()) return;
     const month = createdAt.getMonth();
     const amount = parseFloat(order.amount) || 0;
 
@@ -1740,23 +1915,17 @@ function getMessageTypeDistribution(conversations) {
 // Helper function to get agent performance
 function getAgentPerformance(agents, tasks) {
   return agents.slice(0, 3).map((agent) => {
-    const agentTasks = tasks.filter((task) => task.uid === agent.uid);
+    const agentTasks = tasks.filter((task) => String(task.agent_id) === String(agent.id));
     const completedTasks = agentTasks.filter(
       (task) => task.status === "COMPLETED",
     ).length;
     const completionRate =
       agentTasks.length > 0 ? (completedTasks / agentTasks.length) * 100 : 0;
 
-    // Generate some random metrics for demo purposes
+    // Only metrics we actually track; the rest are 0 instead of invented numbers
     return {
       name: agent.name,
-      data: [
-        Math.floor(Math.random() * 30) + 70, // Response time (70-100)
-        completionRate || Math.floor(Math.random() * 20) + 75, // Resolution rate
-        Math.floor(Math.random() * 15) + 80, // Customer rating
-        Math.floor(Math.random() * 25) + 70, // Chats handled
-        Math.floor(Math.random() * 20) + 75, // Tasks completed
-      ],
+      data: [0, Math.round(completionRate), 0, agentTasks.length, completedTasks],
     };
   });
 }
@@ -1798,15 +1967,15 @@ router.post("/update-admin", adminValidator, async (req, res) => {
 });
 
 // send recover
-router.post("/send_resovery", async (req, res) => {
+router.post("/send_resovery", authRateLimiter({ limit: 5, prefix: "admin_recovery" }), async (req, res) => {
   try {
-    const { email } = req.body;
+    const email = String(req.body?.email || "").trim().toLowerCase();
 
     if (!isValidEmail(email)) {
       return res.json({ msg: "Please enter a valid email" });
     }
 
-    const checkEmailValid = await query(`SELECT * FROM admin WHERE email = ?`, [
+    const checkEmailValid = await query(`SELECT uid, email, tokenVersion FROM admin WHERE LOWER(email) = ?`, [
       email,
     ]);
     if (checkEmailValid.length < 1) {
@@ -1819,12 +1988,13 @@ router.post("/send_resovery", async (req, res) => {
     const getWeb = await query(`SELECT * FROM web_public`, []);
     const appName = getWeb[0]?.app_name;
 
+    // Purpose-bound reset token: no admin role (so it can't be used as a session) and
+    // tied to tokenVersion, which the reset bumps, so the link works only once.
     const jsontoken = sign(
       {
-        old_email: email,
-        email: email,
-        time: moment(new Date()),
-        role: "admin",
+        purpose: "admin_password_reset",
+        admin_uid: checkEmailValid[0].uid,
+        tv: Number(checkEmailValid[0].tokenVersion || 0),
       },
       process.env.JWTKEY,
       { expiresIn: "1h" },
@@ -1863,41 +2033,49 @@ router.post("/send_resovery", async (req, res) => {
 
     res.json({
       success: true,
-      msg: "We have sent your a password recovery link. Please check your email",
+      msg: "We have sent a recovery link if this email is associated with admin account.",
     });
   } catch (err) {
     logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    res.json({ msg: "Something went wrong", success: false });
   }
 });
 
-router.get("/modify_password", adminValidator, async (req, res) => {
+// Admin password reset from the emailed link (POST body; the password never goes in a URL)
+router.post("/reset_password", authRateLimiter({ limit: 10, prefix: "admin_reset" }), async (req, res) => {
   try {
-    const { pass } = req.query;
-
-    if (!pass) {
-      return res.json({ success: false, msg: "Please provides a password" });
+    const { token, password } = req.body || {};
+    if (!token || typeof password !== "string" || password.length < 8) {
+      return res.json({ success: false, msg: "Password must be at least 8 characters" });
     }
 
-    if (moment(req.decode.time).diff(moment(new Date()), "hours") > 1) {
-      return res.json({ success: false, msg: "Token expired" });
+    let decoded;
+    try {
+      decoded = verifyJwt(String(token), process.env.JWTKEY);
+    } catch (_) {
+      return res.json({ success: false, msg: "This reset link is invalid or has expired" });
+    }
+    if (decoded?.purpose !== "admin_password_reset" || !decoded.admin_uid) {
+      return res.json({ success: false, msg: "This reset link is invalid or has expired" });
     }
 
-    const hashpassword = await bcrypt.hash(pass, 10);
+    const [admin] = await query(`SELECT uid, tokenVersion FROM admin WHERE uid = ?`, [decoded.admin_uid]);
+    if (!admin || Number(admin.tokenVersion || 0) !== Number(decoded.tv || 0)) {
+      return res.json({ success: false, msg: "This reset link has already been used or has expired" });
+    }
 
-    // ✅ Bump tokenVersion on password reset
+    const hashpassword = await bcrypt.hash(password, 10);
+    // Bumping tokenVersion logs out every admin session and burns this link
     await query(
-      `UPDATE admin SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 WHERE email = ?`,
-      [hashpassword, req.decode.old_email],
+      `UPDATE admin SET password = ?, tokenVersion = COALESCE(tokenVersion, 0) + 1 WHERE uid = ?`,
+      [hashpassword, admin.uid],
     );
+    await audit({ decode: { uid: admin.uid }, headers: req.headers, ip: req.ip }, "ADMIN_PASSWORD_RESET", "ADMIN", admin.uid);
 
-    res.json({
-      success: true,
-      msg: "Your password has been changed. You may login now! Redirecting...",
-    });
+    res.json({ success: true, msg: "Your password has been changed. You can log in now." });
   } catch (err) {
     logger.log(err);
-    res.json({ msg: "Something went wrong", err, success: false });
+    res.json({ msg: "Something went wrong", success: false });
   }
 });
 
@@ -1911,8 +2089,41 @@ async function safelyDeleteUserTenantData(connection, user) {
     [uid]
   );
 
+  // 1b. Close live WhatsApp (QR) sessions so they stop running after the rows are gone
+  try {
+    const [qrRows] = await connection.query(`SELECT uniqueId FROM instance WHERE uid = ?`, [uid]);
+    const qrHelper = getQrHelper();
+    for (const row of qrRows || []) {
+      const session = qrHelper.getSession ? qrHelper.getSession(row.uniqueId) : null;
+      if (session) {
+        try {
+          await session.logout();
+        } catch (_) {}
+      }
+      if (qrHelper.deleteSession) {
+        try {
+          qrHelper.deleteSession(row.uniqueId);
+        } catch (_) {}
+      }
+    }
+  } catch (err) {
+    logger.error("[del_user] QR session cleanup failed:", err.message);
+  }
+
+  // Child rows keyed by a parent id, removed before their parents
+  for (const sql of [
+    `DELETE FROM support_messages WHERE ticket_id IN (SELECT id FROM support_tickets WHERE uid = ?)`,
+    `DELETE FROM api_key_connections WHERE api_key_id IN (SELECT id FROM api_keys WHERE uid = ?)`,
+  ]) {
+    try {
+      await connection.query(sql, [uid]);
+    } catch (_) {}
+  }
+
   // 2. Cascade delete tenant operational data across related tables
   const tenantTables = [
+    "chat_widget",
+    "rooms",
     "instance",
     "meta_api",
     "email_verification",
@@ -2022,6 +2233,7 @@ router.post("/del_user", adminValidator, async (req, res) => {
     await connection.commit();
 
     logger.log(`[Admin Audit] Admin ${currentAdminUid} deleted user ${user.uid} (${user.email})`);
+    await audit(req, "USER_DELETE", "USER", user.uid, { email: user.email });
 
     res.json({ success: true, msg: "User was deleted successfully." });
   } catch (err) {
@@ -2131,6 +2343,10 @@ router.post("/delete_users", adminValidator, async (req, res) => {
       `[Admin Audit] Admin ${currentAdminUid} deleted ${validUsersToDelete.length} users:`,
       validUsersToDelete.map((u) => u.uid)
     );
+    await audit(req, "USER_BULK_DELETE", "USER", validUsersToDelete.map((u) => u.uid).join(",").slice(0, 255), {
+      count: validUsersToDelete.length,
+      emails: validUsersToDelete.map((u) => u.email),
+    });
 
     res.json({
       success: true,
@@ -3659,6 +3875,7 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
               u.subscription_status, u.is_blocked, u.createdAt,
               (SELECT MAX(o.createdAt) FROM orders o WHERE o.uid = u.uid AND o.status IN ('PAID', 'SUCCESS', 'paid')) as lastPaidAt,
               (SELECT o.amount FROM orders o WHERE o.uid = u.uid AND o.status IN ('PAID', 'SUCCESS', 'paid') ORDER BY o.id DESC LIMIT 1) as lastAmount,
+              (SELECT o.data FROM orders o WHERE o.uid = u.uid AND o.status IN ('PAID', 'SUCCESS', 'paid') ORDER BY o.id DESC LIMIT 1) as lastOrderData,
               (SELECT o.payment_mode FROM orders o WHERE o.uid = u.uid ORDER BY o.id DESC LIMIT 1) as paymentMode
        FROM user u
        WHERE u.plan IS NOT NULL AND u.plan != ''
@@ -3666,6 +3883,8 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
     );
 
     const now = moment();
+    const { getCurrencySettings } = require("../helper/pricing");
+    const { baseCode } = await getCurrencySettings();
     const formatted = usersWithPlan.map((u) => {
       let planObj = null;
       try {
@@ -3675,18 +3894,25 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
       const planTitle = planObj?.title || "Custom Plan";
       const isTrial = Boolean(planObj?.is_trial);
 
-      let status = "ACTIVE";
-      if (u.is_blocked) {
-        status = "SUSPENDED";
-      } else if (u.subscription_status) {
-        status = u.subscription_status.toUpperCase();
-      } else if (u.plan_expire) {
+      // Expiry wins over the stored subscription_status, which is never reset when a plan lapses
+      let isExpired = false;
+      if (u.plan_expire) {
         const rawExpire = !isNaN(Number(u.plan_expire)) ? Number(u.plan_expire) : u.plan_expire;
         const exp = moment(rawExpire);
-        if (exp.isValid() && exp.isBefore(now)) {
-          status = "EXPIRED";
-        }
+        isExpired = exp.isValid() && exp.isBefore(now);
       }
+      let status = isTrial ? "TRIALING" : "ACTIVE";
+      if (u.is_blocked) {
+        status = "SUSPENDED";
+      } else if (isExpired) {
+        status = "EXPIRED";
+      } else if (u.subscription_status) {
+        status = u.subscription_status.toUpperCase();
+      }
+      let lastOrder = {};
+      try {
+        lastOrder = JSON.parse(u.lastOrderData || "{}");
+      } catch (_) {}
 
       return {
         id: u.id,
@@ -3696,7 +3922,8 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
         planTitle,
         isTrial,
         planDurationDays: planObj?.plan_duration_in_days || 30,
-        price: u.lastAmount || planObj?.price || 0,
+        price: isTrial ? 0 : Number(u.lastAmount || 0),
+        currency: String(lastOrder?.currency || baseCode).toUpperCase(),
         status,
         planExpire: u.plan_expire,
         subscriptionId: u.subscription_id || null,
@@ -3712,6 +3939,7 @@ router.get("/get_subscriptions", adminValidator, async (req, res) => {
       summary: {
         total: formatted.length,
         active: formatted.filter((s) => s.status === "ACTIVE").length,
+        trialing: formatted.filter((s) => s.status === "TRIALING").length,
         expired: formatted.filter((s) => s.status === "EXPIRED").length,
         suspended: formatted.filter((s) => s.status === "SUSPENDED").length,
       },
@@ -3729,13 +3957,13 @@ router.get("/get_usage_summary", adminValidator, async (req, res) => {
       `SELECT 
         u.id, u.uid, u.name, u.email, u.plan, u.plan_expire,
         (SELECT COUNT(*) FROM contact c WHERE c.uid = u.uid) as contactCount,
-        (SELECT COUNT(*) FROM instance i WHERE i.uid = u.uid) as instanceCount,
+        (SELECT COUNT(*) FROM instance i WHERE i.uid = u.uid AND i.status = 'ACTIVE') as instanceCount,
         (SELECT COUNT(*) FROM beta_chatbot b WHERE b.uid = u.uid AND b.active = 1) as activeChatbots,
         (SELECT COUNT(*) FROM beta_campaign bc WHERE bc.uid = u.uid) as campaignCount
       FROM user u
       WHERE u.is_blocked = 0 OR u.is_blocked IS NULL
       ORDER BY contactCount DESC
-      LIMIT 100`
+      LIMIT 1000`
     );
 
     const formatted = tenants.map((t) => {
@@ -3744,15 +3972,24 @@ router.get("/get_usage_summary", adminValidator, async (req, res) => {
         parsedPlan = t.plan ? (typeof t.plan === "string" ? JSON.parse(t.plan) : t.plan) : null;
       } catch (_) {}
 
-      const contactLimit = parseInt(parsedPlan?.contact_limit || 1000, 10);
-      const instanceLimit = parseInt(parsedPlan?.qr_account || 1, 10);
-      const chatbotAllowed = Boolean(parsedPlan?.allow_chatbot);
+      // Same numbers the entitlement checks use; no plan means no allowance (not invented defaults)
+      const hasPlan = Boolean(parsedPlan?.title);
+      const expireAt = Number(t.plan_expire);
+      const planExpired = hasPlan && (!Number.isFinite(expireAt) || expireAt <= Date.now());
+      const contactLimit = hasPlan ? parseInt(parsedPlan?.contact_limit, 10) || 0 : 0;
+      const instanceLimit = hasPlan ? parseInt(parsedPlan?.qr_account, 10) || 0 : 0;
+      const chatbotAllowed = hasPlan && Boolean(Number(parsedPlan?.allow_chatbot));
 
-      const contactPercent = Math.min(Math.round(((t.contactCount || 0) / (contactLimit || 1)) * 100), 100);
-      const instancePercent = Math.min(Math.round(((t.instanceCount || 0) / (instanceLimit || 1)) * 100), 100);
+      const pct = (used, limit) => (limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : used > 0 ? 100 : 0);
+      const contactPercent = pct(Number(t.contactCount || 0), contactLimit);
+      const instancePercent = pct(Number(t.instanceCount || 0), instanceLimit);
 
       let usageRisk = "NORMAL";
-      if (contactPercent >= 100 || instancePercent >= 100) {
+      if (!hasPlan) {
+        usageRisk = "NO_PLAN";
+      } else if (planExpired) {
+        usageRisk = "EXPIRED";
+      } else if (contactPercent >= 100 || instancePercent >= 100) {
         usageRisk = "LIMIT_REACHED";
       } else if (contactPercent >= 80 || instancePercent >= 80) {
         usageRisk = "NEAR_LIMIT";
@@ -3763,7 +4000,8 @@ router.get("/get_usage_summary", adminValidator, async (req, res) => {
         uid: t.uid,
         name: t.name || "Customer",
         email: t.email,
-        planTitle: parsedPlan?.title || "Standard Tier",
+        planTitle: parsedPlan?.title || "No plan",
+        planExpired,
         usageRisk,
         contacts: {
           used: Number(t.contactCount || 0),
@@ -3790,6 +4028,8 @@ router.get("/get_usage_summary", adminValidator, async (req, res) => {
         totalInspected: formatted.length,
         nearLimit: formatted.filter((f) => f.usageRisk === "NEAR_LIMIT").length,
         limitReached: formatted.filter((f) => f.usageRisk === "LIMIT_REACHED").length,
+        noPlan: formatted.filter((f) => f.usageRisk === "NO_PLAN").length,
+        expired: formatted.filter((f) => f.usageRisk === "EXPIRED").length,
       },
     });
   } catch (err) {

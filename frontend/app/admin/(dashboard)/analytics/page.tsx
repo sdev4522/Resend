@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/currency/format';
 import React, { useEffect, useState, useCallback } from 'react';
 import { analyticsApi } from '@/lib/api/analytics';
 import { mailApi } from '@/lib/api/mail';
@@ -222,11 +223,11 @@ export default function AdminAnalyticsPage() {
           </div>
           <div className="mt-3">
             <div className="text-2xl font-bold font-mono text-foreground">
-              {loading ? <Skeleton className="h-8 w-28" /> : `$${(data?.revenue.totalRevenue || 0).toLocaleString()}`}
+              {loading ? <Skeleton className="h-8 w-28" /> : formatMoney(data?.revenue.totalRevenue || 0, data?.revenue.currency || 'INR')}
             </div>
             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
               <span className="text-emerald-600 font-medium">
-                ${(data?.revenue.periodRevenue || 0).toLocaleString()} in period
+                {formatMoney(data?.revenue.periodRevenue || 0, data?.revenue.currency || 'INR')} in period
               </span>
               <span>•</span>
               <span>{data?.revenue.successfulOrders || 0} paid orders</span>
@@ -352,8 +353,8 @@ export default function AdminAnalyticsPage() {
             ) : (
               <TimeSeriesChart
                 data={data.revenue.timeSeries}
-                series={[{ key: 'revenue', label: 'Revenue ($)', color: '#10b981' }]}
-                valueFormatter={(v) => `$${v.toLocaleString()}`}
+                series={[{ key: 'revenue', label: `Revenue (${data.revenue.currency || 'INR'})`, color: '#10b981' }]}
+                valueFormatter={(v) => formatMoney(v, data.revenue.currency || 'INR')}
                 height={240}
               />
             )}

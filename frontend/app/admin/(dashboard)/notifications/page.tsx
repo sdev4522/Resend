@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from 'sonner';
 import React, { useEffect, useState } from 'react';
 import { notificationsApi } from '@/lib/api/notifications';
 import { adminApi } from '@/lib/api/admin';
@@ -110,19 +111,19 @@ export default function AdminNotificationsPage() {
 
   const validateForm = () => {
     if (!title.trim()) {
-      alert('Please enter a notification title.');
+      toast('Please enter a notification title.');
       return false;
     }
     if (!message.trim()) {
-      alert('Please enter a message body.');
+      toast('Please enter a message body.');
       return false;
     }
     if (targetType === 'plan' && !selectedPlanId) {
-      alert('Please select a target plan.');
+      toast('Please select a target plan.');
       return false;
     }
     if (targetType === 'single' && !selectedUid) {
-      alert('Please select a recipient user.');
+      toast('Please select a recipient user.');
       return false;
     }
     return true;
@@ -137,7 +138,7 @@ export default function AdminNotificationsPage() {
 
   const handleExecuteSend = async () => {
     if (targetType === 'all' && !allUsersConfirmed) {
-      alert('Please check the confirmation box to proceed broadcasting to all users.');
+      toast('Please check the confirmation box to proceed broadcasting to all users.');
       return;
     }
 

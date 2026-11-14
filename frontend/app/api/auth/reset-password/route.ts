@@ -12,15 +12,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const backendRes = await fetch(
-      `${API_BASE_URL}/api/user/modify_password?pass=${encodeURIComponent(password)}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
+    // Backend accepts POST only; never put the password in the URL (it ends up in logs)
+    const backendRes = await fetch(`${API_BASE_URL}/api/user/modify_password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ token, password }),
+    });
 
     const data = await backendRes.json();
     return NextResponse.json(data);

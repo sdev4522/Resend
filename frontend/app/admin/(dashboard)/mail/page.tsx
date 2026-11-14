@@ -1,5 +1,6 @@
 'use client';
 
+import { toast } from 'sonner';
 import React, { useEffect, useState } from 'react';
 import { mailApi } from '@/lib/api/mail';
 import { MailTemplateItem } from '@/types/notifications';
@@ -171,7 +172,7 @@ export default function AdminMailTemplatesPage() {
       setPreviewSubject(res.renderedSubject);
       setShowPreviewModal(true);
     } catch (err: any) {
-      alert(err.message || 'Error generating preview.');
+      toast.error(err.message || 'Error generating preview.');
     }
   };
 
@@ -185,10 +186,10 @@ export default function AdminMailTemplatesPage() {
         showBanner(`Template "${deletingTemplate.name}" deleted.`);
         await fetchTemplates();
       } else {
-        alert(res?.msg || 'Failed to delete template.');
+        toast.error(res?.msg || 'Failed to delete template.');
       }
     } catch (err: any) {
-      alert(err.message || 'Server error.');
+      toast.error(err.message || 'Server error.');
     } finally {
       setDeleteLoading(false);
     }

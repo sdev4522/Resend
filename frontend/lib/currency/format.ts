@@ -19,3 +19,23 @@ export function formatCurrencyAmount(
 
   return `${symbol}${num.toFixed(2)}`;
 }
+
+/**
+ * Formats an amount in its own currency with the right symbol (₹, $, €, AED…).
+ * Keeps up to 2 decimals so admin totals are exact.
+ */
+export function formatMoney(amount: number | string | undefined | null, currency: string = 'INR'): string {
+  const num = Number(amount ?? 0);
+  const code = (currency || 'INR').toUpperCase();
+  const value = Number.isFinite(num) ? num : 0;
+  try {
+    return new Intl.NumberFormat(code === 'INR' ? 'en-IN' : 'en-US', {
+      style: 'currency',
+      currency: code,
+      minimumFractionDigits: value % 1 === 0 ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${code} ${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  }
+}

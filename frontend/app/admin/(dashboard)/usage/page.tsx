@@ -259,7 +259,15 @@ export default function AdminUsageLimitsPage() {
                       </TableCell>
 
                       <TableCell className="py-3">
-                        {item.usageRisk === 'LIMIT_REACHED' ? (
+                        {item.usageRisk === 'NO_PLAN' ? (
+                          <Badge variant="outline" className="text-muted-foreground text-[10px]">
+                            No plan
+                          </Badge>
+                        ) : item.usageRisk === 'EXPIRED' ? (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-[10px]">
+                            Plan expired
+                          </Badge>
+                        ) : item.usageRisk === 'LIMIT_REACHED' ? (
                           <Badge variant="destructive" className="text-[10px]">
                             At Limit
                           </Badge>

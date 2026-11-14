@@ -1,5 +1,6 @@
 'use client';
 
+import { formatMoney } from '@/lib/currency/format';
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { analyticsApi } from '@/lib/api/analytics';
@@ -129,7 +130,7 @@ export default function AdminOverviewPage() {
               <Skeleton className="h-8 w-24" />
             ) : (
               <div className="text-2xl sm:text-3xl font-bold font-mono text-foreground tracking-tight">
-                ${(data?.revenue.totalRevenue || 0).toLocaleString()}
+                {formatMoney(data?.revenue.totalRevenue || 0, data?.revenue.currency || 'INR')}
               </div>
             )}
             <div className="flex items-center justify-between mt-2 text-xs text-muted-foreground">
@@ -271,8 +272,8 @@ export default function AdminOverviewPage() {
             ) : (
               <TimeSeriesChart
                 data={data.revenue.timeSeries}
-                series={[{ key: 'revenue', label: 'Revenue ($)', color: '#10b981' }]}
-                valueFormatter={(v) => `$${v.toLocaleString()}`}
+                series={[{ key: 'revenue', label: `Revenue (${data.revenue.currency || 'INR'})`, color: '#10b981' }]}
+                valueFormatter={(v) => formatMoney(v, data.revenue.currency || 'INR')}
                 height={220}
               />
             )}

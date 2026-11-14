@@ -8,7 +8,7 @@ const {
   validateCoupon,
   calculateCheckoutPrice,
   getCurrencySettings,
-  applySmartRounding,
+  getPlanPrice,
   DURATION_DISCOUNT_RATES,
 } = require("../helper/pricing");
 const {
@@ -261,9 +261,9 @@ router.get("/plans", async (req, res) => {
       where: { is_active: true },
     });
 
-    const { baseCode, baseSymbol, supportedCurrencies, roundingMode } = await getCurrencySettings();
+    const { baseCode, baseSymbol, supportedCurrencies } = await getCurrencySettings();
 
-    const formattedPlans = plans.map((p) => {
+    const formattedPlans = await Promise.all(plans.map(async (p) => {
       let customObj = null;
       if (p.custom) {
         try {
@@ -275,31 +275,17 @@ router.get("/plans", async (req, res) => {
       const currencyPrices = {};
       const currencyStrikePrices = {};
 
+      const isTrial = Number(p.is_trial) === 1;
       for (const c of supportedCurrencies) {
-        const foundRow = planPrices.find((row) => row.currency_code.toUpperCase() === c.code.toUpperCase());
-        if (foundRow) {
-          currencyPrices[c.code] = parseFloat(foundRow.amount);
-          if (foundRow.strike_amount) {
-            currencyStrikePrices[c.code] = parseFloat(foundRow.strike_amount);
-          }
-        } else if (c.code === baseCode) {
-          currencyPrices[c.code] = parseFloat(p.price || 0);
-          if (p.price_strike) currencyStrikePrices[c.code] = parseFloat(p.price_strike);
-        } else {
-          // Fallback conversion with smart SaaS rounding
-          currencyPrices[c.code] = applySmartRounding(
-            parseFloat(p.price || 0) * (parseFloat(c.rate) || 1.0),
-            c.code,
-            roundingMode
-          );
-          if (p.price_strike) {
-            currencyStrikePrices[c.code] = applySmartRounding(
-              parseFloat(p.price_strike) * (parseFloat(c.rate) || 1.0),
-              c.code,
-              roundingMode
-            );
-          }
+        if (isTrial) {
+          // Trials are claimed free from the dashboard and can't be bought at checkout
+          currencyPrices[c.code] = 0;
+          continue;
         }
+        // Same resolver as checkout, so the advertised price is the charged price
+        const info = await getPlanPrice(p.id, c.code, parseInt(p.plan_duration_in_days || 30, 10));
+        currencyPrices[c.code] = info.amount;
+        if (info.strikeAmount) currencyStrikePrices[c.code] = info.strikeAmount;
       }
 
       return {
@@ -309,7 +295,7 @@ router.get("/plans", async (req, res) => {
         currencyPrices,
         currencyStrikePrices,
       };
-    });
+    }));
 
     res.json({
       success: true,
