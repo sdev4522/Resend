@@ -41,6 +41,29 @@ export const metadata: Metadata = {
   },
   description: siteConfig.description,
   applicationName: siteConfig.name,
+  keywords: [
+    'WhatsApp Business API',
+    'WhatsApp CRM',
+    'WhatsApp Automation',
+    'Meta Cloud API',
+    'WhatsApp Shared Inbox',
+    'Multi-Agent WhatsApp CRM',
+    'WhatsApp Chatbot Builder',
+    'WhatsApp Bulk Broadcast Campaigns',
+    'Interactive WhatsApp Templates',
+    'WATI Alternative',
+    'AiSensy Alternative',
+    'Interakt Alternative',
+    'WhatsApp Lead Management',
+    'WhatsApp Customer Support Software',
+    'Official WhatsApp Graph API',
+    'Baileys WhatsApp QR',
+    'Conversational Commerce Platform',
+    'WhatsApp Marketing Automation',
+    'WhatsApp Developer API & Webhooks',
+  ],
+  category: 'Technology & Communication',
+  classification: 'Business CRM & Marketing Automation Software',
   authors: [{ name: 'Resend Team' }],
   creator: 'Resend Inc.',
   publisher: 'Resend Inc.',
@@ -57,6 +80,20 @@ export const metadata: Metadata = {
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
     ],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  alternates: {
+    canonical: siteConfig.url,
   },
   openGraph: {
     type: 'website',
@@ -78,7 +115,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: `${siteConfig.name} — WhatsApp Business API, CRM & Automation`,
     description: siteConfig.description,
-    images: ['/newog.png'],
+    images: ['/og.png'],
   },
 };
 
@@ -97,6 +134,8 @@ export default async function RootLayout({
       className={`${golosText.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM Context Summary" />
+        <link rel="alternate" type="text/plain" href="/llms-full.txt" title="Comprehensive LLM Documentation" />
         {themeCss ? (
           <style
             id="wacrm-dynamic-theme"

@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   title: 'Privacy Policy',
   description:
     'Understand how Resend collects, protects, and manages account data, messaging metadata, and integration security.',
+  keywords: [
+    'Resend privacy policy',
+    'WhatsApp CRM data security',
+    'DPDP Act 2023 compliance',
+    'GDPR compliance WhatsApp API',
+  ],
   alternates: {
     canonical: `${siteConfig.url}/privacy`,
   },

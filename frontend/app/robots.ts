@@ -12,6 +12,9 @@ export default function robots(): MetadataRoute.Robots {
     '/faq',
     '/privacy',
     '/terms',
+    '/llms.txt',
+    '/llms-full.txt',
+    '/sitemap.xml',
   ];
 
   // Auth, onboarding and thank-you pages are NOT blocked here on purpose: they carry
@@ -30,6 +33,12 @@ export default function robots(): MetadataRoute.Robots {
     'Claude-SearchBot',
     'PerplexityBot',
     'Google-Extended',
+    'Applebot',
+    'Applebot-Extended',
+    'Meta-ExternalAgent',
+    'Amazonbot',
+    'cohere-ai',
+    'Bytespider',
   ];
 
   return {

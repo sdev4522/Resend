@@ -1,0 +1,29 @@
+# Resend — WhatsApp Business API, CRM & Automation Platform
+
+> Resend (https://resend.in) is an official WhatsApp Business API, multi-agent shared inbox, and conversational marketing automation platform. It empowers sales, support, and marketing teams to connect WhatsApp via Meta Cloud API or rapid QR pairing, broadcast verified template campaigns, automate replies with visual no-code flow builders, and collaborate in real time without per-message platform markups.
+
+## Core Capabilities
+
+- [WhatsApp Business API & Cloud Engine](https://resend.in/features): Official Meta Graph Cloud API integration for high-throughput, tier-escalating enterprise messaging with zero phone hardware dependencies.
+- [Dual Connection Mode](https://resend.in/features): Connect using official Meta Cloud API or instant Baileys QR code sync for existing phone numbers.
+- [Multi-Agent Shared Inbox](https://resend.in/features): Simultaneous team access with automatic chat routing, agent assignments, private internal notes, and real-time Socket.IO collaboration.
+- [Visual No-Code Flow Builder](https://resend.in/features): Drag-and-drop conversational decision trees, keyword-triggered auto-replies, interactive button menus, and media flows.
+- [Bulk Template Broadcasts](https://resend.in/features): Segmented, personalized template campaigns with real-time delivery logs, read receipts, and anti-ban rate limiting.
+- [Contact CRM & Management](https://resend.in/features): Tagging, custom attributes, phonebook segmentation, CSV contact imports, and conversational history.
+- [Developer REST API & Webhooks](https://resend.in/features): Enterprise HTTP REST endpoints and webhook event subscriptions for bidirectional sync with Shopify, WooCommerce, CRM, and custom backend stacks.
+- [Transparent Pricing & Free Trial](https://resend.in/pricing): 14-day full-featured free trial with no credit card required. Transparent flat subscription plans with zero platform markup on Meta conversation fees.
+
+## Key Pages
+
+- [Homepage](https://resend.in/): Overview of WhatsApp CRM, hero preview, capability marquee, and feature highlights.
+- [Features](https://resend.in/features): In-depth breakdown of shared inbox, flow builder, broadcast engine, and developer tools.
+- [Pricing](https://resend.in/pricing): Detailed pricing tiers, 14-day free trial details, plan comparison, and Meta conversation billing transparency.
+- [Frequently Asked Questions (FAQ)](https://resend.in/faq): Authoritative answers covering setup time, Meta Cloud API vs QR engine, agent concurrency, and Meta conversation charges.
+- [Contact Sales & Support](https://resend.in/contact): Support channels, onboarding guidance, and enterprise sales inquiries.
+- [Full LLM Documentation](https://resend.in/llms-full.txt): Comprehensive technical specifications, comparison tables, schema architecture, and complete FAQ repository for AI search engines.
+
+## Optional & Developer Resources
+
+- [Sitemap](https://resend.in/sitemap.xml): Canonical XML sitemap of all public indexable routes.
+- [Privacy Policy](https://resend.in/privacy): DPDP Act 2023 & GDPR data protection, encryption, and messaging metadata retention policies.
+- [Terms of Service](https://resend.in/terms): Service level commitments, fair use, and subscription terms.

@@ -3,7 +3,7 @@ import { siteConfig } from '@/config/site';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = siteConfig.url.replace(/\/+$/, '');
-  const marketingUpdateDate = new Date('2026-10-21T00:00:00.000Z');
+  const marketingUpdateDate = new Date('2026-11-14T00:00:00.000Z');
   const legalUpdateDate = new Date('2026-09-25T00:00:00.000Z');
 
   return [

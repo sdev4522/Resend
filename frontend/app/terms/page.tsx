@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   title: 'Terms and Conditions',
   description:
     'Review terms of service, acceptable messaging policies, WhatsApp Meta API compliance, and subscription guidelines for Resend.',
+  keywords: [
+    'Resend terms and conditions',
+    'WhatsApp Business API terms of service',
+    'WhatsApp messaging acceptable use policy',
+  ],
   alternates: {
     canonical: `${siteConfig.url}/terms`,
   },
