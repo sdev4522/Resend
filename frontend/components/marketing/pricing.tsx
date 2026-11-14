@@ -149,7 +149,7 @@ export function MarketingPricing({ isPageHeading = false }: { isPageHeading?: bo
               <TabsTrigger value="yearly" className="py-1.5 px-5 rounded-full text-xs sm:text-sm font-medium">
                 Yearly
                 {annualDiscountPercent > 0 && (
-                  <span className="ml-1.5 rounded-full bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                  <span className="ml-1.5 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-primary-foreground">
                     Save {annualDiscountPercent}%
                   </span>
                 )}

@@ -98,6 +98,8 @@ export function generateThemeCss(config: ThemeConfig | null): string {
   // PRIMARY & CONTRAST
   if (primary) {
     rootCss += `  --primary: ${primary} !important;\n`;
+    // Unmodified brand colour, so scoped areas (landing) can derive accessible shades from it
+    rootCss += `  --brand-primary: ${primary} !important;\n`;
     rootCss += `  --sidebar-primary: ${primary} !important;\n`;
     rootCss += `  --ring: ${primary} !important;\n`;
     if (primaryFg) {
@@ -158,6 +160,7 @@ export function generateThemeCss(config: ThemeConfig | null): string {
   // DARK THEME TOKENS
   if (primaryDark) {
     darkCss += `  --primary: ${primaryDark} !important;\n`;
+    darkCss += `  --brand-primary: ${primaryDark} !important;\n`;
     darkCss += `  --sidebar-primary: ${primaryDark} !important;\n`;
     darkCss += `  --ring: ${primaryDark} !important;\n`;
     if (primaryDarkFg) {

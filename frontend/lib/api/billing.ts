@@ -12,16 +12,30 @@ import {
   SupportedBillingCurrency,
 } from '@/types/billing';
 
+const fetchPlans = () =>
+  api.get<{
+    success: boolean;
+    plans: SubscriptionPlan[];
+    currency: string;
+    currencySymbol: string;
+    supportedCurrencies?: SupportedBillingCurrency[];
+    durationDiscounts?: Record<string, number>;
+  }>(API_ENDPOINTS.billing.plans);
+
+// The landing page asks for plans from two places at mount (currency provider and
+// pricing section); share one in-flight request instead of hitting the API twice.
+let plansInFlight: ReturnType<typeof fetchPlans> | null = null;
+
 export const billingApi = {
   getPlans: () => {
-    return api.get<{
-      success: boolean;
-      plans: SubscriptionPlan[];
-      currency: string;
-      currencySymbol: string;
-      supportedCurrencies?: SupportedBillingCurrency[];
-      durationDiscounts?: Record<string, number>;
-    }>(API_ENDPOINTS.billing.plans);
+    if (plansInFlight) return plansInFlight;
+    const req = fetchPlans();
+    plansInFlight = req;
+    const clear = () => {
+      if (plansInFlight === req) plansInFlight = null;
+    };
+    req.then(clear, clear);
+    return req;
   },
 
   calculatePrice: (payload: {

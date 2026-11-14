@@ -66,9 +66,9 @@ function FloatCard({ className, children }: { className: string; children: React
 const stages = ['New lead', 'Qualified', 'Paid'];
 const rail = [Inbox, Bot, Megaphone, BarChart3, Users];
 const agents = [
-  { i: 'RS', c: '#7c6cf2' },
-  { i: 'AK', c: '#f2a93b' },
-  { i: 'NM', c: '#2fa6de' },
+  { i: 'RS', c: '#5b49d6' },
+  { i: 'AK', c: '#9a5c06' },
+  { i: 'NM', c: '#17689a' },
 ];
 
 export function HeroDesk() {

@@ -286,11 +286,17 @@
   --border: var(--lp-line);
   --input: var(--lp-line);
 
+  /* Light mode: darken the admin brand colour so green text on white and white
+     text on green buttons meet WCAG AA 4.5:1 (#00A884 alone is only 3:1). */
+  --primary: color-mix(in srgb, var(--brand-primary, #00A884) 72%, #000);
+
   background: var(--lp-paper);
   color: var(--lp-ink);
 }
 
 .dark .lp {
+  /* Dark mode keeps the brand colour as-is (it already contrasts with the dark paper) */
+  --primary: var(--brand-primary, #00A884);
   --lp-paper: #0a0e1a;
   --lp-ink: #eef2fb;
   --lp-mute: #a4adc2;
@@ -310,7 +316,13 @@
 .lp-glow {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(80px);
+  /* Soft edge via a radial mask instead of filter: blur(80px). The blur forced a
+     full re-rasterisation on every frame while the hero intro animated the glass
+     panels above it (~170ms long tasks). The mask is painted once. */
+  -webkit-mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  /* the blur used to spread colour ~2x past the box; scale the masked blob to match */
+  scale: 1.7;
   opacity: 0.9;
   pointer-events: none;
 }
