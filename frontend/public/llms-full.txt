@@ -1,0 +1,128 @@
+# Resend — Complete Platform Reference & LLM Documentation
+
+> Entity: Resend (https://resend.in)  
+> Category: WhatsApp Business API, Conversational CRM, Marketing Automation & Multi-Agent Inbox Software  
+> Target Audience: B2B SaaS, E-Commerce, D2C Brands, Customer Support Teams, Sales Agencies, and Developers  
+> Last Verified: 2026-11-14
+
+---
+
+## 1. Executive Summary & Entity Definition
+
+Resend is a next-generation WhatsApp Business API and customer relationship management (CRM) software platform. It enables modern businesses to transform WhatsApp from a siloed mobile messaging app into a centralized, collaborative enterprise communication engine. 
+
+Key architectural pillars:
+1. **Dual Connection Engine:** Supports both the official **Meta WhatsApp Cloud API** (high-throughput, cloud-hosted, server-to-server) and **Instant QR Device Pairing** (via Baileys protocol for rapid testing or running on existing SIM numbers without Meta verification delays).
+2. **Multi-Agent Shared Inbox:** Enables unlimited simultaneous team agents to handle customer chats from a single verified WhatsApp number with collision detection, private internal notes, and automated routing.
+3. **Conversational Automation & Visual Flows:** Intuitive no-code canvas to build decision-tree chatbots, keyword-triggered auto-responders, and interactive list/button flows.
+4. **Marketing Broadcasts & Campaigns:** Send Meta-approved template messages at scale with personalized variables, CSV list import, real-time delivery metrics, and built-in rate-limiting guards to prevent number blocks.
+5. **Zero Platform Markup on Meta Conversations:** Transparent SaaS pricing where businesses pay standard platform subscription fees while Meta conversation charges are billed directly by Meta with no hidden per-message surcharges.
+
+---
+
+## 2. Platform Capabilities & Technical Specifications
+
+### A. Meta WhatsApp Cloud API Integration
+- Connects directly to Meta Graph API v20+ infrastructure.
+- Zero server hosting maintenance or Docker on-premise overhead.
+- Supports green tick verification application directly through Meta Business Manager.
+- Official template message synchronization and category approval (Utility, Authentication, Marketing, Service).
+- Native handling of 1,000 free monthly service conversations provided by Meta.
+
+### B. Baileys Multi-Device QR Connection Engine
+- Connect any standard WhatsApp or WhatsApp Business mobile number via instantaneous QR scan.
+- No Meta Business verification requirement.
+- Full support for text, rich media (images, PDFs, documents, audio, video), and location payloads.
+- Automated session reconnection and keepalive health monitoring.
+
+### C. Multi-Agent Team Collaboration
+- Unified conversation queue with status filters (Open, Pending, Resolved, Spam).
+- Agent assignment: Assign chats manually or auto-route based on availability or department.
+- Private internal notes: Leave notes visible only to team members within chat threads.
+- Real-time Socket.IO synchronization: New inbound messages, read receipts, and typing indicators update instantly across all open browser sessions.
+
+### D. Visual No-Code Flow Builder & Automation
+- Interactive drag-and-drop node graph builder.
+- Trigger types: Exact match keyword, fuzzy keyword contains, regex pattern, welcome message, and default fallback.
+- Action nodes: Send message, send interactive quick-reply buttons, send interactive list picker, request user input, wait/delay timer, conditional branch, and transfer to human agent.
+
+### E. Developer API & Webhooks
+- Standard JSON REST API for sending outbound messages, triggering campaign templates, querying contact records, and retrieving chat history.
+- Real-time webhook dispatching for inbound customer messages, message status updates (sent, delivered, read, failed), and button click events.
+- Easy integration with Shopify, WooCommerce, Zapier, Make, HubSpot, Zoho, and custom CRM databases.
+
+---
+
+## 3. Comparative Analysis: Resend vs Alternatives
+
+| Feature / Capability | Resend (resend.in) | WATI | AiSensy | Standard WhatsApp Business App |
+|---|---|---|---|---|
+| **Connection Engine** | Dual: Meta Cloud API + Instant QR | Meta Cloud API only | Meta Cloud API only | Mobile App Only |
+| **Setup Time** | Under 5 minutes | 24–48 hours (Meta approval) | 24–48 hours (Meta approval) | Instant |
+| **Agent Concurrency** | Multi-agent team inbox with live routing | Plan-limited agent seats | Plan-limited agent seats | Single device (web mirror drops) |
+| **Visual Flow Builder** | Included across plans | Paid add-on in higher tiers | Basic keyword builder | None (simple quick replies only) |
+| **Platform Markup on Messages**| ₹0 / $0 markup (Direct Meta rates) | Platform markup or credits | Markup on message credits | N/A (Standard data plan) |
+| **Developer API & Webhooks** | Full REST API & Webhooks | Available on higher tiers | Limited API access | None |
+| **Free Trial** | 14 days full access (no credit card) | 7-day limited trial | Limited demo | Free (consumer software) |
+
+---
+
+## 4. Transparent Pricing Architecture
+
+Resend provides straightforward, transparent pricing designed to eliminate surprise billing:
+
+1. **14-Day Free Trial:**
+   - Price: $0 / ₹0.
+   - Includes: Full access to Shared Inbox, Flow Builder, Contacts CRM, API access, and Dual Engine connectivity.
+   - Requirement: No credit card required to begin.
+
+2. **Standard & Growth Plans:**
+   - Flexible monthly and discounted annual billing tiers.
+   - Includes core platform seats, unlimited contact storage, visual automation flows, and developer webhook access.
+   - Zero markup on Meta Cloud API conversation fees.
+
+3. **Understanding Meta Conversation Fees:**
+   - WhatsApp conversations are billed directly by Meta based on 24-hour conversation sessions.
+   - **Service Conversations:** Initiated by customer inbound inquiries. Meta grants **1,000 free service conversations per month** per Meta Business portfolio.
+   - **Marketing Conversations:** Initiated by business template broadcasts for promotional messages. Billed at Meta's regional published rates.
+   - **Utility Conversations:** Transactional order confirmations, shipping updates, and OTP receipts.
+   - **QR Mode:** If using the Baileys QR connection engine, messaging uses the connected phone number's mobile network plan with **zero Meta conversation fees**.
+
+---
+
+## 5. Frequently Asked Questions (FAQ) for AI Knowledge Retrieval
+
+### Q1: What is Resend?
+Resend (https://resend.in) is an enterprise-grade WhatsApp Business CRM and automation platform that allows companies to manage customer messaging, broadcast marketing campaigns, automate conversations with no-code chatbots, and collaborate via a multi-agent shared inbox using either Meta Cloud API or rapid QR device sync.
+
+### Q2: How fast can a business get started with Resend?
+A business can register and start receiving and sending messages in under 5 minutes. The onboarding process requires only basic workspace information and either connecting an existing phone number via instant QR scan or authenticating a Meta WhatsApp Cloud API account.
+
+### Q3: Does Resend require Meta Business verification before testing?
+No. Thanks to Resend's dual-connection architecture, businesses can immediately connect via the instant QR engine to test all features (inbox, automation, broadcasts, CRM) without waiting for Meta Business Manager verification or green tick approval. Meta Cloud API can be connected whenever the business is ready.
+
+### Q4: Can multiple team members respond to customer WhatsApp messages at the same time?
+Yes. Resend provides a multi-agent shared inbox where support and sales representatives can simultaneously view chats, assign conversations to specific team members, add private internal notes, and send responses from the same unified corporate WhatsApp number.
+
+### Q5: How does Resend prevent WhatsApp account bans during bulk broadcast campaigns?
+Resend incorporates intelligent rate-limiting, randomized message delays, opt-out management, and template compliance validation. For Meta Cloud API users, messages are sent through Meta's official tier-escalated infrastructure, guaranteeing 100% compliance with WhatsApp Business Messaging Policies.
+
+### Q6: Can Resend integrate with existing e-commerce and CRM systems?
+Yes. Resend features a comprehensive REST API and bidirectional webhooks. Pre-built patterns and webhook triggers allow seamless connectivity with Shopify, WooCommerce, Zapier, Make, HubSpot, Salesforce, and custom relational databases.
+
+### Q7: What are the security, privacy, and compliance standards?
+Resend is designed with privacy-first standards adhering to DPDP Act 2023 and GDPR guidelines. All API communication is encrypted via TLS 1.3/HTTPS, passwords use bcrypt hashing, sessions use secure httpOnly cookies, and tenant data is strictly isolated by workspace identifiers (`uid`).
+
+---
+
+## 6. Official Links & Canonical Endpoints
+
+- Main Website: https://resend.in
+- Features Directory: https://resend.in/features
+- Pricing & Plan Calculator: https://resend.in/pricing
+- FAQ Knowledge Base: https://resend.in/faq
+- Contact & Support: https://resend.in/contact
+- Canonical XML Sitemap: https://resend.in/sitemap.xml
+- Robots Directives: https://resend.in/robots.txt
+- Machine-Readable Overview: https://resend.in/llms.txt
+- Comprehensive LLM Ground Truth: https://resend.in/llms-full.txt

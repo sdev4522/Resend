@@ -12,6 +12,9 @@ export default function robots(): MetadataRoute.Robots {
     '/faq',
     '/privacy',
     '/terms',
+    '/llms.txt',
+    '/llms-full.txt',
+    '/sitemap.xml',
   ];
 
   const privateDisallowedPaths = [
@@ -38,6 +41,12 @@ export default function robots(): MetadataRoute.Robots {
     'Claude-SearchBot',
     'PerplexityBot',
     'Google-Extended',
+    'Applebot',
+    'Applebot-Extended',
+    'Meta-ExternalAgent',
+    'Amazonbot',
+    'cohere-ai',
+    'Bytespider',
   ];
 
   return {

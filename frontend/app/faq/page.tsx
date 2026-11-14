@@ -12,6 +12,16 @@ export const metadata: Metadata = {
   title: 'Frequently Asked Questions — WhatsApp CRM & Cloud API',
   description:
     'Answers to common questions regarding WhatsApp Cloud API integration, multi-agent inbox setup, broadcast deliverability, and SaaS billing.',
+  keywords: [
+    'WhatsApp Business API FAQ',
+    'WhatsApp CRM questions',
+    'Meta WhatsApp Cloud API setup guide',
+    'WhatsApp shared inbox multi-agent',
+    'Meta conversation fees FAQ',
+    'WATI vs Resend',
+    'AiSensy vs Resend',
+    'WhatsApp broadcast rules anti-ban',
+  ],
   alternates: {
     canonical: 'https://resend.in/faq',
   },
@@ -110,6 +120,30 @@ export default function FAQPage() {
             acceptedAnswer: {
               '@type': 'Answer',
               text: 'Billing is transparent and calculated using real-time SaaS rates. You can choose monthly or annual billing directly from your workspace dashboard, and upgrade, downgrade, or cancel your subscription at any time.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How does Resend compare to alternatives like WATI and AiSensy?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Resend provides dual-engine connectivity (Meta Cloud API plus rapid QR pairing), flat transparent subscription pricing with 0% platform markup on Meta conversation fees, an included visual flow builder, and developer-friendly REST APIs and webhooks.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How does Resend protect businesses against WhatsApp account bans during broadcasts?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Resend incorporates automated anti-ban rate limiting, randomized delivery pacing, opt-out management, and template compliance verification. For Meta Cloud API users, messages are sent through Meta official tier-escalated infrastructure in 100% compliance with WhatsApp Business Messaging Policies.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I integrate Resend with Shopify, WooCommerce, or custom CRM systems?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Resend provides bidirectional webhooks and comprehensive HTTP REST APIs that connect with e-commerce platforms, Zapier, Make, HubSpot, and custom backend databases for automated order alerts, abandoned cart recovery, and lead synchronization.',
             },
           },
         ],

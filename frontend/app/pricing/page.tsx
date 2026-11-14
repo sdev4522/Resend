@@ -12,14 +12,24 @@ import { siteConfig } from '@/config/site';
 export const metadata: Metadata = {
   title: 'Pricing — Transparent WhatsApp CRM Plans',
   description:
-    'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
+    'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands with zero message markups.',
+  keywords: [
+    'WhatsApp Business API pricing',
+    'WhatsApp CRM cost',
+    'WhatsApp marketing plans',
+    'Meta conversation pricing 2026',
+    'Free WhatsApp CRM trial',
+    'No credit card WhatsApp trial',
+    'WATI pricing alternative',
+    'AiSensy pricing alternative',
+  ],
   alternates: {
     canonical: 'https://resend.in/pricing',
   },
   openGraph: {
     title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
     description:
-      'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
+      'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands with zero message markups.',
     url: `${siteConfig.url}/pricing`,
     siteName: siteConfig.name,
     images: [
@@ -36,7 +46,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Pricing — Transparent WhatsApp CRM Plans | Resend',
     description:
-      'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands.',
+      'Simple, transparent plans for WhatsApp marketing, shared inbox seats, and automation workflows. Scale as your team expands with zero message markups.',
     images: ['/og.png'],
   },
 };
@@ -65,13 +75,13 @@ export default function PricingPage() {
       {
         '@type': 'Product',
         name: 'Resend Platform Subscription',
-        description: 'WhatsApp CRM, automation, and collaborative multi-agent inbox platform subscription plans',
+        description: 'WhatsApp CRM, automation, and collaborative multi-agent inbox platform subscription plans with 14-day free trial',
         offers: {
           '@type': 'AggregateOffer',
           priceCurrency: 'USD',
-          lowPrice: '6',
+          lowPrice: '0',
           highPrice: '10',
-          offerCount: '2',
+          offerCount: '3',
           availability: 'https://schema.org/InStock',
           url: `${siteConfig.url}/pricing`,
         },

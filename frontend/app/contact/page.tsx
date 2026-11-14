@@ -12,6 +12,12 @@ export const metadata: Metadata = {
   title: 'Contact Sales & Customer Support',
   description:
     'Get in touch with our team for product inquiries, onboarding guidance, or technical assistance with WhatsApp Cloud API integration.',
+  keywords: [
+    'Contact WhatsApp CRM support',
+    'WhatsApp Business API sales inquiry',
+    'WhatsApp onboarding help',
+    'Resend customer support',
+  ],
   alternates: {
     canonical: 'https://resend.in/contact',
   },

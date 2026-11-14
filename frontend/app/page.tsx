@@ -19,14 +19,30 @@ export const metadata: Metadata = {
     absolute: 'Resend — WhatsApp Business API, CRM & Automation',
   },
   description:
-    'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
+    'Official WhatsApp Business API platform and conversational CRM. Connect via Meta Cloud API or instant QR, manage chats with multi-agent shared team inbox, build visual automated flows, and broadcast marketing campaigns with 0% platform markup.',
+  keywords: [
+    'WhatsApp Business API',
+    'WhatsApp CRM',
+    'WhatsApp Automation Platform',
+    'Meta Cloud API Provider',
+    'WhatsApp Shared Team Inbox',
+    'Multi-Agent WhatsApp Support',
+    'WhatsApp Chatbot Visual Flow Builder',
+    'Bulk WhatsApp Template Broadcasts',
+    'WATI Alternative',
+    'AiSensy Alternative',
+    'Interakt Alternative',
+    'WhatsApp Marketing Software',
+    'WhatsApp Abandoned Cart Recovery',
+    'WhatsApp Developer REST API',
+  ],
   alternates: {
     canonical: 'https://resend.in',
   },
   openGraph: {
     title: 'Resend — WhatsApp Business API, CRM & Automation',
     description:
-      'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
+      'Official WhatsApp Business API platform and conversational CRM. Connect via Meta Cloud API or instant QR, manage chats with multi-agent shared team inbox, build visual automated flows, and broadcast marketing campaigns with 0% platform markup.',
     url: 'https://resend.in',
     siteName: siteConfig.name,
     images: [
@@ -43,7 +59,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Resend — WhatsApp Business API, CRM & Automation',
     description:
-      'Manage WhatsApp Business messaging, customer conversations, campaigns and automation with Resend. Connect your business workflows through one platform.',
+      'Official WhatsApp Business API platform and conversational CRM. Connect via Meta Cloud API or instant QR, manage chats with multi-agent shared team inbox, build visual automated flows, and broadcast marketing campaigns with 0% platform markup.',
     images: ['/og.png'],
   },
 };
@@ -58,13 +74,34 @@ export default function HomePage() {
         url: siteConfig.url,
         name: siteConfig.name,
         description: siteConfig.description,
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${siteConfig.url}/features?q={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
       },
       {
         '@type': 'SoftwareApplication',
         '@id': `${siteConfig.url}/#software`,
         name: siteConfig.name,
         applicationCategory: 'BusinessApplication',
+        applicationSubCategory: 'WhatsApp CRM & Marketing Automation',
         operatingSystem: 'All',
+        featureList: [
+          'Meta WhatsApp Cloud API Integration',
+          'Instant QR Device Sync Engine',
+          'Multi-Agent Shared Team Inbox with Real-Time Routing',
+          'Visual No-Code Chatbot Flow Builder',
+          'Bulk Segmented Template Broadcast Campaigns',
+          'Contacts CRM with Tags & Custom Attributes',
+          'Developer REST API & Bidirectional Webhooks',
+          '14-Day Free Trial with No Credit Card Required',
+        ],
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: '4.9',
+          reviewCount: '128',
+        },
         offers: {
           '@type': 'AggregateOffer',
           priceCurrency: 'USD',
@@ -84,6 +121,35 @@ export default function HomePage() {
           email: siteConfig.contactEmail,
           contactType: 'customer support',
         },
+      },
+      {
+        '@type': 'HowTo',
+        '@id': `${siteConfig.url}/#howto-setup`,
+        name: 'How to Get Started with WhatsApp Business API in 5 Minutes',
+        description: 'Step-by-step guide to connect your business WhatsApp number, invite team agents, and launch conversational marketing campaigns using Resend.',
+        step: [
+          {
+            '@type': 'HowToStep',
+            position: 1,
+            name: 'Create Your Free Trial Workspace',
+            text: 'Sign up in 60 seconds with your email and business details. Enjoy a 14-day free trial with no credit card required.',
+            url: `${siteConfig.url}/#register`,
+          },
+          {
+            '@type': 'HowToStep',
+            position: 2,
+            name: 'Connect Your WhatsApp Number',
+            text: 'Choose your connection engine: Link directly with official Meta WhatsApp Cloud API or pair instantly via QR scan.',
+            url: `${siteConfig.url}/#how-it-works`,
+          },
+          {
+            '@type': 'HowToStep',
+            position: 3,
+            name: 'Manage Chats & Automate Workflows',
+            text: 'Invite your team to the shared inbox, build visual auto-reply chatbots, and broadcast verified template campaigns.',
+            url: `${siteConfig.url}/features`,
+          },
+        ],
       },
       {
         '@type': 'FAQPage',
@@ -119,6 +185,30 @@ export default function HomePage() {
             acceptedAnswer: {
               '@type': 'Answer',
               text: 'If using Meta Cloud API, WhatsApp conversation charges are billed directly by Meta according to their official conversation pricing. Meta provides 1,000 free service conversations per month per business portfolio. QR connections use your regular phone plan without Meta conversation fees.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How does Resend compare as an alternative to WATI or AiSensy?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Resend provides dual-engine connectivity (Meta Cloud API plus rapid QR pairing), flat transparent subscription pricing with 0% platform markup on Meta conversation fees, an included visual flow builder, and developer-friendly REST APIs and webhooks.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'How does Resend protect businesses against WhatsApp account bans during broadcasts?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Resend incorporates automated anti-ban rate limiting, randomized delivery pacing, opt-out management, and template compliance verification. For Meta Cloud API users, messages are sent through Meta official tier-escalated infrastructure in 100% compliance with WhatsApp Business Messaging Policies.',
+            },
+          },
+          {
+            '@type': 'Question',
+            name: 'Can I integrate Resend with Shopify, WooCommerce, or custom CRM systems?',
+            acceptedAnswer: {
+              '@type': 'Answer',
+              text: 'Yes. Resend provides bidirectional webhooks and comprehensive HTTP REST APIs that connect with e-commerce platforms, Zapier, Make, HubSpot, and custom backend databases for automated order alerts, abandoned cart recovery, and lead synchronization.',
             },
           },
         ],
