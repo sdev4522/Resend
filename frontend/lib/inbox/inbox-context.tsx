@@ -409,6 +409,7 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
       const cacheKey = accId + ":" + chat.chat_id;
 
       setSelectedConversation(chat);
+      setCountDownTimer(null);
       setSelectedContact(chat.contactData || { name: chat.sender_name, mobile: chat.sender_mobile });
       setIsMobileChatOpen(true);
 
@@ -627,9 +628,8 @@ export function InboxProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      if (data.countDownTimer) {
-        setCountDownTimer(data.countDownTimer);
-      }
+      // Always replace: a chat without incoming messages must not keep the previous chat's timer
+      setCountDownTimer(data.countDownTimer ?? null);
       if (Array.isArray(data.labelsAdded)) {
         setAvailableTags(data.labelsAdded);
       }

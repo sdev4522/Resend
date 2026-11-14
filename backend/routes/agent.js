@@ -54,6 +54,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const ffmpegStatic = require("ffmpeg-static");
 const fs = require("fs");
 const logger = require("../utils/logger.js");
+const { convertOwnedAudio } = require("../helper/audioConvert.js");
 
 // adding agent
 router.post("/add_agent", validateUser, checkPlan, async (req, res) => {
@@ -68,6 +69,10 @@ router.post("/add_agent", validateUser, checkPlan, async (req, res) => {
 
     if (!isValidEmail(email)) {
       return res.json({ msg: "Please enter a valid email" });
+    }
+
+    if (typeof password !== "string" || password.length < 8) {
+      return res.json({ msg: "Password must be at least 8 characters" });
     }
 
     // check if already
@@ -822,137 +827,10 @@ router.post("/return_media_url", validateAgent, async (req, res) => {
 
 router.post("/convert_audio", validateAgent, async (req, res) => {
   try {
-    ffmpeg.setFfmpegPath(ffmpegStatic);
-
-    const { msgId, audioUrl } = req.body;
-
-    if (!audioUrl) {
-      return res.json({ success: false, msg: "Audio URL is required" });
-    }
-
-    // Extract filename from URL (works with any domain)
-    const urlObj = new URL(audioUrl);
-    const pathname = urlObj.pathname;
-    const originalFilename = pathname.split("/").pop(); // Gets last part of path
-    const filenameWithoutExt =
-      originalFilename.substring(0, originalFilename.lastIndexOf(".")) ||
-      originalFilename;
-    const currentExt = originalFilename.substring(
-      originalFilename.lastIndexOf(".") + 1,
-    );
-
-    // Check if already MP3
-    if (currentExt.toLowerCase() === "mp3") {
-      return res.json({
-        success: true,
-        newUrl: audioUrl,
-        msg: "Already in MP3 format",
-      });
-    }
-
-    // Extract the directory from pathname (e.g., /meta-media/)
-    const pathParts = pathname.split("/");
-    pathParts.pop(); // Remove filename
-    const directory = pathParts.join("/").replace(/^\//, ""); // Remove leading slash
-
-    // Define paths
-    const oldFilePath = `${__dirname}/../client/public/${directory}/${originalFilename}`;
-    const newFilename = `${filenameWithoutExt}.mp3`;
-    const newFilePath = `${__dirname}/../client/public/${directory}/${newFilename}`;
-
-    // Check if original file exists
-    if (!fs.existsSync(oldFilePath)) {
-      return res.json({
-        success: false,
-        msg: "Original audio file not found on server",
-      });
-    }
-
-    // Convert audio to MP3 using fluent-ffmpeg
-    await new Promise((resolve, reject) => {
-      ffmpeg(oldFilePath)
-        .noVideo()
-        .audioCodec("libmp3lame")
-        .audioBitrate(128)
-        .audioChannels(2)
-        .audioFrequency(44100)
-        .outputOptions(["-write_xing 0", "-id3v2_version", "3"])
-        .format("mp3")
-        .on("start", (commandLine) => {
-          logger.log("FFmpeg conversion started:", commandLine);
-        })
-        .on("progress", (progress) => {
-          logger.log("Processing: " + (progress.percent || 0) + "% done");
-        })
-        .on("end", () => {
-          logger.log("Audio conversion to MP3 completed successfully");
-          resolve();
-        })
-        .on("error", (err) => {
-          logger.error("FFmpeg conversion error:", err);
-          reject(err);
-        })
-        .save(newFilePath);
-    });
-
-    // Verify the converted file exists and has content
-    if (!fs.existsSync(newFilePath) || fs.statSync(newFilePath).size === 0) {
-      return res.json({
-        success: false,
-        msg: "Conversion produced empty or missing file",
-      });
-    }
-
-    // Update database with new URL
-    // scoped to the agent's workspace (was: any message id)
-    const getMsg = await prisma.beta_conversation.findFirst({
-      where: { id: idParam(msgId), uid: whereStr(req.owner?.uid) },
-    });
-
-    if (getMsg) {
-      const msgCon = getMsg?.msgContext ? JSON.parse(getMsg.msgContext) : {};
-      const newUrl = `${urlObj.origin}/${directory}/${newFilename}`;
-
-      const updatedMsgCon = {
-        ...msgCon,
-        type: "audio",
-        audio: {
-          ...msgCon.audio,
-          link: newUrl,
-        },
-      };
-
-      await prisma.beta_conversation.update({
-        where: { id: getMsg.id },
-        data: { msgContext: JSON.stringify(updatedMsgCon) },
-      });
-
-      logger.log("Database updated with new MP3 URL");
-    }
-
-    // Delete old file (non-MP3)
-    if (fs.existsSync(oldFilePath)) {
-      fs.unlinkSync(oldFilePath);
-      logger.log("Old audio file deleted:", originalFilename);
-    }
-
-    // Construct new URL
-    const newUrl = `${urlObj.origin}/${directory}/${newFilename}`;
-
-    res.json({
-      success: true,
-      newUrl,
-      oldFile: originalFilename,
-      newFile: newFilename,
-      msg: "Audio converted to MP3 successfully",
-    });
+    res.json(await convertOwnedAudio(req.owner?.uid, req.body || {}));
   } catch (err) {
     logger.error("Audio conversion error:", err);
-    res.json({
-      success: false,
-      msg: "Something went wrong during conversion",
-      err: err.message,
-    });
+    res.json({ success: false, msg: "Something went wrong during conversion" });
   }
 });
 

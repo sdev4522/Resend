@@ -80,7 +80,16 @@ async function verifyMetaSignature(req) {
   const [web] = plain(await prisma.web_private.findMany({ select: { embed_app_sec: true }, take: 1 }));
   const secret = web?.embed_app_sec || process.env.META_APP_SECRET;
 
-  if (signature && secret) {
+  if (!secret) {
+    // Fail closed: unsigned webhooks could forge messages/statuses for any uid
+    logger.error("[Meta Webhook] Meta App Secret not configured; rejecting webhook");
+    return { valid: false, reason: "App secret not configured" };
+  }
+  if (!signature) {
+    return { valid: false, reason: "Missing x-hub-signature-256" };
+  }
+
+  {
     const payload = req.rawBody || JSON.stringify(req.body);
     const expectedSig =
       "sha256=" +
@@ -95,8 +104,6 @@ async function verifyMetaSignature(req) {
     ) {
       return { valid: false, reason: "Signature mismatch" };
     }
-  } else if (!secret) {
-    logger.warn("[Meta Webhook] Meta App Secret not configured, bypassing signature check");
   }
 
   return { valid: true };

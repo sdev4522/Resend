@@ -72,7 +72,7 @@ const KNOWLEDGE_ARTICLES = [
     title: 'Configuring Interactive Flow Chatbots',
     category: 'Automation',
     summary: 'Build conversational decision trees and multi-step customer qualification flows.',
-    link: '/dashboard/flows',
+    link: '/dashboard/automation',
   },
   {
     title: 'Developer REST API Authentication',

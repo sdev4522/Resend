@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from "react";
+import { isServiceWindowOpen } from "@/types/inbox";
 import { useInbox } from "@/lib/inbox/inbox-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -108,7 +109,7 @@ export function ContactDetailPanel({ isMobileSheet = false }: { isMobileSheet?: 
         </div>
 
         {/* 24-hr Session Window Indicator */}
-        {countDownTimer && countDownTimer.timestamp && (
+        {isServiceWindowOpen(countDownTimer) && (
           <div className="p-3 rounded-xl border bg-success/5 border-success/20 space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-success">
               <Clock className="h-3.5 w-3.5" />

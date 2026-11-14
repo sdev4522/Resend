@@ -38,9 +38,13 @@ router.post("/insert_flow", validateUser, checkPlan, async (req, res) => {
 
     // checking with the same id
     const [cehckId] = plain(await prisma.wa_call_flows.findMany({ where: { flow_id: whereStr(flow_id) } }));
+    if (cehckId && cehckId.uid !== req.decode.uid) {
+      // flow_id belongs to another workspace: never overwrite it
+      return res.json({ success: false, msg: "Flow not found" });
+    }
     if (cehckId) {
       await prisma.wa_call_flows.updateMany({
-        where: { flow_id: whereStr(flow_id) },
+        where: { flow_id: whereStr(flow_id), uid: whereStr(req.decode.uid) },
         data: { name: str(name), data: str(JSON.stringify(data)), source: str(source) },
       });
 
@@ -557,69 +561,6 @@ router.post("/delete_broadcast", validateUser, checkPlan, async (req, res) => {
 });
 
 // Update contact status (called by webhook)
-router.post("/update_broadcast_contact", async (req, res) => {
-  try {
-    const { campaignId, contactMobile, updates } = req.body;
-
-    const [broadcast] = plain(await prisma.wa_call_broadcasts.findMany({ where: { campaign_id: whereStr(campaignId) } }));
-
-    if (!broadcast) {
-      return res.json({ success: false, msg: "Broadcast not found" });
-    }
-
-    const contacts = JSON.parse(broadcast.contacts || "[]");
-    const contactIndex = contacts.findIndex((c) => c.mobile === contactMobile);
-
-    if (contactIndex === -1) {
-      return res.json({ success: false, msg: "Contact not found" });
-    }
-
-    // Update contact
-    contacts[contactIndex] = {
-      ...contacts[contactIndex],
-      ...updates,
-    };
-
-    // Update statistics
-    let statsUpdate = {};
-
-    if (updates.permission_status === "requested") {
-      statsUpdate.permission_requested = broadcast.permission_requested + 1;
-    }
-    if (updates.permission_status === "granted") {
-      statsUpdate.permission_granted = broadcast.permission_granted + 1;
-    }
-    if (updates.permission_status === "denied") {
-      statsUpdate.permission_denied = broadcast.permission_denied + 1;
-    }
-    if (updates.call_status === "ringing") {
-      statsUpdate.calls_initiated = broadcast.calls_initiated + 1;
-    }
-    if (updates.call_status === "completed") {
-      statsUpdate.calls_completed = broadcast.calls_completed + 1;
-    }
-    if (updates.call_status === "failed") {
-      statsUpdate.calls_failed = broadcast.calls_failed + 1;
-    }
-
-    // statsUpdate only ever holds the integer counter columns set above
-    const data = { contacts: JSON.stringify(contacts) };
-    Object.keys(statsUpdate).forEach((key) => {
-      data[key] = intOrNull(statsUpdate[key]) ?? 0;
-    });
-
-    await prisma.wa_call_broadcasts.updateMany({
-      where: { campaign_id: whereStr(campaignId) },
-      data,
-    });
-
-    res.json({ success: true, msg: "Contact updated" });
-  } catch (err) {
-    logger.error("Error updating contact:", err);
-    res.json({ success: false, msg: "Failed to update contact" });
-  }
-});
-
 // Single endpoint - Check and Enable in ONE request
 router.post(
   "/check_and_enable_call_permission",

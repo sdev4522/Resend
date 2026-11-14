@@ -1,6 +1,7 @@
 'use client';
 
 import React from "react";
+import { isServiceWindowOpen } from "@/types/inbox";
 import { useInbox } from "@/lib/inbox/inbox-context";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -84,7 +85,7 @@ export function ConversationHeader() {
         </div>
 
         {/* 24-hr Window status if available */}
-        {countDownTimer && countDownTimer.timestamp && (
+        {isServiceWindowOpen(countDownTimer) && (
           <div
             className="hidden sm:flex items-center gap-1 text-xs text-success bg-success/10 border border-success/20 px-2 py-0.5 rounded-md font-mono"
             title="Active 24-hour customer messaging window"

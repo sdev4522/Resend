@@ -14,6 +14,7 @@ const { aiTransferHandler } = require("./useAITransferHandler");
 const FormData = require("form-data");
 const {} = require("../helper/addon/telegram/processTelegramInbox");
 const logger = require("../utils/logger");
+const { resolveUserPlan, getLimit, getUsage } = require("../helper/entitlements");
 const googleServices = require("../automation/googleServices");
 
 async function processGoogleService({
@@ -3196,24 +3197,38 @@ async function processPhonebookManager({
             `✅ PhonebookManager: updated ${resolvedMobile} in "${phonebook.name}"`,
           );
         } else {
-          // Insert fresh — same columns your existing routes use
-          await prisma.contact.create({
-            data: {
-              uid: str(uid),
-              phonebook_id: str(phonebook.id),
-              phonebook_name: str(phonebook.name),
-              name: str(resolvedName),
-              mobile: str(resolvedMobile),
-              var1: str(resolvedVar1),
-              var2: str(resolvedVar2),
-              var3: str(resolvedVar3),
-              var4: str(resolvedVar4),
-              var5: str(resolvedVar5),
-            },
+          // Enforce the plan contact limit (routes do this via checkContactLimit)
+          const owner = await prisma.user.findFirst({
+            where: { uid: whereStr(uid) },
+            select: { plan: true, plan_expire: true },
           });
-          logger.log(
-            `✅ PhonebookManager: added ${resolvedMobile} to "${phonebook.name}"`,
-          );
+          const { plan: ownerPlan } = await resolveUserPlan(owner);
+          const contactLimit = getLimit(ownerPlan, "contacts");
+          const contactCount = await getUsage(uid, "contacts");
+          if (contactCount >= contactLimit) {
+            logger.log(
+              `⚠️ PhonebookManager: contact limit reached for ${uid} (${contactCount}/${contactLimit}); skipped ${resolvedMobile}`,
+            );
+          } else {
+            // Insert fresh — same columns your existing routes use
+            await prisma.contact.create({
+              data: {
+                uid: str(uid),
+                phonebook_id: str(phonebook.id),
+                phonebook_name: str(phonebook.name),
+                name: str(resolvedName),
+                mobile: str(resolvedMobile),
+                var1: str(resolvedVar1),
+                var2: str(resolvedVar2),
+                var3: str(resolvedVar3),
+                var4: str(resolvedVar4),
+                var5: str(resolvedVar5),
+              },
+            });
+            logger.log(
+              `✅ PhonebookManager: added ${resolvedMobile} to "${phonebook.name}"`,
+            );
+          }
         }
       }
     } else if (action === "remove") {

@@ -254,6 +254,16 @@ router.post(
         }
       }
 
+      // ── Template must be APPROVED on Meta ─────────────────
+      const approval = await checkTemplateApproved(
+        req.decode.uid,
+        template_name,
+        template_language,
+      );
+      if (!approval.ok) {
+        return res.json({ success: false, msg: approval.msg });
+      }
+
       // ── Get phonebook ─────────────────────────────────────
       const phonebooks = await query(
         "SELECT * FROM phonebook WHERE id = ? AND uid = ?",
@@ -926,5 +936,48 @@ router.post("/del_campaign", validateUser, async (req, res) => {
     });
   }
 });
+
+// Meta rejects unapproved templates per message; catch it before queueing.
+// Only a definite non-APPROVED answer blocks; a Meta/network error does not.
+async function checkTemplateApproved(uid, name, language) {
+  try {
+    const [meta] = await query(
+      `SELECT waba_id, access_token FROM meta_api WHERE uid = ? LIMIT 1`,
+      [uid],
+    );
+    if (!meta?.waba_id || !meta?.access_token) {
+      return { ok: false, msg: "We could not find your meta API keys" };
+    }
+    const url = `https://graph.facebook.com/v21.0/${encodeURIComponent(
+      meta.waba_id,
+    )}/message_templates?name=${encodeURIComponent(
+      name,
+    )}&fields=name,status,language&limit=50`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${meta.access_token}` },
+    });
+    const body = await resp.json();
+    if (!resp.ok || !Array.isArray(body?.data)) {
+      logger.warn("[campaign] template status check failed:", body?.error?.message);
+      return { ok: true };
+    }
+    const match = body.data.find(
+      (t) => t.name === name && (!language || t.language === language),
+    );
+    if (!match) {
+      return { ok: false, msg: `Template "${name}" was not found on Meta` };
+    }
+    if (match.status !== "APPROVED") {
+      return {
+        ok: false,
+        msg: `Template "${name}" is ${match.status}. Only APPROVED templates can be used in campaigns.`,
+      };
+    }
+    return { ok: true };
+  } catch (err) {
+    logger.warn("[campaign] template status check error:", err.message);
+    return { ok: true };
+  }
+}
 
 module.exports = router;

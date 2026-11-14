@@ -70,6 +70,14 @@ export interface CountDownTimer {
   timezone: string;
 }
 
+/** True while the last incoming message is less than 24h old (Meta service window). */
+export function isServiceWindowOpen(timer: CountDownTimer | null | undefined, now = Date.now()): boolean {
+  const raw = Number(timer?.timestamp);
+  if (!Number.isFinite(raw) || raw <= 0) return false;
+  const ms = raw < 1e12 ? raw * 1000 : raw; // backend stores unix seconds
+  return now - ms < 24 * 60 * 60 * 1000;
+}
+
 export interface ChatTagItem {
   id: number;
   uid: string;

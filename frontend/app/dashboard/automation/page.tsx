@@ -14,8 +14,8 @@ export default function AutomationPage() {
   return (
     <div className="space-y-6">
       <DashboardPageHeader
-        title="Chatbot rules"
-        description="Auto-replies, keyword routing and chatbot workflows."
+        title="Chatbots & flows"
+        description="Visual conversation flows, auto-replies and keyword routing."
         breadcrumbs={[{ title: 'Automation' }]}
       />
 
