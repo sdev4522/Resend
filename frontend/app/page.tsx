@@ -97,7 +97,7 @@ export default async function HomePage() {
           'Bulk Segmented Template Broadcast Campaigns',
           'Contacts CRM with Tags & Custom Attributes',
           'Developer REST API & Bidirectional Webhooks',
-          '14-Day Free Trial with No Credit Card Required',
+          '7-Day Free Trial with No Credit Card Required',
         ],
         // Prices come from the live plan table; omitted if plans couldn't be loaded
         ...(planOffers ? { offers: toAggregateOffer(planOffers) } : {}),
@@ -124,7 +124,7 @@ export default async function HomePage() {
             '@type': 'HowToStep',
             position: 1,
             name: 'Create Your Free Trial Workspace',
-            text: 'Sign up in 60 seconds with your email and business details. Enjoy a 14-day free trial with no credit card required.',
+            text: 'Sign up in 60 seconds with your email and business details. Then claim a 7-day free trial from your dashboard, no credit card required.',
             url: `${siteConfig.url}/#register`,
           },
           {

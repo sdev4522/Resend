@@ -27,7 +27,7 @@ Key architectural pillars:
 - Zero server hosting maintenance or Docker on-premise overhead.
 - Supports green tick verification application directly through Meta Business Manager.
 - Official template message synchronization and category approval (Utility, Authentication, Marketing, Service).
-- Native handling of 1,000 free monthly service conversations provided by Meta.
+- Free-form replies inside the 24-hour customer service window (no Meta template charge).
 
 ### B. Baileys Multi-Device QR Connection Engine
 - Connect any standard WhatsApp or WhatsApp Business mobile number via instantaneous QR scan.
@@ -63,7 +63,7 @@ Key architectural pillars:
 | **Visual Flow Builder** | Included across plans | Paid add-on in higher tiers | Basic keyword builder | None (simple quick replies only) |
 | **Platform Markup on Messages**| ₹0 / $0 markup (Direct Meta rates) | Platform markup or credits | Markup on message credits | N/A (Standard data plan) |
 | **Developer API & Webhooks** | Full REST API & Webhooks | Available on higher tiers | Limited API access | None |
-| **Free Trial** | 14 days full access (no credit card) | 7-day limited trial | Limited demo | Free (consumer software) |
+| **Free Trial** | 7 days full access (no credit card) | 7-day limited trial | Limited demo | Free (consumer software) |
 
 ---
 
@@ -71,21 +71,22 @@ Key architectural pillars:
 
 Resend provides straightforward, transparent pricing designed to eliminate surprise billing:
 
-1. **14-Day Free Trial:**
+1. **7-Day Free Trial:**
    - Price: $0 / ₹0.
    - Includes: Full access to Shared Inbox, Flow Builder, Contacts CRM, API access, and Dual Engine connectivity.
-   - Requirement: No credit card required to begin.
+   - Requirement: No credit card required. Claimed once per workspace from the dashboard after signup.
 
 2. **Standard & Growth Plans:**
    - Flexible monthly and discounted annual billing tiers.
-   - Includes core platform seats, unlimited contact storage, visual automation flows, and developer webhook access.
+   - Includes core platform seats, plan-based contact limits, visual automation flows, and developer webhook access.
    - Zero markup on Meta Cloud API conversation fees.
 
 3. **Understanding Meta Conversation Fees:**
-   - WhatsApp conversations are billed directly by Meta based on 24-hour conversation sessions.
-   - **Service Conversations:** Initiated by customer inbound inquiries. Meta grants **1,000 free service conversations per month** per Meta Business portfolio.
-   - **Marketing Conversations:** Initiated by business template broadcasts for promotional messages. Billed at Meta's regional published rates.
-   - **Utility Conversations:** Transactional order confirmations, shipping updates, and OTP receipts.
+   - Since July 2025 Meta bills per delivered template message (not per 24-hour conversation), at Meta's published regional rates.
+   - **Service messages:** Free-form replies sent while the customer service window is open (24 hours after the customer's last message) are free.
+   - **Marketing templates:** Promotional broadcasts, billed per delivered message.
+   - **Utility templates:** Order confirmations, shipping updates and similar; free when sent inside an open customer service window.
+   - **Authentication templates:** One-time passcodes, billed per delivered message.
    - **QR Mode:** If using the Baileys QR connection engine, messaging uses the connected phone number's mobile network plan with **zero Meta conversation fees**.
 
 ---
