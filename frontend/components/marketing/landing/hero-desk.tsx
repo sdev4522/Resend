@@ -4,7 +4,9 @@ import { useCallback, useLayoutEffect, useRef } from 'react';
 import { gsap } from 'gsap';
 import { BarChart3, Bot, Clock3, Inbox, Megaphone, RotateCcw, Users } from 'lucide-react';
 import { useAuthDialog } from '@/components/auth/auth-dialog-context';
+import { FaMeta, FaWhatsapp } from 'react-icons/fa6';
 import { CountUp } from './reveal-text';
+import { ResendMark } from './landing-nav';
 
 /* ---------------------------------------------------------------------------
  * Hero: centred headline over soft gradient light, then a product window where
@@ -59,6 +61,65 @@ function FloatCard({ className, children }: { className: string; children: React
       className={`lp-fc absolute z-10 hidden rounded-2xl border border-white/70 bg-white/85 p-3.5 shadow-[var(--lp-shadow)] backdrop-blur-md lg:block dark:border-white/10 dark:bg-[var(--lp-raised)]/85 ${className}`}
     >
       {children}
+    </div>
+  );
+}
+
+// Initials only: no stock faces standing in for customers
+const customers = [
+  { i: 'AS', c: '#0f8a6c' },
+  { i: 'MK', c: '#5b49d6' },
+  { i: 'RJ', c: '#c2410c' },
+  { i: 'NP', c: '#17689a' },
+  { i: 'VG', c: '#9a5c06' },
+];
+
+function TrustStrip() {
+  return (
+    <div className="lp-hero-copy mt-10 flex flex-col items-center gap-5">
+      <p className="flex items-center gap-3 text-[var(--lp-ink)]" aria-label="Resend, built on Meta">
+        <span className="flex items-center gap-2">
+          <ResendMark className="h-7 w-7 text-primary" />
+          <span className="lp-section-title text-xl">Resend</span>
+        </span>
+        <span aria-hidden="true" className="text-lg text-[var(--lp-mute)]">
+          &times;
+        </span>
+        <span className="flex items-center gap-1.5">
+          <FaMeta aria-hidden="true" className="h-7 w-7 text-[#0668E1]" />
+          <span className="text-xl font-semibold tracking-tight">Meta</span>
+        </span>
+      </p>
+
+      <div className="flex items-center gap-3">
+        <div className="flex" aria-hidden="true">
+          {customers.map((a, i) => (
+            <span
+              key={a.i}
+              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--lp-paper)] text-xs font-semibold text-white"
+              style={{ backgroundColor: a.c, marginLeft: i ? -10 : 0 }}
+            >
+              {a.i}
+            </span>
+          ))}
+        </div>
+        <p className="text-left text-[15px] leading-tight text-[var(--lp-mute)]">
+          Trusted by <span className="font-semibold text-[var(--lp-ink)]">100+ businesses</span>
+          <br />
+          across India
+        </p>
+      </div>
+
+      <ul className="flex flex-wrap justify-center gap-2.5">
+        <li className="inline-flex items-center gap-2 rounded-full border border-[var(--lp-line)] bg-white/70 px-4 py-2 text-sm font-medium text-[var(--lp-ink)] backdrop-blur dark:bg-white/5">
+          <FaWhatsapp aria-hidden="true" className="h-[18px] w-[18px] text-[#25D366]" />
+          Powered by Official WhatsApp Business API
+        </li>
+        <li className="inline-flex items-center gap-2 rounded-full border border-[var(--lp-line)] bg-white/70 px-4 py-2 text-sm font-medium text-[var(--lp-ink)] backdrop-blur dark:bg-white/5">
+          <FaMeta aria-hidden="true" className="h-[18px] w-[18px] text-[#0668E1]" />
+          Meta Tech Provider
+        </li>
+      </ul>
     </div>
   );
 }
@@ -216,6 +277,7 @@ export function HeroDesk() {
             </a>
           </div>
           <p className="lp-hero-copy mt-4 text-sm text-[var(--lp-mute)]">Free trial. No card needed.</p>
+          <TrustStrip />
         </div>
 
         {/* Product window with floating cards */}
