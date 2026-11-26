@@ -76,7 +76,7 @@ const customers = [
 
 function TrustStrip() {
   return (
-    <div className="lp-hero-copy mt-10 flex flex-col items-center gap-5">
+    <div className="lp-hero-copy flex flex-col items-center gap-5">
       <p className="flex items-center gap-3 text-[var(--lp-ink)]" aria-label="Resend, built on Meta">
         <span className="flex items-center gap-2">
           <ResendMark className="h-7 w-7 text-primary" />
@@ -212,14 +212,11 @@ export function HeroDesk() {
       <div className="mx-auto max-w-7xl px-4 pb-24 pt-14 sm:px-6 md:pt-20 lg:px-8">
         {/* Copy */}
         <div className="mx-auto max-w-3xl text-center">
-          <p className="lp-hero-copy inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-3.5 py-1.5 text-[13px] font-medium text-[var(--lp-ink)] shadow-[var(--lp-shadow)] backdrop-blur dark:border-white/10 dark:bg-white/5">
-            <span className="h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
-            QR scan or official Cloud API, in one inbox
-          </p>
+          <TrustStrip />
           <h1
             id="lp-hero-title"
             aria-label="Get WhatsApp Business API in 5 minutes"
-            className="lp-display mt-6 text-[clamp(2.6rem,6.4vw,5rem)] text-[var(--lp-ink)]"
+            className="lp-display mt-9 text-[clamp(2.6rem,6.4vw,5rem)] text-[var(--lp-ink)]"
           >
             <span aria-hidden="true" className="block">
               {['Get', 'WhatsApp', 'Business', 'API'].map((w) => (
@@ -277,7 +274,6 @@ export function HeroDesk() {
             </a>
           </div>
           <p className="lp-hero-copy mt-4 text-sm text-[var(--lp-mute)]">Free trial. No card needed.</p>
-          <TrustStrip />
         </div>
 
         {/* Product window with floating cards */}
