@@ -65,14 +65,8 @@ function FloatCard({ className, children }: { className: string; children: React
   );
 }
 
-// Initials only: no stock faces standing in for customers
-const customers = [
-  { i: 'AS', c: '#0f8a6c' },
-  { i: 'MK', c: '#5b49d6' },
-  { i: 'RJ', c: '#c2410c' },
-  { i: 'NP', c: '#17689a' },
-  { i: 'VG', c: '#9a5c06' },
-];
+// AI-generated faces (no real person), served locally: /public/landing/customer-N.webp
+const customers = [1, 2, 3, 4, 5].map((n) => `/landing/customer-${n}.webp`);
 
 function TrustStrip() {
   return (
@@ -93,14 +87,18 @@ function TrustStrip() {
 
       <div className="flex items-center gap-3">
         <div className="flex" aria-hidden="true">
-          {customers.map((a, i) => (
-            <span
-              key={a.i}
-              className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--lp-paper)] text-xs font-semibold text-white"
-              style={{ backgroundColor: a.c, marginLeft: i ? -10 : 0 }}
-            >
-              {a.i}
-            </span>
+          {customers.map((src, i) => (
+            // eslint-disable-next-line @next/next/no-img-element -- 2 KB fixed-size avatars
+            <img
+              key={src}
+              src={src}
+              alt=""
+              width={40}
+              height={40}
+              decoding="async"
+              className="h-10 w-10 rounded-full border-2 border-[var(--lp-paper)] bg-[var(--lp-sunk)] object-cover"
+              style={{ marginLeft: i ? -10 : 0 }}
+            />
           ))}
         </div>
         <p className="text-left text-[15px] leading-tight text-[var(--lp-mute)]">
